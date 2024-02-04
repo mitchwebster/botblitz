@@ -2,7 +2,7 @@
 
 ### Background
 
-We are likely to lose motivation on this project.  I think the best way for this project to stay interesting, is if we can use some form of what we are building almost immediately.  What version of this can be put into immediate use by us with very little upfront engineering work?  The purpose of this doc is to describe that.
+We are likely to lose motivation on this project.  I think the best way for this project to stay interesting, is if we can use some form of what we are building almost immediately.  The purpose of this doc is to describe the MVP version of Bot Blitzer which we can start playing immediately, competing in algorithmic fantasy sports play.
 
 ### Approach
 
