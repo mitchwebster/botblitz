@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+service AgentService{
+    rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
+}
+
+message FantasyLandscape{
+    LeagueSettings settings = 1;
+    FantasyTeam botTeam = 2;
+    repeated Player players = 3;
+    /* TODO historical / statistical data */
+}
+
+message FantasySelections{
+    repeated PlayerSlot slots = 1;
+}
+
+message FantasyTeam{
+    int32 id = 1;
+    string name = 2;
+    string owner = 3;
+}
+
+message LeagueSettings{
+    int32 numTeams = 1;
+    repeated PlayerSlot slotsPerTeam = 2;
+    /* scoring, budgets, etc. */
+}
+
+message PlayerSlot{
+    string name = 1;
+    bool canBeEmpty = 2;
+    repeated string allowedPlayerPositions = 4;
+    optional int32 assignedPlayerId = 3;
+}
+
+enum PlayerStatus {
+    PLAYER_STATUS_ACTIVE = 0;
+    PLAYER_STATUS_QUESTIONABLE = 1;
+    PLAYER_STATUS_OUT = 2;
+}
+
+message Player{
+    int32 id = 1;
+    string name = 2;
+    repeated string allowedPositions = 3;
+    string team = 4; /* professional team, not fantasy team */
+    PlayerStatus status = 5;
+    optional int32 fantasyTeamId = 6; /* 0 should be unassigned */
+}
