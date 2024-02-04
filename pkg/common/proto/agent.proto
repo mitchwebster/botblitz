@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/protocolbuffers/mitchwebster/botblitz/common";
+option go_package = ".;pb";
 
 service AgentService{
     rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
