@@ -1,0 +1,6 @@
+go 1.21.3
+
+use (
+	./pkg/agent-runner
+	./pkg/common
+)
