@@ -24,7 +24,7 @@ And they are asked to response with whether they'd like to take the best
 ```json 
 {
     "reason": "", \\ displayed but otherwise unused
-    "response": "YES", \\ one of YES,NO,SKIP
+    "quantity": -4.0,  \\ zero indicates a "skip", negative indicates a "No" bet of a specified magnitude, positive indicates a "Yes" bet; invalid if wagering an amount outside of the user's current wallet
 }
 ```
 
