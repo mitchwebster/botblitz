@@ -1,14 +1,18 @@
 syntax = "proto3";
 
+option go_package = "github.com/protocolbuffers/mitchwebster/botblitz/common";
+
 service AgentService{
     rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
 }
 
 message FantasyLandscape{
-    LeagueSettings settings = 1;
-    FantasyTeam botTeam = 2;
-    repeated Player players = 3;
+    int32 matchNumber = 1;
+    LeagueSettings settings = 2;
+    FantasyTeam botTeam = 3;
+    repeated Player players = 4;
     /* TODO historical / statistical data */
+    /* TODO competition lineups */
 }
 
 message FantasySelections{
@@ -16,7 +20,7 @@ message FantasySelections{
 }
 
 message FantasyTeam{
-    int32 id = 1;
+    string id = 1;
     string name = 2;
     string owner = 3;
 }
@@ -31,7 +35,7 @@ message PlayerSlot{
     string name = 1;
     bool canBeEmpty = 2;
     repeated string allowedPlayerPositions = 4;
-    optional int32 assignedPlayerId = 3;
+    optional string assignedPlayerId = 3;
 }
 
 enum PlayerStatus {
@@ -41,8 +45,8 @@ enum PlayerStatus {
 }
 
 message Player{
-    int32 id = 1;
-    string name = 2;
+    string id = 1;
+    string fullName = 2;
     repeated string allowedPositions = 3;
     string team = 4; /* professional team, not fantasy team */
     PlayerStatus status = 5;
