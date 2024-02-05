@@ -38,17 +38,11 @@ message PlayerSlot{
     optional string assignedPlayerId = 3;
 }
 
-enum PlayerStatus {
-    PLAYER_STATUS_ACTIVE = 0;
-    PLAYER_STATUS_QUESTIONABLE = 1;
-    PLAYER_STATUS_OUT = 2;
-}
-
 message Player{
     string id = 1;
     string fullName = 2;
     repeated string allowedPositions = 3;
     string team = 4; /* professional team, not fantasy team */
-    PlayerStatus status = 5;
+    string status = 5;
     optional int32 fantasyTeamId = 6; /* 0 should be unassigned */
 }
