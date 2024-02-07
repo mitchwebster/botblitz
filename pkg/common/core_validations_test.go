@@ -10,14 +10,13 @@ func TestLandscapeValidations(t *testing.T) {
 
 	team := &pb.FantasyTeam{
 		Id:    "001",
-		Name:  "Test Team",
-		Owner: "test@test.com",
+		Name:  "Vulcan Paradise",
+		Owner: "mrspock@trek.com",
 	}
 
 	qbSlot := &pb.PlayerSlot{
-		Name:                   "QB",
-		CanBeEmpty:             false,
-		AllowedPlayerPositions: []string{"QB"},
+		Name:                   "Captain",
+		AllowedPlayerPositions: []string{"Captain"},
 	}
 
 	settings := &pb.LeagueSettings{
