@@ -14,6 +14,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Check starting Go version
+      run: go version
+
     - name: Update apt-get
       run: sudo apt-get update
 
