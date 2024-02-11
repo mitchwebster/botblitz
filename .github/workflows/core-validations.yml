@@ -39,13 +39,13 @@ jobs:
       run: export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
     - name: Use profile
-      run: source ~/.profile
-
-    - name: Install protoc
-      run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
+      run: source ~/.bashrc
 
     - name: Check go version
       run: go version
+
+    - name: Install protoc
+      run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
 
     - name: Check protoc version
       run: protoc --version
