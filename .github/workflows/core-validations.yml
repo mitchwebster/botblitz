@@ -1,0 +1,24 @@
+name: Core BotBlitz Validations
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Clean generated proto
+      run: make clean
+
+    - name: Generate proto
+      run: make gen
+
+    - name: Test Monorepo
+      run: make test
