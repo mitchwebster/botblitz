@@ -1,0 +1,37 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  schedule:
+    # 4PM (PT) daily
+    - cron:  '0 23 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DB: ${{ secrets.DB }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v1
+      with:
+        python-version: "3.8"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f nba-bets/requirements.txt ]; then pip install -r nba-bets/requirements.txt; fi
+    - name: Download Database
+      run: python nba-bets/download-game-logs.py
+    - name: Settle Past Bets
+      run: python nba-bets/settle-bets.py
+    - name: Download New Bet
+      run: python nba-bets/download-bet.py
+    - uses: stefanzweifel/git-auto-commit-action@v5
