@@ -17,6 +17,9 @@ jobs:
     - name: Install protoc
       run: sudo apt-get install -y protobuf-compiler
 
+    - name: Check protoc version
+      run: protoc --version
+
     - name: Clean generated proto
       run: make clean
 
