@@ -7,12 +7,23 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  buildAndTest:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Setup Go 1.21
+      run: >
+        sudo apt-get update
+        wget https://go.dev/dl/go1.21.7.linux-amd64.tar.gz
+        sudo tar -xvf go1.21.7.linux-amd64.tar.gz
+        sudo mv go /usr/local
+        export GOROOT=/usr/local/go
+        export GOPATH=$HOME/go
+        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+        source ~/.profile
 
     - name: Install protoc
       run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
