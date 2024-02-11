@@ -34,7 +34,7 @@ message LeagueSettings {
 message PlayerSlot {
     string name = 1;
     repeated string allowed_player_positions = 2;
-    optional string assigned_player_id = 3;
+    string assigned_player_id = 3;
 }
 
 message Player {
@@ -43,5 +43,5 @@ message Player {
     repeated string allowed_positions = 3;
     string professional_team = 4;
     string status = 5;
-    optional uint32 fantasy_team_id = 6; /* 0 should be unassigned */
+    uint32 fantasy_team_id = 6; /* 0 should be unassigned */
 }
