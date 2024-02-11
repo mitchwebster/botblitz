@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+option go_package = ".;pb";
+
+service AgentService {
+    rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
+}
+
+message FantasyLandscape {
+    uint32 match_number = 1;
+    LeagueSettings settings = 2;
+    FantasyTeam bot_team = 3;
+    repeated Player players = 4;
+    /* TODO historical / statistical data */
+    /* TODO competition lineups */
+}
+
+message FantasySelections {
+    repeated PlayerSlot slots = 1;
+}
+
+message FantasyTeam {
+    string id = 1;
+    string name = 2;
+    string owner = 3;
+}
+
+message LeagueSettings {
+    uint32 num_teams = 1;
+    repeated PlayerSlot slots_per_team = 2;
+    /* scoring, budgets, etc. */
+}
+
+message PlayerSlot {
+    string name = 1;
+    repeated string allowed_player_positions = 2;
+    optional string assigned_player_id = 3;
+}
+
+message Player {
+    string id = 1;
+    string full_name = 2;
+    repeated string allowed_positions = 3;
+    string professional_team = 4;
+    string status = 5;
+    optional uint32 fantasy_team_id = 6; /* 0 should be unassigned */
+}
