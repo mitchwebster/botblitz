@@ -32,6 +32,9 @@ jobs:
     - name: Update GO root
       run: export GOROOT=/usr/local/go
 
+    - name: debug print $HOME
+      run: echo $HOME
+
     - name: Update GO PATH
       run: export GOPATH=$HOME/go
 
