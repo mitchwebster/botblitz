@@ -14,16 +14,29 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Setup Go 1.21
-      run: >
-        sudo apt-get update
-        wget https://go.dev/dl/go1.21.7.linux-amd64.tar.gz
-        sudo tar -xvf go1.21.7.linux-amd64.tar.gz
-        sudo mv go /usr/local
-        export GOROOT=/usr/local/go
-        export GOPATH=$HOME/go
-        export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-        source ~/.profile
+    - name: Update apt-get
+      run: sudo apt-get update
+
+    - name: Download go package 
+      run: wget https://go.dev/dl/go1.21.7.linux-amd64.tar.gz
+
+    - name: Extract tar
+      run: sudo tar -xvf go1.21.7.linux-amd64.tar.gz
+
+    - name: Move to user local
+      run: sudo mv go /usr/local
+
+    - name: Update GO root
+      run: export GOROOT=/usr/local/go
+
+    - name: Update GO PATH
+      run: export GOPATH=$HOME/go
+
+    - name: Update PATH
+      run: export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+
+    - name: Use profile
+      run: source ~/.profile
 
     - name: Install protoc
       run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
