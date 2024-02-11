@@ -42,7 +42,8 @@ jobs:
       run: export GOPATH=$HOME/work
 
     - name: Update PATH
-      run: export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+      run: echo "$GOPATH/bin:$GOROOT/bin" >> $GITHUB_PATH
+      # run: export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
     - name: debug path
       run: echo $PATH
