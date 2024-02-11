@@ -41,6 +41,9 @@ jobs:
     - name: Install protoc
       run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
 
+    - name: Check go version
+      run: go --version
+
     - name: Check protoc version
       run: protoc --version
 
