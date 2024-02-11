@@ -17,6 +17,12 @@ jobs:
     - name: Check starting Go version
       run: go version
 
+    - name: debug GOROOT
+      run: echo $GOROOT
+
+    - name: debug path
+      run: echo $PATH
+
     - name: Update apt-get
       run: sudo apt-get update
 
@@ -32,17 +38,26 @@ jobs:
     - name: Update GO root
       run: export GOROOT=/usr/local/go
 
-    - name: debug print $HOME
-      run: echo $HOME
-
     - name: Update GO PATH
-      run: export GOPATH=$HOME/go
+      run: export GOPATH=$HOME/work
 
     - name: Update PATH
       run: export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 
+    - name: debug path
+      run: echo $PATH
+
+    - name: debug GOROOT
+      run: echo $GOROOT
+
     - name: Use profile
       run: source ~/.bashrc
+
+    - name: debug GOROOT
+      run: echo $GOROOT
+
+    - name: debug path
+      run: echo $PATH
 
     - name: Check go version
       run: go version
