@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchwebster/botblitz/pkg/common/pb"
+	common "github.com/mitchwebster/botblitz/pkg/common"
 )
 
 type BotEngineSettings struct {
@@ -14,10 +14,10 @@ type BotEngineSettings struct {
 
 type BotEngine struct {
 	settings BotEngineSettings
-	bots     []*pb.Bot
+	bots     []*common.Bot
 }
 
-func NewBotEngine(settings BotEngineSettings, bots []*pb.Bot) *BotEngine {
+func NewBotEngine(settings BotEngineSettings, bots []*common.Bot) *BotEngine {
 	return &BotEngine{
 		settings: settings,
 		bots:     bots,
@@ -94,7 +94,7 @@ func runAutomated(e BotEngine) {
 	}
 }
 
-func runBot(bot *pb.Bot, settings BotEngineSettings) error {
+func runBot(bot *common.Bot, settings BotEngineSettings) error {
 	fmt.Printf("Running bot -- Id: %s, Username: %s, Repo: %s, Fantasy Team Id: %d\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName, bot.FantasyTeamId)
 
 	err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, settings.VerboseLoggingEnabled)

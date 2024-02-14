@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mitchwebster/botblitz/pkg/common/pb"
+	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
 )
 
@@ -39,8 +39,8 @@ func enableInteractiveMode() bool {
 	return false
 }
 
-func fetchBotList() []*pb.Bot {
-	return []*pb.Bot{
+func fetchBotList() []*common.Bot {
+	return []*common.Bot{
 		{
 			Id:                 "Bigbot",
 			SourceRepoUsername: "mitchwebster",

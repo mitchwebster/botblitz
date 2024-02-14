@@ -1,8 +1,8 @@
 clean:
-	rm pkg/common/pb/*
+	rm -f pkg/common/agent.pb.go
 
 gen:
-	protoc ./pkg/common/proto/agent.proto --go_out=./pkg/common/pb/
+	protoc ./pkg/common/proto/agent.proto --go_out=./pkg/common/
 
 test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go mod tidy -C

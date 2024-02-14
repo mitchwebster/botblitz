@@ -1,6 +1,7 @@
 syntax = "proto3";
 
-option go_package = ".;pb";
+// option go_package = ".;pb";
+option go_package = ".;common";
 
 service AgentService {
     rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
