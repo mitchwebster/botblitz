@@ -21,7 +21,7 @@ def main():
         'sec-ch-ua-mobile': '?0',
         'sec-ch-ua-platform': '"macOS"'
     }
-    game_logs = playergamelogs.PlayerGameLogs(season_nullable="2023-24", headers=custom_headers)
+    game_logs = playergamelogs.PlayerGameLogs(season_nullable="2023-24", headers=custom_headers, timeout=60)
     df = game_logs.get_data_frames()[0]
     print(f"Found {len(df)} rows")
     # Connect to SQLite database
