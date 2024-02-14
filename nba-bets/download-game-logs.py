@@ -4,6 +4,7 @@ from nba_api.stats.endpoints import playergamelogs
 import pandas as pd
 
 def main():
+    print("Downloading Game Logs")
     game_logs = playergamelogs.PlayerGameLogs(season_nullable="2023-24")
     df = game_logs.get_data_frames()[0]
     print(f"Found {len(df)} rows")
