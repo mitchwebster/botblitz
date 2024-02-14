@@ -45,3 +45,10 @@ message Player {
     string status = 5;
     uint32 fantasy_team_id = 6; /* 0 should be unassigned */
 }
+
+message Bot {
+    string id = 1;
+    string source_repo_username = 2;
+    string source_repo_name = 3;
+    uint32 fantasy_team_id = 4; /* 0 should be unassigned */
+}

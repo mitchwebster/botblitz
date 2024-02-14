@@ -8,3 +8,6 @@ test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go mod tidy -C
 	go list -f '{{.Dir}}' -m | xargs -L1 go work sync -C
 	go list -f '{{.Dir}}' -m | xargs -L1 go test -C
+
+run-engine:
+	go run pkg/cmd/engine_bootstrap.go
