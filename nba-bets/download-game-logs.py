@@ -5,7 +5,7 @@ import pandas as pd
 
 def main():
     print("Downloading Game Logs")
-    game_logs = playergamelogs.PlayerGameLogs(season_nullable="2023-24")
+    game_logs = playergamelogs.PlayerGameLogs(season_nullable="2023-24", timeout=120)
     df = game_logs.get_data_frames()[0]
     print(f"Found {len(df)} rows")
     # Connect to SQLite database
