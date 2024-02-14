@@ -22,7 +22,8 @@ jobs:
       ODDS_API_KEY: a23c9884795b77de65081cc5fa65b8ff
     steps:
     - uses: actions/checkout@v2
-      ref: main
+      with:
+        ref: main
     - name: Set up Python 3.8
       uses: actions/setup-python@v1
       with:
