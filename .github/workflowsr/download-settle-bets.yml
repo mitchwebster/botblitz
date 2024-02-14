@@ -15,11 +15,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DB: ${{ secrets.DB }}
-      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      DB: nba-bets/nbastat.db
+      DISCORD_WEBHOOK: https://discord.com/api/webhooks/1203794391362437242/9kOW437LYjip9F_FCUu30_-DnuZhqpY1t5TtnSCNtPTKw6KZRYG18dvM8KAvlH0rBohu
+      ODDS_API_KEY: a23c9884795b77de65081cc5fa65b8ff
     steps:
     - uses: actions/checkout@v2
+      ref: main
     - name: Set up Python 3.8
       uses: actions/setup-python@v1
       with:
