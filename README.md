@@ -7,3 +7,5 @@
 `make gen` - generates proto classes from proto
 
 `make test` - runs tests
+
+`make run-engine` - run engine
