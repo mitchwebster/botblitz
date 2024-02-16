@@ -31,7 +31,7 @@ jobs:
         oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
         oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
         tags: tag:ci
-        args: --exit-node=raspberrypi.tailbdf9d.ts.net
+        args: --exit-node=100.80.55.51
     - name: Set up Python 3.8
       uses: actions/setup-python@v1
       with:
