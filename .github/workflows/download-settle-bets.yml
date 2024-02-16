@@ -4,8 +4,6 @@
 name: Python application
 
 on:
-  push:
-    branches: [ "fix-settle-bets-workflow" ]
   schedule:
     # 4PM (PT) daily
     - cron:  '0 23 * * *'
@@ -23,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: fix-settle-bets-workflow
+        ref: main
     - name: Tailscale
       uses: tailscale/github-action@v2
       with:
