@@ -25,6 +25,9 @@ jobs:
     - name: Install protoc
       run: sudo apt-get install -y protobuf-compiler golang-goprotobuf-dev
 
+    - name: Install GRPC proto tools
+      run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
     - name: Check protoc version
       run: protoc --version
 
