@@ -21,8 +21,6 @@ jobs:
       DB: nba-bets/nbastat.db # DB location
       DISCORD_WEBHOOK: https://discord.com/api/webhooks/1203794391362437242/9kOW437LYjip9F_FCUu30_-DnuZhqpY1t5TtnSCNtPTKw6KZRYG18dvM8KAvlH0rBohu
       ODDS_API_KEY: a23c9884795b77de65081cc5fa65b8ff
-      TS_OAUTH_CLIENT_ID:  ${{ secrets.TS_OAUTH_CLIENT_ID }}
-      TS_OAUTH_SECRET:  ${{ secrets.TS_OAUTH_SECRET }}
     steps:
     - uses: actions/checkout@v2
       with:
@@ -32,6 +30,7 @@ jobs:
       with:
         oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
         oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+        tags: tag:ci
         args: --exit-node=raspberrypi
     - name: Set up Python 3.8
       uses: actions/setup-python@v1
