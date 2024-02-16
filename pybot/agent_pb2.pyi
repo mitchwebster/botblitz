@@ -1,4 +1,5 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
@@ -6,22 +7,48 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class FantasyLandscape(_message.Message):
-    __slots__ = ("match_number", "settings", "bot_team", "players")
+    __slots__ = ("match_number", "settings", "bot_team", "bet", "players")
     MATCH_NUMBER_FIELD_NUMBER: _ClassVar[int]
     SETTINGS_FIELD_NUMBER: _ClassVar[int]
     BOT_TEAM_FIELD_NUMBER: _ClassVar[int]
+    BET_FIELD_NUMBER: _ClassVar[int]
     PLAYERS_FIELD_NUMBER: _ClassVar[int]
     match_number: int
     settings: LeagueSettings
     bot_team: FantasyTeam
+    bet: Bet
     players: _containers.RepeatedCompositeFieldContainer[Player]
-    def __init__(self, match_number: _Optional[int] = ..., settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., bot_team: _Optional[_Union[FantasyTeam, _Mapping]] = ..., players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ...) -> None: ...
+    def __init__(self, match_number: _Optional[int] = ..., settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., bot_team: _Optional[_Union[FantasyTeam, _Mapping]] = ..., bet: _Optional[_Union[Bet, _Mapping]] = ..., players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ...) -> None: ...
+
+class Bet(_message.Message):
+    __slots__ = ("professional_home_team", "professional_away_team", "player", "type", "points", "price")
+    class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        OVER: _ClassVar[Bet.Type]
+        UNDER: _ClassVar[Bet.Type]
+    OVER: Bet.Type
+    UNDER: Bet.Type
+    PROFESSIONAL_HOME_TEAM_FIELD_NUMBER: _ClassVar[int]
+    PROFESSIONAL_AWAY_TEAM_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    POINTS_FIELD_NUMBER: _ClassVar[int]
+    PRICE_FIELD_NUMBER: _ClassVar[int]
+    professional_home_team: str
+    professional_away_team: str
+    player: Player
+    type: Bet.Type
+    points: float
+    price: float
+    def __init__(self, professional_home_team: _Optional[str] = ..., professional_away_team: _Optional[str] = ..., player: _Optional[_Union[Player, _Mapping]] = ..., type: _Optional[_Union[Bet.Type, str]] = ..., points: _Optional[float] = ..., price: _Optional[float] = ...) -> None: ...
 
 class FantasySelections(_message.Message):
-    __slots__ = ("slots",)
+    __slots__ = ("make_bet", "slots")
+    MAKE_BET_FIELD_NUMBER: _ClassVar[int]
     SLOTS_FIELD_NUMBER: _ClassVar[int]
+    make_bet: bool
     slots: _containers.RepeatedCompositeFieldContainer[PlayerSlot]
-    def __init__(self, slots: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ...) -> None: ...
+    def __init__(self, make_bet: bool = ..., slots: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ...) -> None: ...
 
 class FantasyTeam(_message.Message):
     __slots__ = ("id", "name", "owner")

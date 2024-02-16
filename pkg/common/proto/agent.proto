@@ -11,13 +11,30 @@ message FantasyLandscape {
     uint32 match_number = 1;
     LeagueSettings settings = 2;
     FantasyTeam bot_team = 3;
-    repeated Player players = 4;
+    Bet bet = 4;
+    repeated Player players = 5;
     /* TODO historical / statistical data */
     /* TODO competition lineups */
 }
 
+message Bet {
+    string professional_home_team = 1;
+    string professional_away_team = 2;
+    Player player = 3;
+
+    enum Type {
+        OVER = 0;
+        UNDER = 1;
+    }
+
+    Type type = 4;
+    float points = 5;
+    float price = 6;
+}
+
 message FantasySelections {
-    repeated PlayerSlot slots = 1;
+    bool make_bet = 1;
+    repeated PlayerSlot slots = 2;
 }
 
 message FantasyTeam {

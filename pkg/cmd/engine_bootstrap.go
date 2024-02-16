@@ -58,27 +58,21 @@ func fetchBotList() []*common.Bot {
 }
 
 func genLandscape() *common.FantasyLandscape {
-	team := common.FantasyTeam{
-		Id:    "001",
-		Name:  "Vulcan Paradise",
-		Owner: "mrspock@trek.com",
+	player := common.Player{
+		FullName: "Kevin Durant",
 	}
 
-	qbSlot := common.PlayerSlot{
-		Name:                   "Captain",
-		AllowedPlayerPositions: []string{"Captain"},
-	}
-
-	settings := common.LeagueSettings{
-		NumTeams:     1,
-		SlotsPerTeam: []*common.PlayerSlot{&qbSlot},
+	bet := common.Bet{
+		Player:               &player,
+		ProfessionalHomeTeam: "Golden State Warriors",
+		ProfessionalAwayTeam: "Phoenix Suns",
+		Type:                 common.Bet_UNDER,
+		Points:               25.5,
+		Price:                -115.0,
 	}
 
 	landscape := common.FantasyLandscape{
-		MatchNumber: 1,
-		Settings:    &settings,
-		BotTeam:     &team,
-		Players:     []*common.Player{},
+		Bet: &bet,
 	}
 
 	return &landscape

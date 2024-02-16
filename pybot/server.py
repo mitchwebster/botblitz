@@ -17,9 +17,10 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         print(request)
 
         return agent_pb2.FantasySelections(
-            slots = [
-                agent_pb2.PlayerSlot(name="QB", assigned_player_id="007")
-            ]
+            make_bet=True
+            # slots = [
+            #     agent_pb2.PlayerSlot(name="QB", assigned_player_id="007")
+            # ]
         )
 
         # context.set_code(grpc.StatusCode.UNIMPLEMENTED)
