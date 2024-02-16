@@ -28,6 +28,9 @@ jobs:
     - name: Install GRPC proto tools
       run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
+    - name: Install python grpc tools
+      run: pip install -r pybot/requirements.txt
+
     - name: Check protoc version
       run: protoc --version
 
