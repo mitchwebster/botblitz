@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -11,6 +16,8 @@ import (
 
 func main() {
 	fmt.Println("Starting up...")
+
+	makeGRPCcall()
 
 	isInteractive := enableInteractiveMode()
 	bots := fetchBotList()
@@ -48,4 +55,58 @@ func fetchBotList() []*common.Bot {
 			FantasyTeamId:      0,
 		},
 	}
+}
+
+func genLandscape() *common.FantasyLandscape {
+	team := common.FantasyTeam{
+		Id:    "001",
+		Name:  "Vulcan Paradise",
+		Owner: "mrspock@trek.com",
+	}
+
+	qbSlot := common.PlayerSlot{
+		Name:                   "Captain",
+		AllowedPlayerPositions: []string{"Captain"},
+	}
+
+	settings := common.LeagueSettings{
+		NumTeams:     1,
+		SlotsPerTeam: []*common.PlayerSlot{&qbSlot},
+	}
+
+	landscape := common.FantasyLandscape{
+		MatchNumber: 1,
+		Settings:    &settings,
+		BotTeam:     &team,
+		Players:     []*common.Player{},
+	}
+
+	return &landscape
+}
+
+func makeGRPCcall() error {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	conn, err := grpc.Dial("localhost:8080", opts...)
+	if err != nil {
+		log.Fatalf("fail to dial: %v", err)
+	}
+
+	defer conn.Close()
+	client := common.NewAgentServiceClient(conn)
+
+	landscape := genLandscape()
+
+	selections, err := client.PerformFantasyActions(context.Background(), landscape)
+	if err != nil {
+		fmt.Println("Failed to get selections")
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("Got selections %d\n", len(selections.Slots))
+	fmt.Println(selections)
+
+	return nil
 }
