@@ -6,6 +6,7 @@ import time
 import grpc
 import agent_pb2
 import agent_pb2_grpc
+from bot import PerformFantasyActions
 
 class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
 
@@ -17,16 +18,6 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         print(request)
 
         return PerformFantasyActions(request)
-        # return agent_pb2.FantasySelections(
-        #     make_bet=True
-        #     # slots = [
-        #     #     agent_pb2.PlayerSlot(name="QB", assigned_player_id="007")
-        #     # ]
-        # )
-
-        # context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        # context.set_details('Method not implemented!')
-        # raise NotImplementedError('Method not implemented!')
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

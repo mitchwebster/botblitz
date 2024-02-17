@@ -66,7 +66,15 @@ message Player {
 
 message Bot {
     string id = 1;
-    string source_repo_username = 2;
-    string source_repo_name = 3;
-    uint32 fantasy_team_id = 4; /* 0 should be unassigned */
+
+    enum Source {
+        LOCAL = 0;
+        REMOTE = 1;
+    }
+
+    Source source_type = 2;
+    string source_repo_username = 3;
+    string source_repo_name = 4;
+    string source_path = 5;
+    uint32 fantasy_team_id = 6; /* 0 should be unassigned */
 }

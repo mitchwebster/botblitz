@@ -95,13 +95,23 @@ class Player(_message.Message):
     def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., status: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
 
 class Bot(_message.Message):
-    __slots__ = ("id", "source_repo_username", "source_repo_name", "fantasy_team_id")
+    __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id")
+    class Source(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        LOCAL: _ClassVar[Bot.Source]
+        REMOTE: _ClassVar[Bot.Source]
+    LOCAL: Bot.Source
+    REMOTE: Bot.Source
     ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_TYPE_FIELD_NUMBER: _ClassVar[int]
     SOURCE_REPO_USERNAME_FIELD_NUMBER: _ClassVar[int]
     SOURCE_REPO_NAME_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
     FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
     id: str
+    source_type: Bot.Source
     source_repo_username: str
     source_repo_name: str
+    source_path: str
     fantasy_team_id: int
-    def __init__(self, id: _Optional[str] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
