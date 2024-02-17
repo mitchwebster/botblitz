@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const pyServerHostAndPort = "localhost:8080"
 const pyServerPath = "./py-grpc-server/server.py"   // py gRPC server code
 const pyServerBotFilePath = "py-grpc-server/bot.py" // source code filepath
 
@@ -23,14 +23,16 @@ type BotEngineSettings struct {
 }
 
 type BotEngine struct {
-	settings BotEngineSettings
-	bots     []*common.Bot
+	settings  BotEngineSettings
+	bots      []*common.Bot
+	landscape *common.FantasyLandscape
 }
 
-func NewBotEngine(settings BotEngineSettings, bots []*common.Bot) *BotEngine {
+func NewBotEngine(settings BotEngineSettings, bots []*common.Bot, landscape *common.FantasyLandscape) *BotEngine {
 	return &BotEngine{
-		settings: settings,
-		bots:     bots,
+		settings:  settings,
+		bots:      bots,
+		landscape: landscape,
 	}
 }
 
@@ -45,8 +47,14 @@ func (e BotEngine) Summarize() string {
 	fmt.Fprintf(&builder, "\tNumSimulations: %d\n", e.settings.NumSimulations)
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
 
-	fmt.Fprintf(&builder, "Bots:\n")
+	fmt.Fprintf(&builder, "\nBots:\n")
 	fmt.Fprintf(&builder, "\tCount: %d\n", len(e.bots))
+	for _, obj := range e.bots {
+		fmt.Fprintf(&builder, "\t - %s\n", obj.Id)
+	}
+
+	fmt.Fprintf(&builder, "\nLandscape:\n")
+	fmt.Fprintf(&builder, "\tPlayer Count: %d\n", len(e.landscape.Players))
 
 	return builder.String()
 }
@@ -74,7 +82,7 @@ func runAutomated(e BotEngine) error {
 			fmt.Printf("Bot details: Username: %s, Repo: %s, Fantasy Team Id: %d\n", obj.SourceRepoUsername, obj.SourceRepoName, obj.FantasyTeamId)
 			fmt.Printf("Using a %s source to find %s\n", obj.SourceType, obj.SourcePath)
 
-			selections, err := runBot(obj, e.settings)
+			selections, err := runBot(obj, e.landscape, e.settings.VerboseLoggingEnabled)
 			if err != nil {
 				if e.settings.VerboseLoggingEnabled {
 					fmt.Println(err)
@@ -106,8 +114,8 @@ func runAutomated(e BotEngine) error {
 	return nil
 }
 
-func runBot(bot *common.Bot, settings BotEngineSettings) (*common.FantasySelections, error) {
-	botCode, err := fetchSourceCode(bot, settings)
+func runBot(bot *common.Bot, landscape *common.FantasyLandscape, verboseLoggingEnabled bool) (*common.FantasySelections, error) {
+	botCode, err := fetchSourceCode(bot, verboseLoggingEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -121,14 +129,11 @@ func runBot(bot *common.Bot, settings BotEngineSettings) (*common.FantasySelecti
 	time.Sleep(2 * time.Second) // Allow 2s for gRPC server startup
 
 	fmt.Println("Making gRPC call")
-	selections, err := makeGRPCcall()
+	selections, err := callBotRPC(landscape)
 	if err != nil {
 		fmt.Println("Failed to make gRPC call")
 		fmt.Println(err)
 	}
-
-	fmt.Println("Made gRPC call")
-	fmt.Println(selections.MakeBet)
 
 	fmt.Println("Shutting down gRPC server")
 	err = cmd.Process.Kill()
@@ -141,11 +146,11 @@ func runBot(bot *common.Bot, settings BotEngineSettings) (*common.FantasySelecti
 	return selections, nil
 }
 
-func fetchSourceCode(bot *common.Bot, settings BotEngineSettings) ([]byte, error) {
+func fetchSourceCode(bot *common.Bot, verboseLoggingEnabled bool) ([]byte, error) {
 	var botCode []byte
 
 	if bot.SourceType == common.Bot_REMOTE {
-		downloadedSourceCode, err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, settings.VerboseLoggingEnabled)
+		downloadedSourceCode, err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, verboseLoggingEnabled)
 		if err != nil {
 			return nil, err
 		}
@@ -218,50 +223,22 @@ func cleanAfterRun() error {
 	return nil
 }
 
-func genLandscape() *common.FantasyLandscape {
-	player := common.Player{
-		FullName: "Kevin Durant",
-	}
-
-	bet := common.Bet{
-		Player:               &player,
-		ProfessionalHomeTeam: "Golden State Warriors",
-		ProfessionalAwayTeam: "Phoenix Suns",
-		Type:                 common.Bet_UNDER,
-		Points:               25.5,
-		Price:                -115.0,
-	}
-
-	landscape := common.FantasyLandscape{
-		Bet: &bet,
-	}
-
-	return &landscape
-}
-
-func makeGRPCcall() (*common.FantasySelections, error) {
+func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	conn, err := grpc.Dial("localhost:8080", opts...)
+	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
-		log.Fatalf("fail to dial: %v", err)
+		return nil, err
 	}
 
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
-	landscape := genLandscape()
-
 	selections, err := client.PerformFantasyActions(context.Background(), landscape)
 	if err != nil {
-		fmt.Println("Failed to get selections")
-		fmt.Println(err)
 		return nil, err
 	}
-
-	fmt.Printf("Got selections %d\n", len(selections.Slots))
-	fmt.Println(selections)
 
 	return selections, nil
 }

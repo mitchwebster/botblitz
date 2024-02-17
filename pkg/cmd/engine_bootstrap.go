@@ -11,13 +11,14 @@ func main() {
 	fmt.Println("Starting up...")
 
 	bots := fetchBotList()
+	landscape := genLandscape()
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: true,
 		NumSimulations:        1,
 	}
 
-	engine := engine.NewBotEngine(engineSettings, bots)
+	engine := engine.NewBotEngine(engineSettings, bots, landscape)
 
 	fmt.Println(engine.Summarize())
 
@@ -51,4 +52,26 @@ func fetchBotList() []*common.Bot {
 			FantasyTeamId:      2,
 		},
 	}
+}
+
+func genLandscape() *common.FantasyLandscape {
+	player := common.Player{
+		FullName: "Kevin Durant",
+	}
+
+	bet := common.Bet{
+		Player:               &player,
+		ProfessionalHomeTeam: "Golden State Warriors",
+		ProfessionalAwayTeam: "Phoenix Suns",
+		Type:                 common.Bet_UNDER,
+		Points:               25.5,
+		Price:                -115.0,
+	}
+
+	landscape := common.FantasyLandscape{
+		Bet:     &bet,
+		Players: []*common.Player{&player},
+	}
+
+	return &landscape
 }
