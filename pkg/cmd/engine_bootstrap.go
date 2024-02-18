@@ -59,7 +59,7 @@ func fetchBotList() []*common.Bot {
 			SourceType:         common.Bot_REMOTE,
 			SourceRepoUsername: "mitchwebster",
 			SourceRepoName:     "testagent",
-			SourcePath:         "/dist/agent2.py",
+			SourcePath:         "/dist/agent.py",
 			FantasyTeamId:      2,
 		},
 	}
