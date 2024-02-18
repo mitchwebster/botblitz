@@ -1,6 +1,7 @@
-go 1.21
+go 1.21.4
 
 use (
+	./pkg/bets
 	./pkg/cmd
 	./pkg/common
 	./pkg/engine
