@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -120,19 +121,20 @@ func runBot(bot *common.Bot, landscape *common.FantasyLandscape, verboseLoggingE
 		return nil, err
 	}
 
-	cmd, err := startServerForBot(botCode)
+	cmd, stdout, stderr, err := startServerForBot(botCode)
 	if err != nil {
+		fmt.Printf("Server output logs: %s\n", stdout)
+		fmt.Printf("Server error logs: %s\n", stderr)
 		return nil, err
 	}
-
-	fmt.Println("Successfully started bot server!")
-	time.Sleep(2 * time.Second) // Allow 2s for gRPC server startup
 
 	fmt.Println("Making gRPC call")
 	selections, err := callBotRPC(landscape)
 	if err != nil {
 		fmt.Println("Failed to make gRPC call")
 		fmt.Println(err)
+		fmt.Printf("Server output logs: %s\n", stdout)
+		fmt.Printf("Server error logs: %s\n", stderr)
 	}
 
 	fmt.Println("Shutting down gRPC server")
@@ -174,26 +176,32 @@ func fetchSourceCode(bot *common.Bot, verboseLoggingEnabled bool) ([]byte, error
 	return botCode, nil
 }
 
-func startServerForBot(botCode []byte) (*exec.Cmd, error) {
+func startServerForBot(botCode []byte) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
 
 	fmt.Println("Creating source code file")
 	absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
 	if err != nil {
-		return nil, err
+		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
 
 	err = os.WriteFile(absPath, botCode, 0755)
 	if err != nil {
-		return nil, err
+		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
 
 	cmd := exec.Command("python", pyServerPath)
+	var outb, errb bytes.Buffer
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+
 	err = cmd.Start()
 	if err != nil {
-		return nil, err
+		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
 
-	return cmd, nil
+	time.Sleep(2 * time.Second) // Allow 2s for gRPC server startup
+
+	return cmd, &outb, &errb, nil
 }
 
 func buildLocalAbsolutePath(relativePath string) (string, error) {

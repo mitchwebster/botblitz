@@ -26,8 +26,7 @@ func DownloadGithubSourceCode(username string, repoName string, path string, ver
 	}
 
 	if verboseLoggingEnabled {
-		fmt.Println("Retrieved agent code: ")
-		fmt.Println(agentCode)
+		fmt.Println("Retrieved agent code!")
 	}
 
 	return agentCode, nil
