@@ -110,7 +110,7 @@ func run(e BotEngine) error {
 			fmt.Println(err)
 		}
 
-		err = shutDownAndCleanBotServer(cmd)
+		err = shutDownAndCleanBotServer(bot, cmd)
 		if err != nil {
 			fmt.Println("CRITICAL!! Failed to clean after bot run")
 			return err
@@ -121,21 +121,26 @@ func run(e BotEngine) error {
 }
 
 func initializeBots(e BotEngine) error {
-	// Initialize bots
+	fmt.Printf("\n-----------------------------------------\n")
+	fmt.Println("Initializing Bots")
+
 	for _, bot := range e.bots {
 		e.botResults[bot.Id] = make(map[string][]*common.FantasySelections)
 		byteCode, err := fetchSourceCode(bot, e)
 		if err != nil {
+			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)
 			return err
 		}
 
 		e.sourceCodeCache[bot.Id] = byteCode
 	}
 
+	fmt.Printf("\n-----------------------------------------\n")
+
 	return nil
 }
 
-func shutDownAndCleanBotServer(cmd *exec.Cmd) error {
+func shutDownAndCleanBotServer(bot *common.Bot, cmd *exec.Cmd) error {
 	fmt.Println("Shutting down gRPC server")
 	err := cmd.Process.Kill()
 	if err != nil {
@@ -148,6 +153,9 @@ func shutDownAndCleanBotServer(cmd *exec.Cmd) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Finished cleaning server for bot (%s)\n", bot.Id)
+	fmt.Printf("\n-----------------------------------------\n")
 
 	return nil
 }
@@ -204,11 +212,14 @@ func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
 		botCode = bytes
 	}
 
-	fmt.Println("Successfully retrieved source code")
+	fmt.Printf("Successfully retrieved source code for bot (%s)\n", bot.Id)
 	return botCode, nil
 }
 
 func startServerForBot(bot *common.Bot, e BotEngine) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
+	fmt.Printf("\n-----------------------------------------\n")
+	fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
+
 	botCode := e.sourceCodeCache[bot.Id]
 
 	fmt.Println("Creating source code file")
