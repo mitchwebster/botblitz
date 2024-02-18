@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -33,6 +34,7 @@ func main() {
 	if err != nil {
 		fmt.Println("Engine failed unexpectedly")
 		fmt.Println(err)
+		os.Exit(1) // Crash hard
 	} else {
 		engine.PrintResults()
 	}
@@ -57,7 +59,7 @@ func fetchBotList() []*common.Bot {
 			SourceType:         common.Bot_REMOTE,
 			SourceRepoUsername: "mitchwebster",
 			SourceRepoName:     "testagent",
-			SourcePath:         "/dist/agent.py",
+			SourcePath:         "/dist/agent2.py",
 			FantasyTeamId:      2,
 		},
 	}
