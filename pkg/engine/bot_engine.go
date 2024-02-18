@@ -18,22 +18,31 @@ const pyServerHostAndPort = "localhost:8080"
 const pyServerPath = "./py-grpc-server/server.py"   // py gRPC server code
 const pyServerBotFilePath = "py-grpc-server/bot.py" // source code filepath
 
+type Simulation struct {
+	Id            string
+	Landscape     *common.FantasyLandscape
+	NumIterations int
+}
+
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
-	NumSimulations        int
 }
 
 type BotEngine struct {
-	settings  BotEngineSettings
-	bots      []*common.Bot
-	landscape *common.FantasyLandscape
+	botResults      map[string]map[string][]*common.FantasySelections // Bot -> Simulation -> Simulation Selections per iteration
+	settings        BotEngineSettings
+	bots            []*common.Bot
+	simulations     []*Simulation
+	sourceCodeCache map[string][]byte
 }
 
-func NewBotEngine(settings BotEngineSettings, bots []*common.Bot, landscape *common.FantasyLandscape) *BotEngine {
+func NewBotEngine(simulations []*Simulation, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
 	return &BotEngine{
-		settings:  settings,
-		bots:      bots,
-		landscape: landscape,
+		settings:        settings,
+		bots:            bots,
+		simulations:     simulations,
+		botResults:      make(map[string]map[string][]*common.FantasySelections),
+		sourceCodeCache: make(map[string][]byte),
 	}
 }
 
@@ -45,7 +54,7 @@ func (e BotEngine) Summarize() string {
 
 	// Print settings
 	fmt.Fprintf(&builder, "Settings:\n")
-	fmt.Fprintf(&builder, "\tNumSimulations: %d\n", e.settings.NumSimulations)
+	fmt.Fprintf(&builder, "\tNumSimulations: %d\n", len(e.simulations))
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
 
 	fmt.Fprintf(&builder, "\nBots:\n")
@@ -54,105 +63,128 @@ func (e BotEngine) Summarize() string {
 		fmt.Fprintf(&builder, "\t - %s\n", obj.Id)
 	}
 
-	fmt.Fprintf(&builder, "\nLandscape:\n")
-	fmt.Fprintf(&builder, "\tPlayer Count: %d\n", len(e.landscape.Players))
+	// fmt.Fprintf(&builder, "\nLandscape:\n")
+	// fmt.Fprintf(&builder, "\tPlayer Count: %d\n", len(e.landscape.Players))
 
 	return builder.String()
 }
 
 func (e BotEngine) Run() error {
-	return runAutomated(e)
+	return run(e)
 }
 
-func runAutomated(e BotEngine) error {
-	if e.settings.VerboseLoggingEnabled {
-		fmt.Println("Running automated")
-	}
-
-	// Initialize results
-	results := make(map[string][]*common.FantasySelections)
-	for _, obj := range e.bots {
-		results[obj.Id] = []*common.FantasySelections{}
-	}
-
-	// Run bots
-	for iteration := 1; iteration <= e.settings.NumSimulations; iteration++ {
-		for _, obj := range e.bots {
-			fmt.Printf("\n-----------------------------------------\n")
-			fmt.Printf("[%s] - simulation: %d\n", obj.Id, iteration)
-			fmt.Printf("Bot details: Username: %s, Repo: %s, Fantasy Team Id: %d\n", obj.SourceRepoUsername, obj.SourceRepoName, obj.FantasyTeamId)
-			fmt.Printf("Using a %s source to find %s\n", obj.SourceType, obj.SourcePath)
-
-			selections, err := runBot(obj, e.landscape, e.settings.VerboseLoggingEnabled)
-			if err != nil {
-				if e.settings.VerboseLoggingEnabled {
-					fmt.Println(err)
-				}
-
-				fmt.Printf("Failed to run bot %s\n", obj.Id)
-				results[obj.Id] = append(results[obj.Id], nil)
-			} else {
-				fmt.Printf("Ran bot %s successfully!\n", obj.Id)
-				results[obj.Id] = append(results[obj.Id], selections)
-			}
-
-			// if we fail to clean after a bot run, crash the engine!
-			// for correctness / security reasons, we do not want to continue
-			err = cleanAfterRun()
-			if err != nil {
-				fmt.Println("CRITICAL!! Failed to clean after bot run")
-				return err
-			}
-
-			fmt.Printf("\n-----------------------------------------\n") // Add formatting to make separate runs clear
+func (e BotEngine) PrintResults() {
+	for botId, simulationMap := range e.botResults {
+		fmt.Printf("%s:\n", botId)
+		for simulationId, results := range simulationMap {
+			fmt.Printf("\t%s: %s\n", simulationId, results)
 		}
 	}
+}
 
-	for k, v := range results {
-		fmt.Printf("%s: %v\n", k, v)
+func run(e BotEngine) error {
+	if e.settings.VerboseLoggingEnabled {
+		fmt.Println("Running engine")
+	}
+
+	err := initializeBots(e)
+	if err != nil {
+		return err
+	}
+
+	for _, bot := range e.bots {
+		cmd, stdout, stderr, err := startServerForBot(bot, e)
+		if err != nil {
+			fmt.Printf("Server output logs: %s\n", stdout)
+			fmt.Printf("Server error logs: %s\n", stderr)
+			return err
+		}
+
+		fmt.Printf("Setup bot: %s\n", bot.Id)
+		fmt.Printf("Bot details: Username: %s, Repo: %s, Fantasy Team Id: %d\n", bot.SourceRepoUsername, bot.SourceRepoName, bot.FantasyTeamId)
+		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+
+		err = runSimulationsOnBot(bot, e)
+		if err != nil {
+			fmt.Println("Failed to run simulations on bot")
+			fmt.Println(err)
+		}
+
+		err = shutDownAndCleanBotServer(cmd)
+		if err != nil {
+			fmt.Println("CRITICAL!! Failed to clean after bot run")
+			return err
+		}
 	}
 
 	return nil
 }
 
-func runBot(bot *common.Bot, landscape *common.FantasyLandscape, verboseLoggingEnabled bool) (*common.FantasySelections, error) {
-	botCode, err := fetchSourceCode(bot, verboseLoggingEnabled)
-	if err != nil {
-		return nil, err
+func initializeBots(e BotEngine) error {
+	// Initialize bots
+	for _, bot := range e.bots {
+		e.botResults[bot.Id] = make(map[string][]*common.FantasySelections)
+		byteCode, err := fetchSourceCode(bot, e)
+		if err != nil {
+			return err
+		}
+
+		e.sourceCodeCache[bot.Id] = byteCode
 	}
 
-	cmd, stdout, stderr, err := startServerForBot(botCode)
-	if err != nil {
-		fmt.Printf("Server output logs: %s\n", stdout)
-		fmt.Printf("Server error logs: %s\n", stderr)
-		return nil, err
-	}
+	return nil
+}
 
-	fmt.Println("Making gRPC call")
-	selections, err := callBotRPC(landscape)
-	if err != nil {
-		fmt.Println("Failed to make gRPC call")
-		fmt.Println(err)
-		fmt.Printf("Server output logs: %s\n", stdout)
-		fmt.Printf("Server error logs: %s\n", stderr)
-	}
-
+func shutDownAndCleanBotServer(cmd *exec.Cmd) error {
 	fmt.Println("Shutting down gRPC server")
-	err = cmd.Process.Kill()
+	err := cmd.Process.Kill()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fmt.Println("Shut down gRPC server")
 
-	return selections, nil
+	err = cleanAfterRun()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func fetchSourceCode(bot *common.Bot, verboseLoggingEnabled bool) ([]byte, error) {
+func runSimulationsOnBot(bot *common.Bot, e BotEngine) error {
+
+	for _, simulation := range e.simulations {
+		fmt.Printf("\n-----------------------------------------\n")
+		fmt.Printf("Running simulation (%s) on bot (%s)\n", simulation.Id, bot.Id)
+		selectionsForSimulation := []*common.FantasySelections{}
+
+		for iteration := 1; iteration <= simulation.NumIterations; iteration++ {
+			fmt.Printf("\n\tIteration (%d): Making gRPC call\n", iteration)
+			selectionsForIteration, err := callBotRPC(simulation.Landscape)
+			if err != nil {
+				fmt.Printf("\tIteration (%d): Failed to make gRPC call\n", iteration)
+				fmt.Println(err)
+				selectionsForSimulation = append(selectionsForSimulation, nil)
+			} else {
+				fmt.Printf("\tIteration (%d): bot ran successfully!\n", iteration)
+				selectionsForSimulation = append(selectionsForSimulation, selectionsForIteration)
+			}
+
+		}
+
+		e.botResults[bot.Id][simulation.Id] = selectionsForSimulation
+		fmt.Printf("\n-----------------------------------------\n") // Add formatting to make separate runs clear
+	}
+
+	return nil
+}
+
+func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
 	var botCode []byte
 
 	if bot.SourceType == common.Bot_REMOTE {
-		downloadedSourceCode, err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, verboseLoggingEnabled)
+		downloadedSourceCode, err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, e.settings.VerboseLoggingEnabled)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +208,8 @@ func fetchSourceCode(bot *common.Bot, verboseLoggingEnabled bool) ([]byte, error
 	return botCode, nil
 }
 
-func startServerForBot(botCode []byte) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
+func startServerForBot(bot *common.Bot, e BotEngine) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
+	botCode := e.sourceCodeCache[bot.Id]
 
 	fmt.Println("Creating source code file")
 	absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
@@ -199,7 +232,7 @@ func startServerForBot(botCode []byte) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer,
 		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
 
-	time.Sleep(2 * time.Second) // Allow 2s for gRPC server startup
+	time.Sleep(1 * time.Second) // Allow 1s for gRPC server startup
 
 	return cmd, &outb, &errb, nil
 }

@@ -15,10 +15,17 @@ func main() {
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: true,
-		NumSimulations:        1,
 	}
 
-	engine := engine.NewBotEngine(engineSettings, bots, landscape)
+	simulation := engine.Simulation{
+		Id:            "Today's Bets",
+		Landscape:     landscape,
+		NumIterations: 1,
+	}
+
+	simulations := []*engine.Simulation{&simulation}
+
+	engine := engine.NewBotEngine(simulations, bots, engineSettings)
 
 	fmt.Println(engine.Summarize())
 
@@ -26,6 +33,8 @@ func main() {
 	if err != nil {
 		fmt.Println("Engine failed unexpectedly")
 		fmt.Println(err)
+	} else {
+		engine.PrintResults()
 	}
 }
 
