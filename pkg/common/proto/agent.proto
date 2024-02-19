@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 // option go_package = ".;pb";
 option go_package = ".;common";
 
@@ -30,6 +32,7 @@ message Bet {
     Type type = 4;
     float points = 5;
     float price = 6;
+    google.protobuf.Timestamp start_time = 7;
 }
 
 message FantasySelections {
@@ -94,7 +97,7 @@ message GameLog {
   string team_abbreviation = 6;
   string team_name = 7;
   string game_id = 8;
-  string game_date = 9;
+  google.protobuf.Timestamp game_date = 9;
   string matchup = 10;
   string wl = 11;
   float min = 12;

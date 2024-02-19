@@ -1,3 +1,4 @@
+from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -21,7 +22,7 @@ class FantasyLandscape(_message.Message):
     def __init__(self, match_number: _Optional[int] = ..., settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., bot_team: _Optional[_Union[FantasyTeam, _Mapping]] = ..., bet: _Optional[_Union[Bet, _Mapping]] = ..., players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ...) -> None: ...
 
 class Bet(_message.Message):
-    __slots__ = ("professional_home_team", "professional_away_team", "player", "type", "points", "price")
+    __slots__ = ("professional_home_team", "professional_away_team", "player", "type", "points", "price", "start_time")
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         OVER: _ClassVar[Bet.Type]
@@ -34,13 +35,15 @@ class Bet(_message.Message):
     TYPE_FIELD_NUMBER: _ClassVar[int]
     POINTS_FIELD_NUMBER: _ClassVar[int]
     PRICE_FIELD_NUMBER: _ClassVar[int]
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
     professional_home_team: str
     professional_away_team: str
     player: Player
     type: Bet.Type
     points: float
     price: float
-    def __init__(self, professional_home_team: _Optional[str] = ..., professional_away_team: _Optional[str] = ..., player: _Optional[_Union[Player, _Mapping]] = ..., type: _Optional[_Union[Bet.Type, str]] = ..., points: _Optional[float] = ..., price: _Optional[float] = ...) -> None: ...
+    start_time: _timestamp_pb2.Timestamp
+    def __init__(self, professional_home_team: _Optional[str] = ..., professional_away_team: _Optional[str] = ..., player: _Optional[_Union[Player, _Mapping]] = ..., type: _Optional[_Union[Bet.Type, str]] = ..., points: _Optional[float] = ..., price: _Optional[float] = ..., start_time: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class FantasySelections(_message.Message):
     __slots__ = ("make_bet", "slots")
@@ -125,3 +128,143 @@ class Simulation(_message.Message):
     landscape: FantasyLandscape
     num_iterations: int
     def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
+
+class GameLog(_message.Message):
+    __slots__ = ("season_year", "player_id", "player_name", "nickname", "team_id", "team_abbreviation", "team_name", "game_id", "game_date", "matchup", "wl", "min", "fgm", "fga", "fg_pct", "fg3m", "fg3a", "fg3_pct", "ftm", "fta", "ft_pct", "oreb", "dreb", "reb", "ast", "tov", "stl", "blk", "blka", "pf", "pfd", "pts", "plus_minus", "nba_fantasy_pts", "dd2", "td3", "wnba_fantasy_pts", "gp_rank", "w_rank", "l_rank", "w_pct_rank", "min_rank", "fgm_rank", "fga_rank", "fg_pct_rank", "fg3m_rank", "fg3a_rank", "fg3_pct_rank", "ftm_rank", "fta_rank", "ft_pct_rank", "oreb_rank", "dreb_rank", "reb_rank", "ast_rank", "tov_rank", "stl_rank", "blk_rank", "blka_rank", "pf_rank", "pfd_rank", "pts_rank", "plus_minus_rank", "nba_fantasy_pts_rank", "dd2_rank", "td3_rank", "wnba_fantasy_pts_rank", "available_flag")
+    SEASON_YEAR_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_NAME_FIELD_NUMBER: _ClassVar[int]
+    NICKNAME_FIELD_NUMBER: _ClassVar[int]
+    TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    TEAM_ABBREVIATION_FIELD_NUMBER: _ClassVar[int]
+    TEAM_NAME_FIELD_NUMBER: _ClassVar[int]
+    GAME_ID_FIELD_NUMBER: _ClassVar[int]
+    GAME_DATE_FIELD_NUMBER: _ClassVar[int]
+    MATCHUP_FIELD_NUMBER: _ClassVar[int]
+    WL_FIELD_NUMBER: _ClassVar[int]
+    MIN_FIELD_NUMBER: _ClassVar[int]
+    FGM_FIELD_NUMBER: _ClassVar[int]
+    FGA_FIELD_NUMBER: _ClassVar[int]
+    FG_PCT_FIELD_NUMBER: _ClassVar[int]
+    FG3M_FIELD_NUMBER: _ClassVar[int]
+    FG3A_FIELD_NUMBER: _ClassVar[int]
+    FG3_PCT_FIELD_NUMBER: _ClassVar[int]
+    FTM_FIELD_NUMBER: _ClassVar[int]
+    FTA_FIELD_NUMBER: _ClassVar[int]
+    FT_PCT_FIELD_NUMBER: _ClassVar[int]
+    OREB_FIELD_NUMBER: _ClassVar[int]
+    DREB_FIELD_NUMBER: _ClassVar[int]
+    REB_FIELD_NUMBER: _ClassVar[int]
+    AST_FIELD_NUMBER: _ClassVar[int]
+    TOV_FIELD_NUMBER: _ClassVar[int]
+    STL_FIELD_NUMBER: _ClassVar[int]
+    BLK_FIELD_NUMBER: _ClassVar[int]
+    BLKA_FIELD_NUMBER: _ClassVar[int]
+    PF_FIELD_NUMBER: _ClassVar[int]
+    PFD_FIELD_NUMBER: _ClassVar[int]
+    PTS_FIELD_NUMBER: _ClassVar[int]
+    PLUS_MINUS_FIELD_NUMBER: _ClassVar[int]
+    NBA_FANTASY_PTS_FIELD_NUMBER: _ClassVar[int]
+    DD2_FIELD_NUMBER: _ClassVar[int]
+    TD3_FIELD_NUMBER: _ClassVar[int]
+    WNBA_FANTASY_PTS_FIELD_NUMBER: _ClassVar[int]
+    GP_RANK_FIELD_NUMBER: _ClassVar[int]
+    W_RANK_FIELD_NUMBER: _ClassVar[int]
+    L_RANK_FIELD_NUMBER: _ClassVar[int]
+    W_PCT_RANK_FIELD_NUMBER: _ClassVar[int]
+    MIN_RANK_FIELD_NUMBER: _ClassVar[int]
+    FGM_RANK_FIELD_NUMBER: _ClassVar[int]
+    FGA_RANK_FIELD_NUMBER: _ClassVar[int]
+    FG_PCT_RANK_FIELD_NUMBER: _ClassVar[int]
+    FG3M_RANK_FIELD_NUMBER: _ClassVar[int]
+    FG3A_RANK_FIELD_NUMBER: _ClassVar[int]
+    FG3_PCT_RANK_FIELD_NUMBER: _ClassVar[int]
+    FTM_RANK_FIELD_NUMBER: _ClassVar[int]
+    FTA_RANK_FIELD_NUMBER: _ClassVar[int]
+    FT_PCT_RANK_FIELD_NUMBER: _ClassVar[int]
+    OREB_RANK_FIELD_NUMBER: _ClassVar[int]
+    DREB_RANK_FIELD_NUMBER: _ClassVar[int]
+    REB_RANK_FIELD_NUMBER: _ClassVar[int]
+    AST_RANK_FIELD_NUMBER: _ClassVar[int]
+    TOV_RANK_FIELD_NUMBER: _ClassVar[int]
+    STL_RANK_FIELD_NUMBER: _ClassVar[int]
+    BLK_RANK_FIELD_NUMBER: _ClassVar[int]
+    BLKA_RANK_FIELD_NUMBER: _ClassVar[int]
+    PF_RANK_FIELD_NUMBER: _ClassVar[int]
+    PFD_RANK_FIELD_NUMBER: _ClassVar[int]
+    PTS_RANK_FIELD_NUMBER: _ClassVar[int]
+    PLUS_MINUS_RANK_FIELD_NUMBER: _ClassVar[int]
+    NBA_FANTASY_PTS_RANK_FIELD_NUMBER: _ClassVar[int]
+    DD2_RANK_FIELD_NUMBER: _ClassVar[int]
+    TD3_RANK_FIELD_NUMBER: _ClassVar[int]
+    WNBA_FANTASY_PTS_RANK_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_FLAG_FIELD_NUMBER: _ClassVar[int]
+    season_year: str
+    player_id: int
+    player_name: str
+    nickname: str
+    team_id: int
+    team_abbreviation: str
+    team_name: str
+    game_id: str
+    game_date: _timestamp_pb2.Timestamp
+    matchup: str
+    wl: str
+    min: float
+    fgm: int
+    fga: int
+    fg_pct: float
+    fg3m: int
+    fg3a: int
+    fg3_pct: float
+    ftm: int
+    fta: int
+    ft_pct: float
+    oreb: int
+    dreb: int
+    reb: int
+    ast: int
+    tov: int
+    stl: int
+    blk: int
+    blka: int
+    pf: int
+    pfd: int
+    pts: int
+    plus_minus: int
+    nba_fantasy_pts: float
+    dd2: int
+    td3: int
+    wnba_fantasy_pts: float
+    gp_rank: int
+    w_rank: int
+    l_rank: int
+    w_pct_rank: int
+    min_rank: int
+    fgm_rank: int
+    fga_rank: int
+    fg_pct_rank: int
+    fg3m_rank: int
+    fg3a_rank: int
+    fg3_pct_rank: int
+    ftm_rank: int
+    fta_rank: int
+    ft_pct_rank: int
+    oreb_rank: int
+    dreb_rank: int
+    reb_rank: int
+    ast_rank: int
+    tov_rank: int
+    stl_rank: int
+    blk_rank: int
+    blka_rank: int
+    pf_rank: int
+    pfd_rank: int
+    pts_rank: int
+    plus_minus_rank: int
+    nba_fantasy_pts_rank: int
+    dd2_rank: int
+    td3_rank: int
+    wnba_fantasy_pts_rank: int
+    available_flag: int
+    def __init__(self, season_year: _Optional[str] = ..., player_id: _Optional[int] = ..., player_name: _Optional[str] = ..., nickname: _Optional[str] = ..., team_id: _Optional[int] = ..., team_abbreviation: _Optional[str] = ..., team_name: _Optional[str] = ..., game_id: _Optional[str] = ..., game_date: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., matchup: _Optional[str] = ..., wl: _Optional[str] = ..., min: _Optional[float] = ..., fgm: _Optional[int] = ..., fga: _Optional[int] = ..., fg_pct: _Optional[float] = ..., fg3m: _Optional[int] = ..., fg3a: _Optional[int] = ..., fg3_pct: _Optional[float] = ..., ftm: _Optional[int] = ..., fta: _Optional[int] = ..., ft_pct: _Optional[float] = ..., oreb: _Optional[int] = ..., dreb: _Optional[int] = ..., reb: _Optional[int] = ..., ast: _Optional[int] = ..., tov: _Optional[int] = ..., stl: _Optional[int] = ..., blk: _Optional[int] = ..., blka: _Optional[int] = ..., pf: _Optional[int] = ..., pfd: _Optional[int] = ..., pts: _Optional[int] = ..., plus_minus: _Optional[int] = ..., nba_fantasy_pts: _Optional[float] = ..., dd2: _Optional[int] = ..., td3: _Optional[int] = ..., wnba_fantasy_pts: _Optional[float] = ..., gp_rank: _Optional[int] = ..., w_rank: _Optional[int] = ..., l_rank: _Optional[int] = ..., w_pct_rank: _Optional[int] = ..., min_rank: _Optional[int] = ..., fgm_rank: _Optional[int] = ..., fga_rank: _Optional[int] = ..., fg_pct_rank: _Optional[int] = ..., fg3m_rank: _Optional[int] = ..., fg3a_rank: _Optional[int] = ..., fg3_pct_rank: _Optional[int] = ..., ftm_rank: _Optional[int] = ..., fta_rank: _Optional[int] = ..., ft_pct_rank: _Optional[int] = ..., oreb_rank: _Optional[int] = ..., dreb_rank: _Optional[int] = ..., reb_rank: _Optional[int] = ..., ast_rank: _Optional[int] = ..., tov_rank: _Optional[int] = ..., stl_rank: _Optional[int] = ..., blk_rank: _Optional[int] = ..., blka_rank: _Optional[int] = ..., pf_rank: _Optional[int] = ..., pfd_rank: _Optional[int] = ..., pts_rank: _Optional[int] = ..., plus_minus_rank: _Optional[int] = ..., nba_fantasy_pts_rank: _Optional[int] = ..., dd2_rank: _Optional[int] = ..., td3_rank: _Optional[int] = ..., wnba_fantasy_pts_rank: _Optional[int] = ..., available_flag: _Optional[int] = ...) -> None: ...

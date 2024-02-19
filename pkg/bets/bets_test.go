@@ -38,3 +38,13 @@ func Test_GetAllBets(t *testing.T) {
 		t.Errorf("There were unfulfilled expectations: %s", err)
 	}
 }
+
+// Integration Test
+// func Test_GetGameLogsBeforeBet(t *testing.T) {
+// 	db, _ := GetDB()
+// 	bets, err := GetAllBets(db)
+// 	fmt.Printf("%d error %v\n", len(bets), err)
+// 	defer db.Close()
+// 	gameLogs, err := GetGameLogsBeforeBet(db, bets[2])
+// 	fmt.Printf("%d error %v\n", len(gameLogs), err)
+// }
