@@ -34,6 +34,9 @@ jobs:
     - name: Check protoc version
       run: protoc --version
 
+    - name: Docker version
+      run: docker -v
+
     - name: Clean generated proto
       run: make clean
 
