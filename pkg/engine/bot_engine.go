@@ -1,12 +1,10 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -20,8 +18,11 @@ import (
 )
 
 const pyServerHostAndPort = "localhost:8080"
-const pyServerPath = "./py-grpc-server/server.py"   // py gRPC server code
-const pyServerBotFilePath = "py-grpc-server/bot.py" // source code filepath
+
+const botResourceFolderName = "/tmp"
+const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
+const containerServerPort = "8080"
+const botResourceFolderNameInContainer = "/botblitz"
 
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
@@ -71,11 +72,7 @@ func (e BotEngine) Run() error {
 		return err
 	}
 
-	val, err := CreateNewContainer(e.simulations[0].Landscape)
-	fmt.Println(val)
-
-	return nil
-	// return run(e)
+	return run(e)
 }
 
 func (e BotEngine) PrintResults() {
@@ -106,16 +103,19 @@ func run(e BotEngine) error {
 		fmt.Println("Running engine")
 	}
 
-	err := initializeBots(e)
+	err := collectBotResources(e)
+	if err != nil {
+		return err
+	}
+
+	err = initializeBots(e)
 	if err != nil {
 		return err
 	}
 
 	for _, bot := range e.bots {
-		cmd, stdout, stderr, err := startServerForBot(bot, e)
+		containerId, err := startBotContainer(bot, e)
 		if err != nil {
-			fmt.Printf("Server output logs: %s\n", stdout)
-			fmt.Printf("Server error logs: %s\n", stderr)
 			return err
 		}
 
@@ -129,12 +129,37 @@ func run(e BotEngine) error {
 			fmt.Println(err)
 		}
 
-		err = shutDownAndCleanBotServer(bot, cmd)
+		err = shutDownAndCleanBotServer(bot, containerId)
 		if err != nil {
 			fmt.Println("CRITICAL!! Failed to clean after bot run")
 			return err
 		}
 	}
+
+	return nil
+}
+
+func collectBotResources(e BotEngine) error {
+	folderPath, err := buildLocalAbsolutePath(botResourceFolderName)
+	if err != nil {
+		return err
+	}
+
+	// Clear temp folder
+	err = os.RemoveAll(folderPath)
+	if err != nil {
+		// Non-existence errors are ok
+		if !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	err = os.Mkdir(folderPath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	// TODO: put any resources we want to expose to the bot in this directory
 
 	return nil
 }
@@ -159,16 +184,30 @@ func initializeBots(e BotEngine) error {
 	return nil
 }
 
-func shutDownAndCleanBotServer(bot *common.Bot, cmd *exec.Cmd) error {
-	fmt.Println("Shutting down gRPC server")
-	err := cmd.Process.Kill()
+func shutDownAndCleanBotServer(bot *common.Bot, containerId string) error {
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	defer apiClient.Close()
+
+	apiClient.NegotiateAPIVersion(context.Background())
+
+	fmt.Println("Killing container")
+	err = apiClient.ContainerKill(context.Background(), containerId, "")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Shut down gRPC server")
+	fmt.Println("Force deleting container")
+	err = apiClient.ContainerRemove(context.Background(), containerId, container.RemoveOptions{Force: true})
+	if err != nil {
+		return err
+	}
 
-	err = cleanAfterRun()
+	fmt.Println("Force deleted container")
+
+	err = cleanBotResources()
 	if err != nil {
 		return err
 	}
@@ -235,45 +274,29 @@ func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
 	return botCode, nil
 }
 
-func startServerForBot(bot *common.Bot, e BotEngine) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer, error) {
+func startBotContainer(bot *common.Bot, e BotEngine) (string, error) {
 	fmt.Printf("\n-----------------------------------------\n")
 	fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
 
 	botCode := e.sourceCodeCache[bot.Id]
 
 	fmt.Println("Creating source code file")
-	// absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
-	// if err != nil {
-	// 	return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
-	// }
-	absPath, err := buildLocalAbsolutePath("tmp/bot.py")
+	absPath, err := buildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
-		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
+		return "", err
 	}
 
 	err = os.WriteFile(absPath, botCode, 0755)
 	if err != nil {
-		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
+		return "", err
 	}
 
-	// _, err = CreateNewContainer("")
-	// if err != nil {
-	// 	return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
-	// }
-
-	cmd := exec.Command("python", pyServerPath)
-	var outb, errb bytes.Buffer
-	cmd.Stdout = &outb
-	cmd.Stderr = &errb
-
-	err = cmd.Start()
+	containerId, err := createAndStartContainer()
 	if err != nil {
-		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
+		return "", err
 	}
 
-	time.Sleep(1 * time.Second) // Allow 1s for gRPC server startup
-
-	return cmd, &outb, &errb, nil
+	return containerId, nil
 }
 
 func buildLocalAbsolutePath(relativePath string) (string, error) {
@@ -286,8 +309,8 @@ func buildLocalAbsolutePath(relativePath string) (string, error) {
 	return fmt.Sprintf("%s/%s", directory, trimmedPath), nil
 }
 
-func cleanAfterRun() error {
-	absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
+func cleanBotResources() error {
+	absPath, err := buildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return err
 	}
@@ -323,7 +346,7 @@ func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, 
 	return selections, nil
 }
 
-func CreateNewContainer(landscape *common.FantasyLandscape) (string, error) {
+func createAndStartContainer() (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		panic(err)
@@ -337,14 +360,14 @@ func CreateNewContainer(landscape *common.FantasyLandscape) (string, error) {
 		HostPort: "8080",
 	}
 
-	containerPort, err := nat.NewPort("tcp", "8080")
+	containerPort, err := nat.NewPort("tcp", containerServerPort)
 	if err != nil {
 		panic("Unable to get the port")
 	}
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
 
-	hostMountPath, err := buildLocalAbsolutePath("/tmp")
+	hostMountPath, err := buildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		panic(err)
 	}
@@ -361,7 +384,7 @@ func CreateNewContainer(landscape *common.FantasyLandscape) (string, error) {
 					Type:     mount.TypeBind,
 					ReadOnly: true,
 					Source:   hostMountPath,
-					Target:   "/botblitz",
+					Target:   botResourceFolderNameInContainer,
 				},
 			},
 		},
@@ -370,31 +393,14 @@ func CreateNewContainer(landscape *common.FantasyLandscape) (string, error) {
 		"",
 	)
 
-	fmt.Println(createResponse)
-
 	err = apiClient.ContainerStart(context.Background(), createResponse.ID, container.StartOptions{})
 	if err != nil {
 		fmt.Println(err)
+		// TODO: delete the container we created if we can't start it?
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(2 * time.Second) // Give container 2 seconds to start up
+	// TODO: could we potentially check that the container is running?
 
-	fmt.Println("Making RPC call")
-
-	selections, err := callBotRPC(landscape)
-	fmt.Println(selections)
-
-	fmt.Println("Killing container")
-	err = apiClient.ContainerKill(context.Background(), createResponse.ID, "")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Force deleting container")
-	err = apiClient.ContainerRemove(context.Background(), createResponse.ID, container.RemoveOptions{Force: true})
-	if err != nil {
-		panic(err)
-	}
-
-	return "", nil
+	return createResponse.ID, nil
 }

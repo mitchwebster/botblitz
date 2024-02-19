@@ -23,4 +23,6 @@ nba-bets/create-env.sh
 
 # Ignore bot.py in py-grpc-server as it is a temporary file
 py-grpc-server/bot.py
+
+# This is what is passed to the bot, do not override
 tmp/

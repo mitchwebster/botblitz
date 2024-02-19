@@ -20,5 +20,5 @@ run-engine:
 build-docker:
 	docker build -f py-server-dockerfile -t py-grpc-server ./py-grpc-server
 
-run-docker:
-	docker run -v $(pwd)/tmp:/botblitz:ro -p 8080:8080 py-grpc-server
+# debug-docker:
+# 	docker run -v $(pwd)/tmp:/botblitz:ro -p 8080:8080 py-grpc-server
