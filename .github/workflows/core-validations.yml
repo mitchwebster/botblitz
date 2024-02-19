@@ -37,6 +37,9 @@ jobs:
     - name: Docker version
       run: docker -v
 
+    - name: Build docker image
+      run: make build-docker
+
     - name: Clean generated proto
       run: make clean
 
