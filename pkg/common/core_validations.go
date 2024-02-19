@@ -16,12 +16,12 @@ func ValidateBotConfigs(bots []*Bot) bool {
 			return false
 		}
 
-		value, exists := uniquenessMap[bot.Id]
+		_, exists := uniquenessMap[bot.Id]
 		if exists {
 			return false
 		}
 
-		uniquenessMap[bot.Id] = value
+		uniquenessMap[bot.Id] = true
 	}
 
 	return true
@@ -35,13 +35,13 @@ func ValidateSimulation(simulations []*Simulation) bool {
 			return false
 		}
 
-		value, exists := uniquenessMap[simulation.Id]
+		_, exists := uniquenessMap[simulation.Id]
 		if exists {
 			return false
 		}
 
-		uniquenessMap[simulation.Id] = value
+		uniquenessMap[simulation.Id] = true
 	}
 
-	return false
+	return true
 }
