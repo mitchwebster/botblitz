@@ -18,13 +18,13 @@ func main() {
 		VerboseLoggingEnabled: true,
 	}
 
-	simulation := engine.Simulation{
+	simulation := common.Simulation{
 		Id:            "Today's Bets",
 		Landscape:     landscape,
 		NumIterations: 1,
 	}
 
-	simulations := []*engine.Simulation{&simulation}
+	simulations := []*common.Simulation{&simulation}
 
 	engine := engine.NewBotEngine(simulations, bots, engineSettings)
 

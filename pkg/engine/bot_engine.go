@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,12 +19,6 @@ const pyServerHostAndPort = "localhost:8080"
 const pyServerPath = "./py-grpc-server/server.py"   // py gRPC server code
 const pyServerBotFilePath = "py-grpc-server/bot.py" // source code filepath
 
-type Simulation struct {
-	Id            string
-	Landscape     *common.FantasyLandscape
-	NumIterations int
-}
-
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
 }
@@ -32,11 +27,11 @@ type BotEngine struct {
 	botResults      map[string]map[string][]*common.FantasySelections // Bot -> Simulation -> Simulation Selections per iteration
 	settings        BotEngineSettings
 	bots            []*common.Bot
-	simulations     []*Simulation
+	simulations     []*common.Simulation
 	sourceCodeCache map[string][]byte
 }
 
-func NewBotEngine(simulations []*Simulation, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
+func NewBotEngine(simulations []*common.Simulation, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
 	return &BotEngine{
 		settings:        settings,
 		bots:            bots,
@@ -63,13 +58,15 @@ func (e BotEngine) Summarize() string {
 		fmt.Fprintf(&builder, "\t - %s\n", obj.Id)
 	}
 
-	// fmt.Fprintf(&builder, "\nLandscape:\n")
-	// fmt.Fprintf(&builder, "\tPlayer Count: %d\n", len(e.landscape.Players))
-
 	return builder.String()
 }
 
 func (e BotEngine) Run() error {
+	err := performValidations(e)
+	if err != nil {
+		return err
+	}
+
 	return run(e)
 }
 
@@ -80,6 +77,20 @@ func (e BotEngine) PrintResults() {
 			fmt.Printf("\t%s: %s\n", simulationId, results)
 		}
 	}
+}
+
+func performValidations(e BotEngine) error {
+	botValidation := common.ValidateBotConfigs(e.bots)
+	if !botValidation {
+		return errors.New("Bot validation failed, please check provided bots")
+	}
+
+	simulationValidation := common.ValidateSimulation(e.simulations)
+	if !simulationValidation {
+		return errors.New("Simulation validation failed, please check provided simulations")
+	}
+
+	return nil
 }
 
 func run(e BotEngine) error {
@@ -167,7 +178,7 @@ func runSimulationsOnBot(bot *common.Bot, e BotEngine) error {
 		fmt.Printf("Running simulation (%s) on bot (%s)\n", simulation.Id, bot.Id)
 		selectionsForSimulation := []*common.FantasySelections{}
 
-		for iteration := 1; iteration <= simulation.NumIterations; iteration++ {
+		for iteration := uint32(1); iteration <= simulation.NumIterations; iteration++ {
 			fmt.Printf("\n\tIteration (%d): Making gRPC call\n", iteration)
 			selectionsForIteration, err := callBotRPC(simulation.Landscape)
 			if err != nil {

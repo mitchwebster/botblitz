@@ -78,3 +78,9 @@ message Bot {
     string source_path = 5;
     uint32 fantasy_team_id = 6; /* 0 should be unassigned */
 }
+
+message Simulation {
+	string id = 1;
+    FantasyLandscape landscape = 2;
+    uint32 num_iterations = 3;
+}

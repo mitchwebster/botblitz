@@ -115,3 +115,13 @@ class Bot(_message.Message):
     source_path: str
     fantasy_team_id: int
     def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
+
+class Simulation(_message.Message):
+    __slots__ = ("id", "landscape", "num_iterations")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    LANDSCAPE_FIELD_NUMBER: _ClassVar[int]
+    NUM_ITERATIONS_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    landscape: FantasyLandscape
+    num_iterations: int
+    def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
