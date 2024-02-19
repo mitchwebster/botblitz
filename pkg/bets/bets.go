@@ -1,4 +1,4 @@
-package main
+package bets
 
 import (
 	"database/sql"
@@ -9,24 +9,25 @@ import (
 	common "github.com/mitchwebster/botblitz/pkg/common"
 )
 
-func main() {
-	// Get the database file name from the environment variable
-	dbName := "/Users/caltonji/Documents/Dev/2024/botblitz/nba-bets/nbastat.db"
-	if dbName == "" {
-		log.Fatal("DB environment variable is not set.")
-	}
-
+// GetDB returns the default DB. Should immediately run defer db.close()
+func GetDB() (*sql.DB, error) {
+	dbPath := "../../../nba-bets/nbastat.db"
 	// Open the SQLite database
-	db, err := sql.Open("sqlite3", dbName)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatalf("Error opening database: %v", err)
+		return nil, fmt.Errorf("Error opening database: %v", err)
 	}
-	defer db.Close()
+	return db, nil
+}
+
+// GetAllBets returns all bets in a DB
+func GetAllBets(db *sql.DB) ([]*common.Bet, error) {
+	bets := []*common.Bet{}
 
 	// Query the bets table
 	rows, err := db.Query(`SELECT id, homeTeam, awayTeam, playerName, type, points, price FROM bets`)
 	if err != nil {
-		log.Fatalf("Error querying database: %v", err)
+		return bets, fmt.Errorf("Error querying database: %v", err)
 	}
 	defer rows.Close()
 
@@ -63,11 +64,11 @@ func main() {
 			Points:               float32(points),
 			Price:                float32(price),
 		}
-
-		fmt.Println(bet)
+		bets = append(bets, bet)
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		return bets, err
 	}
+	return bets, nil
 }
