@@ -20,3 +20,7 @@
 # Python Section
 __pycache__/
 nba-bets/create-env.sh
+
+# Ignore bot.py in py-grpc-server as it is a temporary file
+py-grpc-server/bot.py
+tmp/

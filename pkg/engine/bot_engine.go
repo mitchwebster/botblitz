@@ -10,6 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -67,7 +71,11 @@ func (e BotEngine) Run() error {
 		return err
 	}
 
-	return run(e)
+	val, err := CreateNewContainer(e.simulations[0].Landscape)
+	fmt.Println(val)
+
+	return nil
+	// return run(e)
 }
 
 func (e BotEngine) PrintResults() {
@@ -234,7 +242,11 @@ func startServerForBot(bot *common.Bot, e BotEngine) (*exec.Cmd, *bytes.Buffer, 
 	botCode := e.sourceCodeCache[bot.Id]
 
 	fmt.Println("Creating source code file")
-	absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
+	// absPath, err := buildLocalAbsolutePath(pyServerBotFilePath)
+	// if err != nil {
+	// 	return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
+	// }
+	absPath, err := buildLocalAbsolutePath("tmp/bot.py")
 	if err != nil {
 		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
@@ -243,6 +255,11 @@ func startServerForBot(bot *common.Bot, e BotEngine) (*exec.Cmd, *bytes.Buffer, 
 	if err != nil {
 		return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
 	}
+
+	// _, err = CreateNewContainer("")
+	// if err != nil {
+	// 	return nil, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), err
+	// }
 
 	cmd := exec.Command("python", pyServerPath)
 	var outb, errb bytes.Buffer
@@ -304,4 +321,80 @@ func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, 
 	}
 
 	return selections, nil
+}
+
+func CreateNewContainer(landscape *common.FantasyLandscape) (string, error) {
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		panic(err)
+	}
+	defer apiClient.Close()
+
+	apiClient.NegotiateAPIVersion(context.Background())
+
+	hostBinding := nat.PortBinding{
+		HostIP:   "0.0.0.0",
+		HostPort: "8080",
+	}
+
+	containerPort, err := nat.NewPort("tcp", "8080")
+	if err != nil {
+		panic("Unable to get the port")
+	}
+
+	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
+
+	hostMountPath, err := buildLocalAbsolutePath("/tmp")
+	if err != nil {
+		panic(err)
+	}
+
+	createResponse, _ := apiClient.ContainerCreate(
+		context.Background(),
+		&container.Config{
+			Image: "py-grpc-server",
+		},
+		&container.HostConfig{
+			PortBindings: portBinding,
+			Mounts: []mount.Mount{
+				{
+					Type:     mount.TypeBind,
+					ReadOnly: true,
+					Source:   hostMountPath,
+					Target:   "/botblitz",
+				},
+			},
+		},
+		nil,
+		nil,
+		"",
+	)
+
+	fmt.Println(createResponse)
+
+	err = apiClient.ContainerStart(context.Background(), createResponse.ID, container.StartOptions{})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	fmt.Println("Making RPC call")
+
+	selections, err := callBotRPC(landscape)
+	fmt.Println(selections)
+
+	fmt.Println("Killing container")
+	err = apiClient.ContainerKill(context.Background(), createResponse.ID, "")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Force deleting container")
+	err = apiClient.ContainerRemove(context.Background(), createResponse.ID, container.RemoveOptions{Force: true})
+	if err != nil {
+		panic(err)
+	}
+
+	return "", nil
 }
