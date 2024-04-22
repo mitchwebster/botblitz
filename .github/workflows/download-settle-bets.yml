@@ -3,6 +3,8 @@
 
 name: Python application
 
+on:
+
 permissions:
   contents: write
 
