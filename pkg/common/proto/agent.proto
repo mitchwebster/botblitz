@@ -60,8 +60,11 @@ message Player {
     string full_name = 2;
     repeated string allowed_positions = 3;
     string professional_team = 4;
-    string status = 5;
-    uint32 fantasy_team_id = 6; /* 0 should be unassigned */
+    uint32 player_bye_week = 5;
+    uint32 rank = 6;
+    uint32 tier = 7;
+    uint32 position_rank = 8;
+    uint32 position_tier = 9;
 }
 
 message Bot {

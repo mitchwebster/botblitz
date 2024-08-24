@@ -26,3 +26,4 @@ py-grpc-server/bot.py
 
 # This is what is passed to the bot, do not override
 tmp/
+.DS_Store

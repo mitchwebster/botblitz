@@ -79,20 +79,26 @@ class PlayerSlot(_message.Message):
     def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ...) -> None: ...
 
 class Player(_message.Message):
-    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "status", "fantasy_team_id")
+    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier")
     ID_FIELD_NUMBER: _ClassVar[int]
     FULL_NAME_FIELD_NUMBER: _ClassVar[int]
     ALLOWED_POSITIONS_FIELD_NUMBER: _ClassVar[int]
     PROFESSIONAL_TEAM_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_BYE_WEEK_FIELD_NUMBER: _ClassVar[int]
+    RANK_FIELD_NUMBER: _ClassVar[int]
+    TIER_FIELD_NUMBER: _ClassVar[int]
+    POSITION_RANK_FIELD_NUMBER: _ClassVar[int]
+    POSITION_TIER_FIELD_NUMBER: _ClassVar[int]
     id: str
     full_name: str
     allowed_positions: _containers.RepeatedScalarFieldContainer[str]
     professional_team: str
-    status: str
-    fantasy_team_id: int
-    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., status: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
+    player_bye_week: int
+    rank: int
+    tier: int
+    position_rank: int
+    position_tier: int
+    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ...) -> None: ...
 
 class Bot(_message.Message):
     __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id")
