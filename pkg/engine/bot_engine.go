@@ -375,7 +375,7 @@ func createAndStartContainer() (string, error) {
 	createResponse, _ := apiClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
-			Image: "py-grpc-server",
+			Image: "py_grpc_server",
 		},
 		&container.HostConfig{
 			PortBindings: portBinding,

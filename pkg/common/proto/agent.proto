@@ -65,6 +65,17 @@ message Player {
     uint32 tier = 7;
     uint32 position_rank = 8;
     uint32 position_tier = 9;
+    DraftStatus draft_status = 10;
+}
+
+message DraftStatus {
+    enum Availability {
+        AVAILABLE = 0;
+        DRAFTED = 1;
+    }
+    Availability availability = 1;
+    int32 pick_chosen = 2;
+    string team_id_chosen = 3;
 }
 
 message Bot {
@@ -86,4 +97,12 @@ message Simulation {
 	string id = 1;
     FantasyLandscape landscape = 2;
     uint32 num_iterations = 3;
+}
+
+message GameState {
+    repeated Player players = 1;
+    repeated FantasyTeam teams = 2;
+    uint32 current_pick = 3;
+    uint32 total_rounds = 4;
+    string drafting_team_id = 5;
 }
