@@ -61,12 +61,18 @@ class FantasyTeam(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., owner: _Optional[str] = ...) -> None: ...
 
 class LeagueSettings(_message.Message):
-    __slots__ = ("num_teams", "slots_per_team")
+    __slots__ = ("num_teams", "slots_per_team", "is_snake_draft", "total_rounds", "points_per_reception")
     NUM_TEAMS_FIELD_NUMBER: _ClassVar[int]
     SLOTS_PER_TEAM_FIELD_NUMBER: _ClassVar[int]
+    IS_SNAKE_DRAFT_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_ROUNDS_FIELD_NUMBER: _ClassVar[int]
+    POINTS_PER_RECEPTION_FIELD_NUMBER: _ClassVar[int]
     num_teams: int
     slots_per_team: _containers.RepeatedCompositeFieldContainer[PlayerSlot]
-    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ...) -> None: ...
+    is_snake_draft: bool
+    total_rounds: int
+    points_per_reception: float
+    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ...) -> None: ...
 
 class PlayerSlot(_message.Message):
     __slots__ = ("name", "allowed_player_positions", "assigned_player_id")
@@ -153,15 +159,15 @@ class Simulation(_message.Message):
     def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
 
 class GameState(_message.Message):
-    __slots__ = ("players", "teams", "current_pick", "total_rounds", "drafting_team_id")
+    __slots__ = ("players", "teams", "current_pick", "drafting_team_id", "league_settings")
     PLAYERS_FIELD_NUMBER: _ClassVar[int]
     TEAMS_FIELD_NUMBER: _ClassVar[int]
     CURRENT_PICK_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_ROUNDS_FIELD_NUMBER: _ClassVar[int]
     DRAFTING_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    LEAGUE_SETTINGS_FIELD_NUMBER: _ClassVar[int]
     players: _containers.RepeatedCompositeFieldContainer[Player]
     teams: _containers.RepeatedCompositeFieldContainer[FantasyTeam]
     current_pick: int
-    total_rounds: int
     drafting_team_id: str
-    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., current_pick: _Optional[int] = ..., total_rounds: _Optional[int] = ..., drafting_team_id: _Optional[str] = ...) -> None: ...
+    league_settings: LeagueSettings
+    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., current_pick: _Optional[int] = ..., drafting_team_id: _Optional[str] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ...) -> None: ...

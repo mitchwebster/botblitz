@@ -46,7 +46,9 @@ message FantasyTeam {
 message LeagueSettings {
     uint32 num_teams = 1;
     repeated PlayerSlot slots_per_team = 2;
-    /* scoring, budgets, etc. */
+    bool is_snake_draft = 3;
+    uint32 total_rounds = 4;
+    float points_per_reception = 5;
 }
 
 message PlayerSlot {
@@ -104,6 +106,6 @@ message GameState {
     repeated Player players = 1;
     repeated FantasyTeam teams = 2;
     uint32 current_pick = 3;
-    uint32 total_rounds = 4;
     string drafting_team_id = 5;
+    LeagueSettings league_settings = 6;
 }
