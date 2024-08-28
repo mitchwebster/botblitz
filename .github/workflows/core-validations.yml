@@ -1,10 +1,6 @@
 name: Core BotBlitz Validations
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
   buildAndTest:
