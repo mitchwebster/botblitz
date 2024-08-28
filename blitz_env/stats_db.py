@@ -1,7 +1,7 @@
 import nfl_data_py as nfl
 import pandas as pd
 from typing import List
-from .agent_pb2 import Player  # Ensure this import path is correct based on your project structure
+from .agent_pb2 import Player  
 
 class StatsDB:
     def __init__(self, years: List[int]):
