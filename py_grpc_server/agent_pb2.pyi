@@ -79,20 +79,44 @@ class PlayerSlot(_message.Message):
     def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ...) -> None: ...
 
 class Player(_message.Message):
-    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "status", "fantasy_team_id")
+    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "draft_status")
     ID_FIELD_NUMBER: _ClassVar[int]
     FULL_NAME_FIELD_NUMBER: _ClassVar[int]
     ALLOWED_POSITIONS_FIELD_NUMBER: _ClassVar[int]
     PROFESSIONAL_TEAM_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_BYE_WEEK_FIELD_NUMBER: _ClassVar[int]
+    RANK_FIELD_NUMBER: _ClassVar[int]
+    TIER_FIELD_NUMBER: _ClassVar[int]
+    POSITION_RANK_FIELD_NUMBER: _ClassVar[int]
+    POSITION_TIER_FIELD_NUMBER: _ClassVar[int]
+    DRAFT_STATUS_FIELD_NUMBER: _ClassVar[int]
     id: str
     full_name: str
     allowed_positions: _containers.RepeatedScalarFieldContainer[str]
     professional_team: str
-    status: str
-    fantasy_team_id: int
-    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., status: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
+    player_bye_week: int
+    rank: int
+    tier: int
+    position_rank: int
+    position_tier: int
+    draft_status: DraftStatus
+    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ..., draft_status: _Optional[_Union[DraftStatus, _Mapping]] = ...) -> None: ...
+
+class DraftStatus(_message.Message):
+    __slots__ = ("availability", "pick_chosen", "team_id_chosen")
+    class Availability(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        AVAILABLE: _ClassVar[DraftStatus.Availability]
+        DRAFTED: _ClassVar[DraftStatus.Availability]
+    AVAILABLE: DraftStatus.Availability
+    DRAFTED: DraftStatus.Availability
+    AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
+    PICK_CHOSEN_FIELD_NUMBER: _ClassVar[int]
+    TEAM_ID_CHOSEN_FIELD_NUMBER: _ClassVar[int]
+    availability: DraftStatus.Availability
+    pick_chosen: int
+    team_id_chosen: str
+    def __init__(self, availability: _Optional[_Union[DraftStatus.Availability, str]] = ..., pick_chosen: _Optional[int] = ..., team_id_chosen: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
     __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id")
@@ -125,3 +149,17 @@ class Simulation(_message.Message):
     landscape: FantasyLandscape
     num_iterations: int
     def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
+
+class GameState(_message.Message):
+    __slots__ = ("players", "teams", "current_pick", "total_rounds", "drafting_team_id")
+    PLAYERS_FIELD_NUMBER: _ClassVar[int]
+    TEAMS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_PICK_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_ROUNDS_FIELD_NUMBER: _ClassVar[int]
+    DRAFTING_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    players: _containers.RepeatedCompositeFieldContainer[Player]
+    teams: _containers.RepeatedCompositeFieldContainer[FantasyTeam]
+    current_pick: int
+    total_rounds: int
+    drafting_team_id: str
+    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., current_pick: _Optional[int] = ..., total_rounds: _Optional[int] = ..., drafting_team_id: _Optional[str] = ...) -> None: ...

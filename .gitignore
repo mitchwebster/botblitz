@@ -21,8 +21,10 @@
 __pycache__/
 nba-bets/create-env.sh
 
-# Ignore bot.py in py-grpc-server as it is a temporary file
-py-grpc-server/bot.py
+# Ignore bot.py in py_grpc_server as it is a temporary file
+py_grpc_server/bot.py
 
 # This is what is passed to the bot, do not override
 tmp/
+.DS_Store
+.ipynb_checkpoints/
