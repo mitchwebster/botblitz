@@ -63,7 +63,7 @@ def init_game_state(year) -> GameState:
     game_state.drafting_team_id = teams[0].id
     game_state.league_settings.is_snake_draft = True
     game_state.league_settings.num_teams = 10
-    game_state.league_settings.total_rounds = 16
+    game_state.league_settings.total_rounds = 15
     game_state.league_settings.points_per_reception = 1.0
     game_state.league_settings.slots_per_team.extend(
         [
