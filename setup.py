@@ -20,7 +20,7 @@ setup(
         "nfl-data-py==0.3.1"
     ],
     package_data={
-        'blitz_env': ['player_ranks_2024.csv'],
+        'blitz_env': ['player_ranks_2024.csv', 'player_ranks_2023.csv'],
     },
     python_requires='>=3.6',
 )
