@@ -20,5 +20,14 @@ run-engine:
 build-docker:
 	docker build -f py-server-dockerfile -t py_grpc_server ./py_grpc_server
 
+build-py-module:
+	 cp -f py_grpc_server/agent_pb2_grpc.py blitz_env/agent_pb2_grpc.py
+	 cp -f py_grpc_server/agent_pb2.py blitz_env/agent_pb2.py
+	 cp -f py_grpc_server/agent_pb2.pyi blitz_env/agent_pb2.pyi
+	 cp -f py_grpc_server/loadPlayers.py blitz_env/loadPlayers.py
+	 cp -f player_ranks_2024.csv blitz_env/player_ranks_2024.csv
+	 rm -rf build/ dist/ *.egg-info
+	 python setup.py sdist bdist_wheel
+
 # debug-docker:
 # 	docker run -v $(pwd)/tmp:/botblitz:ro -p 8080:8080 py_grpc_server

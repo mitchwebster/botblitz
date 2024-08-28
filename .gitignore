@@ -28,3 +28,11 @@ py_grpc_server/bot.py
 tmp/
 .DS_Store
 .ipynb_checkpoints/
+
+build/
+blitz_env.egg-info/
+blitz_env/agent_pb2_grpc.py
+blitz_env/agent_pb2.py
+blitz_env/agent_pb2.pyi
+blitz_env/loadPlayers.py
+blitz_env/player_ranks_2024.csv
