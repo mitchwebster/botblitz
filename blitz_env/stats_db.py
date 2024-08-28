@@ -30,7 +30,7 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the weekly data for the specified player.
         """
-        return self.weekly_df[self.weekly_df.player_id == player.id]
+        return self.weekly_df[self.weekly_df.player_id == player.gsis_id]
 
     def get_seasonal_data(self, player: Player) -> pd.DataFrame:
         """
@@ -42,7 +42,7 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the seasonal data for the specified player.
         """
-        return self.seasonal_df[self.seasonal_df.player_id == player.id]
+        return self.seasonal_df[self.seasonal_df.player_id == player.gsis_id]
 
     def get_ids(self, player: Player) -> pd.DataFrame:
         """
@@ -54,4 +54,4 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the ID mappings for the specified player.
         """
-        return self.ids_df[self.ids_df.gsis_id == player.id]
+        return self.ids_df[self.ids_df.gsis_id == player.gsis_id]

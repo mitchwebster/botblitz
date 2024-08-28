@@ -1,4 +1,3 @@
-from google.protobuf import any_pb2 as _any_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -80,7 +79,7 @@ class PlayerSlot(_message.Message):
     def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ...) -> None: ...
 
 class Player(_message.Message):
-    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "draft_status")
+    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "draft_status", "gsis_id")
     ID_FIELD_NUMBER: _ClassVar[int]
     FULL_NAME_FIELD_NUMBER: _ClassVar[int]
     ALLOWED_POSITIONS_FIELD_NUMBER: _ClassVar[int]
@@ -91,6 +90,7 @@ class Player(_message.Message):
     POSITION_RANK_FIELD_NUMBER: _ClassVar[int]
     POSITION_TIER_FIELD_NUMBER: _ClassVar[int]
     DRAFT_STATUS_FIELD_NUMBER: _ClassVar[int]
+    GSIS_ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     full_name: str
     allowed_positions: _containers.RepeatedScalarFieldContainer[str]
@@ -101,7 +101,8 @@ class Player(_message.Message):
     position_rank: int
     position_tier: int
     draft_status: DraftStatus
-    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ..., draft_status: _Optional[_Union[DraftStatus, _Mapping]] = ...) -> None: ...
+    gsis_id: str
+    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ..., draft_status: _Optional[_Union[DraftStatus, _Mapping]] = ..., gsis_id: _Optional[str] = ...) -> None: ...
 
 class DraftStatus(_message.Message):
     __slots__ = ("availability", "pick_chosen", "team_id_chosen")

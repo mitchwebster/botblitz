@@ -1,6 +1,6 @@
 from typing import Callable, List, Mapping
 from .agent_pb2 import Player, DraftStatus, FantasyTeam, GameState
-from .loadPlayers import load_all_players
+from .blitz_env import load_players
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import textwrap
@@ -38,17 +38,17 @@ def default_draft_strategy(players: List[Player]) -> str:
         return ""  # Return empty string if no undrafted players are available
 
 def init_game_state(year) -> GameState:
-    players = load_all_players(year)
+    players = load_players(year)
     teams = [
         init_team("1", "A", "Alex"),
-        init_team("2", "B", "Bob"),
+        init_team("2", "B", "Ben"),
         init_team("3", "C", "Chris"),
-        init_team("4", "D", "Darrell"),
-        init_team("5", "E", "Emma"),
+        init_team("4", "D", "Drew"),
+        init_team("5", "E", "Elizabeth"),
         init_team("6", "F", "Frank"),
         init_team("7", "G", "Gillian"),
-        init_team("8", "H", "Helen"),
-        init_team("9", "J", "Jim"),
+        init_team("8", "H", "Harry"),
+        init_team("9", "J", "Jon"),
         init_team("10", "K", "Kevin")
     ]
     game_state = GameState()
@@ -57,6 +57,7 @@ def init_game_state(year) -> GameState:
     game_state.current_pick = 1
     game_state.total_rounds = 16
     game_state.drafting_team_id = teams[0].id
+    return game_state
 
 def get_picking_team_index(game_state: GameState, pick: int) -> int:
     number_of_teams = len(game_state.teams)
@@ -78,14 +79,24 @@ def get_picking_team_index(game_state: GameState, pick: int) -> int:
 def get_picking_team_id(game_state: GameState, pick: int) -> int:
     return game_state.teams[get_picking_team_index(game_state, pick)].id
 
+def get_players_copy(game_state: GameState):
+    players = []
+    for player in game_state.players:
+        copied_player = Player()
+        copied_player.CopyFrom(player)  # Copy the player
+        players.append(copied_player)
+    return players
 
 def run_draft(game_state, draft_strategy_map):
     total_picks = game_state.total_rounds * len(game_state.teams)
     while game_state.current_pick <= total_picks:
         draft_strategy = draft_strategy_map[game_state.drafting_team_id]
-        player_id = draft_strategy(game_state.players)
+        
+        player_id = draft_strategy(get_players_copy(game_state))
         for player in game_state.players:
             if player.id == player_id:
+                if is_drafted(player):
+                    raise Exception(f"Player id: {player_id} already drafted")
                 player.draft_status.availability = DraftStatus.DRAFTED
                 player.draft_status.pick_chosen = game_state.current_pick
                 player.draft_status.team_id_chosen = game_state.drafting_team_id 
@@ -101,7 +112,8 @@ def simulate_draft(draft_player: Callable[[List[Player]], str], year: int):
         draft_strategy_map[team.id] = default_draft_strategy
     # make random team the user's team
     user_team = random.choice(game_state.teams)
-    user_team.name = "User"
+    user_team.owner = "User"
+    user_team.name = "Your Bot"
     draft_strategy_map[user_team.id] = draft_player
 
     run_draft(game_state, draft_strategy_map)
@@ -139,7 +151,6 @@ def visualize_draft_board(game_state: GameState):
             continue
         round_number = (player.draft_status.pick_chosen - 1) // num_teams
         team_index = get_picking_team_index(game_state, player.draft_status.pick_chosen)
-
         # Determine the color based on the first allowed position (assuming the position list is not empty)
         position_color = position_colors.get(player.allowed_positions[0], 'lightgrey')  # Default to lightgrey if no match
 
@@ -165,6 +176,3 @@ def visualize_draft_board(game_state: GameState):
     plt.ylabel('Rounds')
     plt.tight_layout()
     plt.show()
-
-
-

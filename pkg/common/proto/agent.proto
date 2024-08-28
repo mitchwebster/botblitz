@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
-
 // option go_package = ".;pb";
 option go_package = ".;common";
 
@@ -68,6 +66,7 @@ message Player {
     uint32 position_rank = 8;
     uint32 position_tier = 9;
     DraftStatus draft_status = 10;
+    string gsis_id = 11;
 }
 
 message DraftStatus {
