@@ -16,7 +16,7 @@ setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        "pandas==2.2.0",
+        "pandas==2.1.4",
     ],
     package_data={
         'blitz_env': ['player_ranks_2024.csv'],
