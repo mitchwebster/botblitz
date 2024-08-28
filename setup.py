@@ -17,6 +17,7 @@ setup(
     ],
     install_requires=[
         "pandas==2.1.4",
+        "nfl-data-py==0.3.1"
     ],
     package_data={
         'blitz_env': ['player_ranks_2024.csv'],
