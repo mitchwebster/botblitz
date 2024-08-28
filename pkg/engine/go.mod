@@ -6,6 +6,7 @@ replace github.com/mitchwebster/botblitz/pkg/common v0.0.0 => ../common
 
 require (
 	github.com/docker/docker v25.0.3+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/mitchwebster/botblitz/pkg/common v0.0.0
 	google.golang.org/grpc v1.61.1
 )
@@ -14,7 +15,6 @@ require (
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
