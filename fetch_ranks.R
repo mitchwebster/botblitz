@@ -2,13 +2,23 @@ library(dplyr)
 library(ffpros)
 library(readr)
 
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) == 0) {
+  year_input <- NA # Default or error value if no year is provided
+} else {
+  year_input <- args[1]
+}
+
+# Convert the input into an integer
+year <- as.integer(year_input)
+
 # Fetch and prepare the general PPR data
-ppr_data <- fp_rankings(page = "ppr-cheatsheets") %>%
+ppr_data <- fp_rankings(page = "ppr-cheatsheets", year = year) %>%
   select(fantasypros_id, player_name, pos, team, player_bye_week, rank, tier)
 
 # Function to fetch and process position-specific data
 process_position_data <- function(page, suffix) {
-  position_data <- fp_rankings(page = page) %>%
+  position_data <- fp_rankings(page = page, year = year) %>%
     select(fantasypros_id,
       position_rank = rank,
       position_tier = tier
@@ -53,8 +63,10 @@ additional_data <- read_csv("https://raw.githubusercontent.com/dynastyprocess/da
 # Join additional_data to all_data on fantasypros_id
 all_data <- left_join(all_data, additional_data, by = "fantasypros_id")
 
+filename <- paste0("player_ranks_", year, ".csv")
+
 # Save the final joined data to CSV
-write.csv(all_data, "player_ranks.csv", row.names = FALSE)
+write.csv(all_data, filename, row.names = FALSE)
 
 # Print confirmation
-print("Data has been successfully saved to 'player_ranks.csv'.")
+print(paste0("Data has been successfully saved to '", filename, "'."))
