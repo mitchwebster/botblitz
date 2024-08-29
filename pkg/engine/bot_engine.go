@@ -349,7 +349,7 @@ func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, 
 func createAndStartContainer() (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	defer apiClient.Close()
 
@@ -362,17 +362,17 @@ func createAndStartContainer() (string, error) {
 
 	containerPort, err := nat.NewPort("tcp", containerServerPort)
 	if err != nil {
-		panic("Unable to get the port")
+		return "", fmt.Errorf("Unable to get the port: %v", err)
 	}
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
 
 	hostMountPath, err := buildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
-	createResponse, _ := apiClient.ContainerCreate(
+	createResponse, err := apiClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
 			Image: "py_grpc_server",
@@ -392,11 +392,15 @@ func createAndStartContainer() (string, error) {
 		nil,
 		"",
 	)
+	if err != nil {
+		return "", fmt.Errorf("unable to create container: %v", err)
+	}
 
 	err = apiClient.ContainerStart(context.Background(), createResponse.ID, container.StartOptions{})
 	if err != nil {
 		fmt.Println(err)
 		// TODO: delete the container we created if we can't start it?
+		return "", fmt.Errorf("couldn't start container: %v", err)
 	}
 
 	time.Sleep(2 * time.Second) // Give container 2 seconds to start up
