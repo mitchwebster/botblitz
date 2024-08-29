@@ -49,6 +49,7 @@ message LeagueSettings {
     bool is_snake_draft = 3;
     uint32 total_rounds = 4;
     float points_per_reception = 5;
+    uint32 year = 6;
 }
 
 message PlayerSlot {

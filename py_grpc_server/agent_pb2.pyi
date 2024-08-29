@@ -61,18 +61,20 @@ class FantasyTeam(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., owner: _Optional[str] = ...) -> None: ...
 
 class LeagueSettings(_message.Message):
-    __slots__ = ("num_teams", "slots_per_team", "is_snake_draft", "total_rounds", "points_per_reception")
+    __slots__ = ("num_teams", "slots_per_team", "is_snake_draft", "total_rounds", "points_per_reception", "year")
     NUM_TEAMS_FIELD_NUMBER: _ClassVar[int]
     SLOTS_PER_TEAM_FIELD_NUMBER: _ClassVar[int]
     IS_SNAKE_DRAFT_FIELD_NUMBER: _ClassVar[int]
     TOTAL_ROUNDS_FIELD_NUMBER: _ClassVar[int]
     POINTS_PER_RECEPTION_FIELD_NUMBER: _ClassVar[int]
+    YEAR_FIELD_NUMBER: _ClassVar[int]
     num_teams: int
     slots_per_team: _containers.RepeatedCompositeFieldContainer[PlayerSlot]
     is_snake_draft: bool
     total_rounds: int
     points_per_reception: float
-    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ...) -> None: ...
+    year: int
+    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ..., year: _Optional[int] = ...) -> None: ...
 
 class PlayerSlot(_message.Message):
     __slots__ = ("name", "allowed_player_positions", "assigned_player_id")
