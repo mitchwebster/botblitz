@@ -13,7 +13,8 @@ def load_all_players(csv_path):
     for index, row in df.iterrows():
         # Create a new Player object and assign data from the row
         player = Player(
-            id=str(row['gsis_id']),
+            id=str(row['fantasypros_id']),
+            gsis_id=str(row['gsis_id']),
             full_name=row['player_name'],
             allowed_positions=[row['pos']],  # assuming 'pos' is a string; adjust if it's actually a list
             professional_team=row['team'],

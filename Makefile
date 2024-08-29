@@ -26,6 +26,7 @@ build-py-module:
 	 cp -f py_grpc_server/agent_pb2.pyi blitz_env/agent_pb2.pyi
 	 cp -f py_grpc_server/loadPlayers.py blitz_env/loadPlayers.py
 	 cp -f player_ranks_2024.csv blitz_env/player_ranks_2024.csv
+	 cp -f player_ranks_2023.csv blitz_env/player_ranks_2023.csv
 	 rm -rf build/ dist/ *.egg-info
 	 python setup.py sdist bdist_wheel
 
