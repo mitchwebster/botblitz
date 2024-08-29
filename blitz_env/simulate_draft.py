@@ -65,6 +65,7 @@ def init_game_state(year) -> GameState:
     game_state.league_settings.num_teams = 10
     game_state.league_settings.total_rounds = 15
     game_state.league_settings.points_per_reception = 1.0
+    game_state.league_settings.year = year
     game_state.league_settings.slots_per_team.extend(
         [
             init_player_slot(["QB"]),
