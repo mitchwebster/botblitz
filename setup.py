@@ -21,7 +21,7 @@ setup(
         'protobuf==5.27.4'
     ],
     package_data={
-        'blitz_env': ['player_ranks_2024.csv', 'player_ranks_2023.csv'],
+        'blitz_env': ['player_ranks_2024.csv', 'player_ranks_2023.csv', 'player_ranks_2022.csv', 'player_ranks_2021.csv'],
     },
     python_requires='>=3.6',
 )
