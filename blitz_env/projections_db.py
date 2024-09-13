@@ -145,35 +145,75 @@ def fp_projections_parse_nhl(response):
 from .agent_pb2 import Player  
 
 class ProjectionsDB:
+    """
+    A class to manage NFL player projections with caching to avoid redundant data loading.
+
+    The projections are loaded from FantasyPros (ffpros), which maintains historical pre-game and pre-season projections.
+    """
+
     def __init__(self):
+        """
+        Initializes the ProjectionsDB instance with an empty cache.
+        """
         self._cache = {}
-    
+
     def get_preseason_projections(self, player: Player, season: int) -> pd.DataFrame:
+        """
+        Retrieves preseason projections for a specific player and season.
+
+        This method uses caching to avoid reloading data if it has been loaded before.
+        The projections are sourced from FantasyPros (ffpros), which provides historical pre-season projections.
+
+        Parameters:
+        - player (Player): The player object for whom to retrieve projections.
+        - season (int): The season year.
+
+        Returns:
+        - pd.DataFrame: A DataFrame containing the preseason projections for the specified player.
+        """
         page = player.allowed_positions[0].lower()
         sport = "nfl"
         year = str(season)
         week = "draft"
         key = (page, sport, year, week)
-        
+
         if key in self._cache:
             df = self._cache[key]
         else:
+            # Load projections from FantasyPros and cache the result
             df = fp_projections(page=page, sport=sport, year=year, week=week)
             self._cache[key] = df
-            
+
+        # Filter the DataFrame to return projections only for the specified player
         return df[df['id'] == player.id]
-    
+
     def get_weekly_projections(self, player: Player, season: int, week: int) -> pd.DataFrame:
+        """
+        Retrieves weekly projections for a specific player, season, and week.
+
+        This method uses caching to avoid reloading data if it has been loaded before.
+        The projections are sourced from FantasyPros (ffpros), which provides historical pre-game projections.
+
+        Parameters:
+        - player (Player): The player object for whom to retrieve projections.
+        - season (int): The season year.
+        - week (int): The week number within the season.
+
+        Returns:
+        - pd.DataFrame: A DataFrame containing the weekly projections for the specified player and week.
+        """
         page = player.allowed_positions[0].lower()
         sport = "nfl"
         year = str(season)
         week_str = str(week)
         key = (page, sport, year, week_str)
-        
+
         if key in self._cache:
             df = self._cache[key]
         else:
+            # Load projections from FantasyPros and cache the result
             df = fp_projections(page=page, sport=sport, year=year, week=week_str)
             self._cache[key] = df
-            
+
+        # Filter the DataFrame to return projections only for the specified player
         return df[df['id'] == player.id]
