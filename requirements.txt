@@ -10,7 +10,7 @@ attrs==24.2.0
 babel==2.16.0
 beautifulsoup4==4.12.3
 bleach==6.1.0
-blitz_env @ file:///Users/caltonji/Documents/Dev/2024/botblitz/dist/blitz_env-0.1.0-py3-none-any.whl#sha256=a36f289331b9d524286221ebc42d5a685b1a99af142d3502add853d6c6ed130f
+# blitz_env @ file:///Users/caltonji/Documents/Dev/2024/botblitz/dist/blitz_env-0.1.0-py3-none-any.whl#sha256=a36f289331b9d524286221ebc42d5a685b1a99af142d3502add853d6c6ed130f
 certifi==2024.7.4
 cffi==1.17.0
 charset-normalizer==3.3.2

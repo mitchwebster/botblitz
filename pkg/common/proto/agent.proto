@@ -4,7 +4,7 @@ syntax = "proto3";
 option go_package = ".;common";
 
 service AgentService {
-    rpc PerformFantasyActions(FantasyLandscape) returns (FantasySelections) {}
+    rpc PerformFantasyActions(GameState) returns (DraftSelection) {}
 }
 
 message FantasyLandscape {
@@ -109,4 +109,8 @@ message GameState {
     uint32 current_pick = 3;
     string drafting_team_id = 5;
     LeagueSettings league_settings = 6;
+}
+
+message DraftSelection {
+    string player_id = 1;
 }
