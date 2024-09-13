@@ -4,10 +4,12 @@ clean:
 	rm -f blitz_env/agent_pb2.py
 	rm -f blitz_env/agent_pb2.pyi
 	rm -f blitz_env/agent_pb2_grpc.py
+	rm -f py_grpc_server/agent_pb2_grpc.py
 
 gen:
 	protoc ./pkg/common/proto/agent.proto --go_out=./pkg/common/ --go-grpc_out=./pkg/common/
 	cd blitz_env && python -m grpc_tools.protoc -I ../pkg/common/proto --python_out=. --pyi_out=. --grpc_python_out=. ../pkg/common/proto/agent.proto
+	cp -f blitz_env/agent_pb2_grpc.py py_grpc_server/agent_pb2_grpc.py
 
 test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go mod tidy -C
