@@ -18,7 +18,6 @@ import (
 )
 
 const pyServerHostAndPort = "localhost:8080"
-
 const botResourceFolderName = "/tmp"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
 const containerServerPort = "8080"
@@ -32,17 +31,17 @@ type BotEngine struct {
 	botResults      map[string]map[string][]*common.FantasySelections // Bot -> Simulation -> Simulation Selections per iteration
 	settings        BotEngineSettings
 	bots            []*common.Bot
-	simulations     []*common.Simulation
 	sourceCodeCache map[string][]byte
+	gameState       *common.GameState
 }
 
-func NewBotEngine(simulations []*common.Simulation, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
+func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
 	return &BotEngine{
 		settings:        settings,
 		bots:            bots,
-		simulations:     simulations,
 		botResults:      make(map[string]map[string][]*common.FantasySelections),
 		sourceCodeCache: make(map[string][]byte),
+		gameState:       gameState,
 	}
 }
 
@@ -54,7 +53,7 @@ func (e BotEngine) Summarize() string {
 
 	// Print settings
 	fmt.Fprintf(&builder, "Settings:\n")
-	fmt.Fprintf(&builder, "\tNumSimulations: %d\n", len(e.simulations))
+	// fmt.Fprintf(&builder, "\tNumSimulations: %d\n", len(e.simulations))
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
 
 	fmt.Fprintf(&builder, "\nBots:\n")
@@ -90,10 +89,10 @@ func performValidations(e BotEngine) error {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
 
-	simulationValidation := common.ValidateSimulation(e.simulations)
-	if !simulationValidation {
-		return errors.New("Simulation validation failed, please check provided simulations")
-	}
+	// simulationValidation := common.ValidateSimulation(e.simulations)
+	// if !simulationValidation {
+	// 	return errors.New("Simulation validation failed, please check provided simulations")
+	// }
 
 	return nil
 }
@@ -123,11 +122,20 @@ func run(e BotEngine) error {
 		fmt.Printf("Bot details: Username: %s, Repo: %s, Fantasy Team Id: %d\n", bot.SourceRepoUsername, bot.SourceRepoName, bot.FantasyTeamId)
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 
-		err = runSimulationsOnBot(bot, e)
+		err = performDraftPick(bot, e)
 		if err != nil {
 			fmt.Println("Failed to run simulations on bot")
 			fmt.Println(err)
 		}
+
+		// settings := common.LeagueSettings{
+		// 	NumTeams:           uint32(len(fantasy_teams)),
+		// 	IsSnakeDraft:       true,
+		// 	TotalRounds:        15,
+		// 	PointsPerReception: 1.0,
+		// 	Year:               uint32(year),
+		// 	SlotsPerTeam:       player_slots,
+		// }
 
 		err = shutDownAndCleanBotServer(bot, containerId)
 		if err != nil {
@@ -140,7 +148,7 @@ func run(e BotEngine) error {
 }
 
 func collectBotResources(e BotEngine) error {
-	folderPath, err := buildLocalAbsolutePath(botResourceFolderName)
+	folderPath, err := BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return err
 	}
@@ -218,30 +226,44 @@ func shutDownAndCleanBotServer(bot *common.Bot, containerId string) error {
 	return nil
 }
 
-func runSimulationsOnBot(bot *common.Bot, e BotEngine) error {
+// func runSimulationsOnBot(bot *common.Bot, e BotEngine) error {
 
-	for _, simulation := range e.simulations {
-		fmt.Printf("\n-----------------------------------------\n")
-		fmt.Printf("Running simulation (%s) on bot (%s)\n", simulation.Id, bot.Id)
-		selectionsForSimulation := []*common.FantasySelections{}
+// 	for _, simulation := range e.simulations {
+// 		fmt.Printf("\n-----------------------------------------\n")
+// 		fmt.Printf("Running simulation (%s) on bot (%s)\n", simulation.Id, bot.Id)
+// 		selectionsForSimulation := []*common.FantasySelections{}
 
-		for iteration := uint32(1); iteration <= simulation.NumIterations; iteration++ {
-			fmt.Printf("\n\tIteration (%d): Making gRPC call\n", iteration)
-			selectionsForIteration, err := callBotRPC(simulation.Landscape)
-			if err != nil {
-				fmt.Printf("\tIteration (%d): Failed to make gRPC call\n", iteration)
-				fmt.Println(err)
-				selectionsForSimulation = append(selectionsForSimulation, nil)
-			} else {
-				fmt.Printf("\tIteration (%d): bot ran successfully!\n", iteration)
-				selectionsForSimulation = append(selectionsForSimulation, selectionsForIteration)
-			}
+// 		for iteration := uint32(1); iteration <= simulation.NumIterations; iteration++ {
+// 			fmt.Printf("\n\tIteration (%d): Making gRPC call\n", iteration)
+// 			selectionsForIteration, err := callBotRPC(simulation.Landscape)
+// 			if err != nil {
+// 				fmt.Printf("\tIteration (%d): Failed to make gRPC call\n", iteration)
+// 				fmt.Println(err)
+// 				selectionsForSimulation = append(selectionsForSimulation, nil)
+// 			} else {
+// 				fmt.Printf("\tIteration (%d): bot ran successfully!\n", iteration)
+// 				selectionsForSimulation = append(selectionsForSimulation, selectionsForIteration)
+// 			}
 
-		}
+// 		}
 
-		e.botResults[bot.Id][simulation.Id] = selectionsForSimulation
-		fmt.Printf("\n-----------------------------------------\n") // Add formatting to make separate runs clear
+// 		e.botResults[bot.Id][simulation.Id] = selectionsForSimulation
+// 		fmt.Printf("\n-----------------------------------------\n") // Add formatting to make separate runs clear
+// 	}
+
+// 	return nil
+// }
+
+func performDraftPick(bot *common.Bot, e BotEngine) error {
+	draftPick, err := callBotRPC(e.gameState)
+	if err != nil {
+		return err
 	}
+
+	fmt.Println("Got a pick:")
+	fmt.Println(draftPick.PlayerId)
+
+	// Validate that pick was ok
 
 	return nil
 }
@@ -257,7 +279,7 @@ func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
 
 		botCode = downloadedSourceCode
 	} else {
-		absPath, err := buildLocalAbsolutePath(bot.SourcePath)
+		absPath, err := BuildLocalAbsolutePath(bot.SourcePath)
 		if err != nil {
 			return nil, err
 		}
@@ -281,7 +303,7 @@ func startBotContainer(bot *common.Bot, e BotEngine) (string, error) {
 	botCode := e.sourceCodeCache[bot.Id]
 
 	fmt.Println("Creating source code file")
-	absPath, err := buildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return "", err
 	}
@@ -299,7 +321,7 @@ func startBotContainer(bot *common.Bot, e BotEngine) (string, error) {
 	return containerId, nil
 }
 
-func buildLocalAbsolutePath(relativePath string) (string, error) {
+func BuildLocalAbsolutePath(relativePath string) (string, error) {
 	directory, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -310,7 +332,7 @@ func buildLocalAbsolutePath(relativePath string) (string, error) {
 }
 
 func cleanBotResources() error {
-	absPath, err := buildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return err
 	}
@@ -326,7 +348,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, error) {
+func callBotRPC(gameState *common.GameState) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -338,13 +360,33 @@ func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, 
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
-	selections, err := client.PerformFantasyActions(context.Background(), landscape)
+	selections, err := client.PerformFantasyActions(context.Background(), gameState)
 	if err != nil {
 		return nil, err
 	}
 
 	return selections, nil
 }
+
+// func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, error) {
+// 	var opts []grpc.DialOption
+// 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+// 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	defer conn.Close()
+// 	client := common.NewAgentServiceClient(conn)
+
+// 	selections, err := client.PerformFantasyActions(context.Background(), landscape)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return selections, nil
+// }
 
 func createAndStartContainer() (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
@@ -367,7 +409,7 @@ func createAndStartContainer() (string, error) {
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
 
-	hostMountPath, err := buildLocalAbsolutePath(botResourceFolderName)
+	hostMountPath, err := BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return "", err
 	}

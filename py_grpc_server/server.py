@@ -4,11 +4,11 @@ import math
 import time
 
 import grpc
-import agent_pb2
-import agent_pb2_grpc
-from bot import PerformFantasyActions
+from blitz_env import DraftSelection
+from agent_pb2_grpc import AgentServiceServicer, add_AgentServiceServicer_to_server
+from bot import draft_player
 
-class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
+class AgentServiceServicer(AgentServiceServicer):
 
     def __init__(self):
         print("Initialized gRPC server")
@@ -17,11 +17,17 @@ class AgentServiceServicer(agent_pb2_grpc.AgentServiceServicer):
         print("Input from GRPC: ")
         print(request)
 
-        return PerformFantasyActions(request)
+        player_selection_id = draft_player(request)
+        print("player selected: ")
+        print(player_selection_id)
+        
+        return DraftSelection(
+            player_id=player_selection_id
+        )
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    agent_pb2_grpc.add_AgentServiceServicer_to_server(
+    add_AgentServiceServicer_to_server(
         AgentServiceServicer(), server
     )
     server.add_insecure_port("[::]:8080")
