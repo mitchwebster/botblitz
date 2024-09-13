@@ -175,13 +175,14 @@ class ProjectionsDB:
         sport = "nfl"
         year = str(season)
         week = "draft"
-        key = (page, sport, year, week)
+        scoring = "PPR"
+        key = (page, sport, year, week, scoring)
 
         if key in self._cache:
             df = self._cache[key]
         else:
             # Load projections from FantasyPros and cache the result
-            df = fp_projections(page=page, sport=sport, year=year, week=week)
+            df = fp_projections(page=page, sport=sport, year=year, week=week, scoring=scoring)
             self._cache[key] = df
 
         # Filter the DataFrame to return projections only for the specified player
@@ -206,13 +207,14 @@ class ProjectionsDB:
         sport = "nfl"
         year = str(season)
         week_str = str(week)
-        key = (page, sport, year, week_str)
+        scoring = "PPR"
+        key = (page, sport, year, week_str, scoring)
 
         if key in self._cache:
             df = self._cache[key]
         else:
             # Load projections from FantasyPros and cache the result
-            df = fp_projections(page=page, sport=sport, year=year, week=week_str)
+            df = fp_projections(page=page, sport=sport, year=year, week=week_str, scoring=scoring)
             self._cache[key] = df
 
         # Filter the DataFrame to return projections only for the specified player
