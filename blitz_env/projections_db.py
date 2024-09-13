@@ -185,7 +185,7 @@ class ProjectionsDB:
             self._cache[key] = df
 
         # Filter the DataFrame to return projections only for the specified player
-        return df[df['id'] == player.id]
+        return df[df['fantasypros_id'] == player.id]
 
     def get_weekly_projections(self, player: Player, season: int, week: int) -> pd.DataFrame:
         """
@@ -216,4 +216,4 @@ class ProjectionsDB:
             self._cache[key] = df
 
         # Filter the DataFrame to return projections only for the specified player
-        return df[df['id'] == player.id]
+        return df[df['fantasypros_id'] == player.id]
