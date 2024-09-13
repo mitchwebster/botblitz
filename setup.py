@@ -19,7 +19,9 @@ setup(
         "pandas==2.1.4",
         "nfl-data-py==0.3.1",
         'protobuf==5.27.4',
-        'matplotlib==3.9.2'
+        'matplotlib==3.9.2',
+        'beautifulsoup4==4.12.3',
+        'requests==2.32.3'
     ],
     package_data={
         'blitz_env': ['player_ranks_2024.csv', 'player_ranks_2023.csv', 'player_ranks_2022.csv', 'player_ranks_2021.csv'],
