@@ -35,6 +35,7 @@ def get_player_stats(player: Player, stats_db: StatsDB) -> str:
     return stats_summary
 
 def draft_player(game_state: GameState) -> str:
+    print("draft_player")
     openai_client = OpenAI(api_key=openai_api_key)
     stats_db = StatsDB([game_state.league_settings.year])
 
