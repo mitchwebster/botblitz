@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 from typing import List
 import requests
-from blitz_env.agent_pb2 import Player
-from blitz_env.projections_db import fp_projections_parse
-
+from .agent_pb2 import Player
+from .projections_db import fp_projections_parse
 
 def import_def_seasonal_data(
         kwargs
@@ -24,7 +23,6 @@ def import_def_seasonal_data(
     parsed_projections = fp_projections_parse(response_obj)
     
     return parsed_projections['projections']
-
 
 def import_weekly_data(
         years, 
@@ -72,7 +70,6 @@ def import_weekly_data(
         data[cols] = data[cols].astype(np.float32)
 
     return data
-
 
 def import_seasonal_data(
         years,
