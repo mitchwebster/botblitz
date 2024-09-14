@@ -14,7 +14,7 @@ def draft_player(game_state: GameState) -> str:
         str: The id of the drafted player.
     """
 
-    print("---------------------------------------------n--------------------")
+    print("-----------------------------------------------------------------")
 
     # returns zero-based round number
     def get_round_number(game_state: GameState) -> int:
@@ -45,6 +45,15 @@ def draft_player(game_state: GameState) -> str:
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
     undrafted_qbs = [player for player in undrafted_players if player.allowed_positions[0] == 'QB']
+
+    # penalize injured players by increasing their rank
+    injured_players = set(["Christian McCaffrey"])
+    print(f"injured players: {injured_players}")
+    for player in undrafted_players:
+        if player.full_name in injured_players:
+            print(f"Penalized {player.full_name} for being injured")
+            player.rank += 7
+
 
     # Get a list of who's on our team already
     my_team_id = game_state.drafting_team_id
