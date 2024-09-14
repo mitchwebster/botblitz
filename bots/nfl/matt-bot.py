@@ -83,6 +83,8 @@ def experiment(undrafted_players: List[Player], drafted_players: List[Player]):
   # players_ranked = sorted(undrafted_players, key=lambda p: score_player(p))
   players_ranked = sorted(players_scored, key=lambda s_p: s_p.score, reverse=True)
 
+  print(list(map(lambda p: str(p.player.full_name) + " | score: " + str(p.score) + " | need: " + str(get_position_need(p.player)) + " | demand: " + str(get_position_demand(p.player, drafted_players)), players_ranked)))
+
   # Get best Player object
   best_player = players_ranked[0].player
 
