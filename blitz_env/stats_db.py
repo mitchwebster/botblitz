@@ -139,7 +139,7 @@ def fp_stats_dynamic(page, **kwargs):
     return stats_df
 
 class StatsDB:
-    def __init__(self, years: List[int], include_k_def: False):
+    def __init__(self, years: List[int], include_k_dst: False):
         """
         Initialize the StatsDB with a list of years and loads NFL data into memory.
 
@@ -153,9 +153,9 @@ class StatsDB:
         self.weekly_df = nfl.import_weekly_data(years)
         # self.pbp_df = nfl.import_pbp_data(years)
         self.seasonal_df = nfl.import_seasonal_data(years)
-        if include_k_def:
-            self.def_seasonal_df = fp_seasonal_years("dst", years)
-            self.def_weekly_df = fp_weekly_years("dst", years)
+        if include_k_dst:
+            self.dst_seasonal_df = fp_seasonal_years("dst", years)
+            self.dst_weekly_df = fp_weekly_years("dst", years)
             self.k_seasonal_df = fp_seasonal_years("k", years)
             self.k_weekly_df = fp_weekly_years("k", years)
 
@@ -171,6 +171,11 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the weekly data for the specified player.
         """
+        if player.allowed_positions[0] == 'K':
+            return self.k_weekly_df[self.k_weekly_df['fantasypros_id'] == player.id]
+        if player.allowed_positions[0] == 'DST':
+            return self.dst_weekly_df[self.dst_weekly_df['fantasypros_id'] == player.id]
+
         return self.weekly_df[self.weekly_df.player_id == player.gsis_id]
 
     def get_seasonal_data(self, player: Player) -> pd.DataFrame:
@@ -183,6 +188,11 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the seasonal data for the specified player.
         """
+        if player.allowed_positions[0] == 'K':
+            return self.k_seasonal_df[self.k_seasonal_df['fantasypros_id'] == player.id]
+        if player.allowed_positions[0] == 'DST':
+            return self.dst_seasonal_df[self.dst_seasonal_df['fantasypros_id'] == player.id]
+        
         return self.seasonal_df[self.seasonal_df.player_id == player.gsis_id]
 
     def get_ids(self, player: Player) -> pd.DataFrame:
