@@ -139,7 +139,7 @@ def fp_stats_dynamic(page, **kwargs):
     return stats_df
 
 class StatsDB:
-    def __init__(self, years: List[int], include_k_dst: False):
+    def __init__(self, years: List[int], include_k_dst = False):
         """
         Initialize the StatsDB with a list of years and loads NFL data into memory.
 
