@@ -229,5 +229,3 @@ class ScoredPlayer:
   def __init__(self, player: Player, score: float):
       self.player = player
       self.score = score
-
-game_state = simulate_draft(draft_player, 2024)
