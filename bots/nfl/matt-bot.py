@@ -47,7 +47,7 @@ def draft_player(game_state: GameState) -> str:
     populate_team(team_players)
 
     # Populate max player position contants
-    populate_num_player_max_constants()
+    populate_num_player_max_constants(game_state)
     
     # Select the player with the highest rank (lowest rank number)
     if undrafted_players:
@@ -226,7 +226,7 @@ def populate_team(team_players: List[Player]):
   for player in team_players:
     store_player(player)
 
-def populate_num_player_max_constants():
+def populate_num_player_max_constants(game_state: GameState):
   MAX_POS_RANK_WR = len([player for player in game_state.players if player.allowed_positions[0] == "WR"])
   MAX_POS_RANK_RB = len([player for player in game_state.players if player.allowed_positions[0] == "RB"])
   MAX_POS_RANK_TE = len([player for player in game_state.players if player.allowed_positions[0] == "TE"])
