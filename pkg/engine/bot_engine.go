@@ -141,6 +141,7 @@ func runDraft(e BotEngine) error {
 
 		for index >= 0 && index <= arrayEdge {
 			curBot := e.bots[index]
+			e.gameState.DraftingTeamId = curBot.FantasyTeamId
 			performDraftAction(curBot, e)
 			index += increment
 			e.gameState.CurrentPick += 1
@@ -378,10 +379,6 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 		return "", fmt.Errorf("Cannot draft player again")
 	}
 
-	if len(playerId) <= 0 {
-		return "", fmt.Errorf("Cannot draft empty player")
-	}
-
 	team, err := findCurrentTeamById(fantasyTeamId, gameState)
 	if err != nil {
 		return "", err
@@ -521,6 +518,7 @@ func callBotRPC(gameState *common.GameState) (*common.DraftSelection, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 	selections, err := client.PerformFantasyActions(ctx, gameState)
 	if err != nil {
+		fmt.Println("Failed calling bot")
 		return nil, err
 	}
 

@@ -36,7 +36,7 @@ def draft_player(game_state: GameState) -> str:
       drafted_player_count += 1
 
     # all players except for panthers and tua and defense
-    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa' and player.allowed_positions[0] != 'DST']
+    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa']
     # rb and wr list
     undrafted_rbswrs = [player for player in undrafted_players if  player.allowed_positions[0] == 'RB' or player.allowed_positions[0] == 'WR']
     # qb list
@@ -66,7 +66,7 @@ def draft_player(game_state: GameState) -> str:
       elif drafted_te_count == 0:
           drafted_player = min(undrafted_tes, key=lambda p: p.rank)
       # drafts a qb round 4 or 5 after a tight end
-      elif drafted_qb_count == 0 and drafted_player_count > 6 or drafted_player_count == 12:
+      elif drafted_qb_count == 0 and drafted_player_count == 6 or drafted_player_count == 12:
           drafted_player = min(undrafted_qbs, key=lambda p: p.rank)
       # drafts a kicker round 14
       elif drafted_player_count == 13:
@@ -97,6 +97,7 @@ def draft_player(game_state: GameState) -> str:
     # print("drafted qb count", drafted_qb_count)
     # print("drafted k count", drafted_k_count)
     # print("drafted player count", drafted_player_count)
+    # print(rbwr_diff)
     # print(game_state.drafting_team_id)
     # print(drafted_player)
     

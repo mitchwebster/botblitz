@@ -5,7 +5,6 @@ import json
 
 # requirements.txt changes
 # pip install openai
-
 stats_db = StatsDB([2023])
 
 def get_player_stats(player: Player) -> str:
@@ -217,7 +216,6 @@ def draft_player(game_state: GameState) -> str:
                 print(f"No available players for position {next_empty_position}")
         else:
             print("All positions are filled")
-
     return ""
 
 game_state = simulate_draft(draft_player, 2024)

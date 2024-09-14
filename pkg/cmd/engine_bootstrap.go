@@ -20,7 +20,11 @@ func main() {
 
 	year := 2024
 	bots := fetchBotList()
-	gameState, err := genDraftGameState(year)
+	fantasyTeams := fetchFantasyTeams()
+
+	shuffleFantasyTeamsAndBots(fantasyTeams, bots)
+
+	gameState, err := genDraftGameState(year, fantasyTeams)
 	if err != nil {
 		fmt.Println("Failed to build gameState unexpectedly")
 		fmt.Println(err)
@@ -37,7 +41,7 @@ func main() {
 	}
 
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: false,
+		VerboseLoggingEnabled: true,
 		SheetsClient:          sheetClient,
 	}
 
@@ -58,8 +62,14 @@ func main() {
 func fetchFantasyTeams() []*common.FantasyTeam {
 	return []*common.FantasyTeam{
 		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
-		{Id: "1", Name: "Best Bots", Owner: "Tyler"},
-		{Id: "2", Name: "Evil Bot", Owner: "Drew"},
+		{Id: "1", Name: "Tyler's Team", Owner: "Tyler"},
+		{Id: "2", Name: "Missing in Action", Owner: "Drew"},
+		{Id: "3", Name: "Chris's Team", Owner: "Chris"},
+		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
+		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
+		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
+		{Id: "7", Name: "Justin's Team", Owner: "Justin"},
+		{Id: "8", Name: "Ryan's Team", Owner: "Ryan"},
 	}
 }
 
@@ -68,39 +78,89 @@ func fetchBotList() []*common.Bot {
 		{
 			Id:            "Standard NFL Bot",
 			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/standard-bot.py",
+			SourcePath:    "/bots/nfl/mitch-bot.py",
 			FantasyTeamId: "0",
 		},
 		{
 			Id:            "Request Bot Bot",
 			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/request-bot.py",
+			SourcePath:    "/bots/nfl/tyler-bot.py",
 			FantasyTeamId: "1",
 		},
 		{
-			Id:            "Broken Bot",
+			Id:            "Standard Bot",
 			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/broken-bot.py",
+			SourcePath:    "/bots/nfl/standard-bot.py",
 			FantasyTeamId: "2",
 		},
-		// {
-		// 	Id:                 "Remote bot",
-		// 	SourceType:         common.Bot_REMOTE,
-		// 	SourceRepoUsername: "mitchwebster",
-		// 	SourceRepoName:     "testagent",
-		// 	SourcePath:         "/dist/agent.py",
-		// 	FantasyTeamId:      2,
-		// },
+		{
+			Id:            "Chris's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/chris-bot.py",
+			FantasyTeamId: "3",
+		},
+		{
+			Id:            "Harry's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/harry-bot.py",
+			FantasyTeamId: "4",
+		},
+		{
+			Id:            "Parker's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/parker-bot.py",
+			FantasyTeamId: "5",
+		},
+		{
+			Id:            "Matt's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/matt-bot.py",
+			FantasyTeamId: "6",
+		},
+		{
+			Id:            "Justin's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/justin-bot.py",
+			FantasyTeamId: "7",
+		},
+		{
+			Id:            "Ryans's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/ryan-bot.py",
+			FantasyTeamId: "8",
+		},
 	}
 }
 
-func genDraftGameState(year int) (*common.GameState, error) {
+func shuffleFantasyTeamsAndBots(teams []*common.FantasyTeam, bots []*common.Bot) {
+	n := len(teams)
+	indices := make([]int, 0, n)
+
+	for i := 0; i < n; i++ {
+		indices = append(indices, i)
+	}
+
+	rand.Shuffle(len(indices), func(i, j int) {
+		teams[i], teams[j] = teams[j], teams[i]
+		bots[i], bots[j] = bots[j], bots[i]
+	})
+
+	for i := 0; i < n; i++ {
+		id := strconv.Itoa(i)
+		teams[i].Id = id
+		bots[i].FantasyTeamId = id
+
+		fmt.Println(teams[i])
+		fmt.Println(bots[i])
+		fmt.Println()
+	}
+}
+
+func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.GameState, error) {
 	players, err := loadPlayers(year)
 	if err != nil {
 		return nil, err
 	}
-
-	fantasy_teams := fetchFantasyTeams()
 
 	player_slots := []*common.PlayerSlot{
 		{Name: "QB"},
@@ -108,9 +168,9 @@ func genDraftGameState(year int) (*common.GameState, error) {
 	}
 
 	settings := common.LeagueSettings{
-		NumTeams:           uint32(len(fantasy_teams)),
+		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        3,
+		TotalRounds:        2,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
@@ -120,7 +180,7 @@ func genDraftGameState(year int) (*common.GameState, error) {
 		CurrentPick:    1,
 		DraftingTeamId: "0",
 		LeagueSettings: &settings,
-		Teams:          fantasy_teams,
+		Teams:          fantasyTeams,
 		Players:        players,
 	}
 
@@ -204,27 +264,27 @@ func loadPlayers(year int) ([]*common.Player, error) {
 	return players, nil
 }
 
-func genLandscape() *common.FantasyLandscape {
-	player := common.Player{
-		FullName: "Kevin Durant",
-	}
+// func genLandscape() *common.FantasyLandscape {
+// 	player := common.Player{
+// 		FullName: "Kevin Durant",
+// 	}
 
-	bet := common.Bet{
-		Player:               &player,
-		ProfessionalHomeTeam: "Golden State Warriors",
-		ProfessionalAwayTeam: "Phoenix Suns",
-		Type:                 common.Bet_UNDER,
-		Points:               25.5,
-		Price:                -115.0,
-	}
+// 	bet := common.Bet{
+// 		Player:               &player,
+// 		ProfessionalHomeTeam: "Golden State Warriors",
+// 		ProfessionalAwayTeam: "Phoenix Suns",
+// 		Type:                 common.Bet_UNDER,
+// 		Points:               25.5,
+// 		Price:                -115.0,
+// 	}
 
-	landscape := common.FantasyLandscape{
-		Bet:     &bet,
-		Players: []*common.Player{&player},
-	}
+// 	landscape := common.FantasyLandscape{
+// 		Bet:     &bet,
+// 		Players: []*common.Player{&player},
+// 	}
 
-	return &landscape
-}
+// 	return &landscape
+// }
 
 func generateRandomString(length int) string {
 
