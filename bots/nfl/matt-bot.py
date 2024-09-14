@@ -18,6 +18,7 @@ NUM_MAX_KS = 1
 NUM_MAX_DSTS = 1
 
 # Max number of positions based on CSV for 2024 projected players
+# Set to 2024 projected values CSV but populated in populate_num_player_max_constants
 MAX_POS_RANK_WR = 200
 MAX_POS_RANK_RB = 156
 MAX_POS_RANK_TE = 97
@@ -44,8 +45,10 @@ def draft_player(game_state: GameState) -> str:
     
     # Populate team from GameState
     populate_team(team_players)
-    # print("TEAM PLAYERS")
-    # print(list(map(lambda p: str(p.full_name), team_players)))
+
+    # Populate max player position contants
+    populate_num_player_max_constants()
+    print("wr: " + str(MAX_POS_RANK_WR) + " rb: " + str(MAX_POS_RANK_RB) + " te: " + str(MAX_POS_RANK_TE) + " qb: " + str(MAX_POS_RANK_QB) + " k: " + str(MAX_POS_RANK_K) + " dst: " + str(MAX_POS_RANK_DST) + " all: " + str(MAX_RANK_ALL_PLAYERS ))
     
     # Select the player with the highest rank (lowest rank number)
     if undrafted_players:
@@ -80,8 +83,6 @@ def experiment(undrafted_players: List[Player], drafted_players: List[Player]):
   # Sort players according to scoring function
   # players_ranked = sorted(undrafted_players, key=lambda p: score_player(p))
   players_ranked = sorted(players_scored, key=lambda s_p: s_p.score, reverse=True)
-
-  print(list(map(lambda p: str(p.player.full_name) + " | score: " + str(p.score) + " | need: " + str(get_position_need(p.player)) + " | demand: " + str(get_position_demand(p.player, drafted_players)), players_ranked)))
 
   # Get best Player object
   best_player = players_ranked[0].player
@@ -223,6 +224,15 @@ def populate_team(team_players: List[Player]):
   # Populate local list of positions
   for player in team_players:
     store_player(player)
+
+def populate_num_player_max_constants():
+  MAX_POS_RANK_WR = len([player for player in game_state.players if player.allowed_positions[0] == "WR"])
+  MAX_POS_RANK_RB = len([player for player in game_state.players if player.allowed_positions[0] == "RB"])
+  MAX_POS_RANK_TE = len([player for player in game_state.players if player.allowed_positions[0] == "TE"])
+  MAX_POS_RANK_QB = len([player for player in game_state.players if player.allowed_positions[0] == "QB"])
+  MAX_POS_RANK_K = len([player for player in game_state.players if player.allowed_positions[0] == "K"])
+  MAX_POS_RANK_DST = len([player for player in game_state.players if player.allowed_positions[0] == "DST"])
+  MAX_RANK_ALL_PLAYERS = len(game_state.players)
 
 def store_player(player: Player):
   match player.allowed_positions[0]:
