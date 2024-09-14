@@ -114,6 +114,14 @@ def draft_player(game_state: GameState) -> str:
     # TODO: handle multiple allowed_positions
     if undrafted_players:
         allowed_players = [player for player in undrafted_players if player.allowed_positions[0] in open_positions]
+
+        if len(allowed_players) == 0:
+            if len(undrafted_players) > 0:
+                p = min(undrafted_players, key=lambda p: p.rank)
+                return p.id
+            else:
+                return ""
+
         rank_ordered = sorted(allowed_players, key=lambda p: p.rank)
 
         # if we're getting to the end of the draft, make sure we have a player for each position/slot
