@@ -1,7 +1,6 @@
 from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState, StatsDB
 from openai import OpenAI
 from typing import List, Dict
-from google.colab import userdata
 import json
 
 # requirements.txt changes
@@ -26,7 +25,7 @@ MY_TEAM: Dict[str, Player] = {
     "BENCH6": None,
 }
 
-openai_api_key = userdata.get('OPENAI_API_TOKEN')
+openai_api_key = ""
 openai_client = OpenAI(api_key=openai_api_key)
 
 # Assuming stats_db has been initialized with the relevant data
@@ -163,7 +162,3 @@ def draft_player(game_state: GameState) -> str:
         return drafted_player.id
 
     return ""
-
-game_state = simulate_draft(draft_player, 2024)
-roster_strs = [f"{position}: {player.full_name if player else 'None'}" for position, player in MY_TEAM.items()]
-print('\n'.join(roster_strs))
