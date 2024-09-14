@@ -32,16 +32,6 @@ openai_client = OpenAI(api_key=openai_api_key)
 # Assuming stats_db has been initialized with the relevant data
 stats_db = StatsDB([2023])
 
-def is_position_full(position: str) -> bool:
-    """
-    Determines if the given position already has a starter and a backup,
-    or if the position doesn't need backups.
-    """
-    if position in POSITIONS_NO_BACKUPS and len(MY_TEAM[position]) >= 1:
-        return True  # For K and DEF, only one player is allowed (starter)
-    return len(MY_TEAM[position]) >= 2  # One starter and one backup
-
-
 def get_player_stats(player: Player) -> str:
     """
     Retrieves the seasonal stats for a player from the stats_db and formats them for inclusion in the prompt.
@@ -74,7 +64,7 @@ def draft_player(game_state: GameState) -> str:
         if not is_drafted(player)
     ]
     undrafted_players.sort(key=lambda x: x.rank)
-    undrafted_players = undrafted_players[:20]
+    undrafted_players = undrafted_players[:40]
 
     if not undrafted_players:
         return ""  # Return empty string if no eligible players are available
@@ -91,14 +81,13 @@ def draft_player(game_state: GameState) -> str:
         for player in undrafted_players
     ]
 
-
     roster_str = '\n'.join(roster)
 
     system_prompt = f"""
     You are a fantasy football expert with years of knowledge and experience building the best team. I'm an amateur and need your help selecting my team.
 
     Suggest the best player for me to draft next, ensuring balance between starters and backups. Additionally, factor in the player's bye week and their performance last season.
-    Make sure each starting position has a player, and do not add a player to a position that's already filled. You can add any player to the bench, only after all starting positions are filled.
+    Make sure each starting position has at least one player, do not add a player to a position that's already filled. You can add any player to the bench, only after all starting positions are filled.
 
     Return the response in the json format {{ "id": number, position: position_str }} where 'number' is the player ID and position_str is the position to add the player to from {', '.join(MY_TEAM.keys())}.
     """
