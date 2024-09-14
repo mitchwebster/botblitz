@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"flag"
 	"log"
 	"math/rand"
 	"os"
@@ -15,8 +16,14 @@ import (
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const digits = "0123456789"
 
+var (
+	enableGoogleSheets = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
+)
+
 func main() {
 	fmt.Println("Starting up...")
+
+	flag.Parse()
 
 	year := 2024
 	bots := fetchBotList()
@@ -32,12 +39,15 @@ func main() {
 	}
 
 	draftName := "Draft_" + generateRandomString(6)
-	fmt.Printf("Starting Draft Sheet: %s\n", draftName)
-	sheetClient, err := initializeDraftSheet(draftName, gameState)
-	if err != nil {
-		fmt.Println("Failed to setup Google Sheet connection")
-		fmt.Println(err)
-		os.Exit(1) // Crash hard
+	var sheetClient *engine.SheetsClient = nil
+	if *enableGoogleSheets {
+		fmt.Printf("Starting Draft Sheet: %s\n", draftName)
+		sheetClient, err = initializeDraftSheet(draftName, gameState)
+		if err != nil {
+			fmt.Println("Failed to setup Google Sheet connection")
+			fmt.Println(err)
+			os.Exit(1) // Crash hard
+		}
 	}
 
 	engineSettings := engine.BotEngineSettings{
