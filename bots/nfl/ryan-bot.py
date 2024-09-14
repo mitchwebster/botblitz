@@ -1,7 +1,6 @@
 from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState, StatsDB
 from openai import OpenAI
 from typing import List, Dict
-from google.colab import userdata
 import json
 
 # requirements.txt changes
@@ -74,7 +73,7 @@ def draft_player(game_state: GameState) -> str:
             player for player in undrafted_players 
             if any(pos in ["K", "DST"] for pos in player.allowed_positions)
         ]
-    undrafted_players = undrafted_players[:40]
+    undrafted_players = undrafted_players[:50]
 
     if not undrafted_players:
         return ""  # Return empty string if no eligible players are available
@@ -156,11 +155,29 @@ def draft_player(game_state: GameState) -> str:
         print(f"Error calling ChatGPT API: {e}")
 
     # Fallback: select the player with the highest rank if the API call fails or player not found
-    # TODO: Must account for positions, or just iterate through positions, trim index, and add player to that position. Bench won't matter
     if not drafted_player:
-        drafted_player = min(undrafted_players, key=lambda p: p.rank)
-        MY_TEAM[drafted_player.allowed_positions[0]] = drafted_player
-        return drafted_player.id
+        # Find the next empty position directly from MY_TEAM
+        next_empty_position = next((pos for pos, player in MY_TEAM.items() if player is None), None)
+        
+        if next_empty_position:
+            # Find the highest ranked player for the empty position
+            if next_empty_position.startswith("BENCH"):
+                drafted_player = min(undrafted_players, key=lambda p: p.rank)
+            else:
+                drafted_player = min(
+                    (p for p in undrafted_players if next_empty_position in p.allowed_positions),
+                    key=lambda p: p.rank,
+                    default=None
+                )
+            
+            if drafted_player:
+                MY_TEAM[next_empty_position] = drafted_player
+                print(f"Drafted player {drafted_player.full_name} to position {next_empty_position}")
+                return drafted_player.id
+            else:
+                print(f"No available players for position {next_empty_position}")
+        else:
+            print("All positions are filled")
 
     return ""
 
