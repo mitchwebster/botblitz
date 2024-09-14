@@ -13,9 +13,6 @@ import (
 	"github.com/mitchwebster/botblitz/pkg/engine"
 )
 
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const digits = "0123456789"
-
 var (
 	enableGoogleSheets = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
 )
