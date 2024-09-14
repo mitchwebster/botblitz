@@ -16,8 +16,14 @@ def fp_seasonal_years(page, years):
 def fp_weekly_years(page, years):
     dfs = []
     for year in years:
-        for week in range(1, 18):
-           dfs.append(fp_stats_dynamic(page, year=year, range="week", week=week))
+        # Note this may fail for historical data
+        for week in range(1, 19):
+            try:
+                df = fp_stats_dynamic(page, year=year, range="week", week=week)
+                df["week"] = week
+                dfs.append(df)
+            except:
+                print(f"Failed to get week {week}")
     return pd.concat(dfs).reset_index()
 
 def fp_stats_dynamic(page, **kwargs):
