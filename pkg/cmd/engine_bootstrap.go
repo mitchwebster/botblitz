@@ -4,12 +4,16 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
 )
+
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const digits = "0123456789"
 
 func main() {
 	fmt.Println("Starting up...")
@@ -23,10 +27,18 @@ func main() {
 		os.Exit(1) // Crash hard
 	}
 
-	print(gameState)
+	draftName := "Draft_" + generateRandomString(6)
+	fmt.Printf("Starting Draft Sheet: %s\n", draftName)
+	sheetClient, err := initializeDraftSheet(draftName, gameState)
+	if err != nil {
+		fmt.Println("Failed to setup Google Sheet connection")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	}
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: false,
+		SheetsClient:          sheetClient,
 	}
 
 	engine := engine.NewBotEngine(gameState, bots, engineSettings)
@@ -212,4 +224,59 @@ func genLandscape() *common.FantasyLandscape {
 	}
 
 	return &landscape
+}
+
+func generateRandomString(length int) string {
+
+	var result []rune
+	// Combine letters and digits
+	charSet := letters + digits
+
+	for i := 0; i < length; i++ {
+		// Get a random index from the character set
+		randomIndex := rand.Intn(len(charSet))
+		// Append the character at that index to the result
+		result = append(result, rune(charSet[randomIndex]))
+	}
+
+	return string(result)
+}
+
+func initializeDraftSheet(sheetName string, gameState *common.GameState) (*engine.SheetsClient, error) {
+	client, err := engine.CreateSheetsClient(sheetName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = engine.CreateNewDraftSheet(client)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Created Draft Sheet")
+
+	err = engine.WriteContentToCell(engine.IntialRow, engine.InitialCol, "Round / Team", client)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 1; i <= int(gameState.LeagueSettings.TotalRounds); i++ {
+		content := strconv.Itoa(i)
+		err = engine.WriteContentToCell(engine.IntialRow+i, engine.InitialCol, content, client)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for i := 1; i <= len(gameState.Teams); i++ {
+		team := gameState.Teams[i-1]
+		content := team.Name + "(" + team.Owner + ")"
+		newCol := rune(int(engine.InitialCol) + i)
+		err = engine.WriteContentToCell(engine.IntialRow, newCol, content, client)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return client, nil
 }

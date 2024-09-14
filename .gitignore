@@ -36,3 +36,4 @@ blitz_env/agent_pb2.py
 blitz_env/agent_pb2.pyi
 blitz_env/loadPlayers.py
 blitz_env/player_ranks_2024.csv
+sheets-creds.json

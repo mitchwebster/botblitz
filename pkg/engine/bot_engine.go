@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ const botResourceFolderNameInContainer = "/botblitz"
 
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
+	SheetsClient          *SheetsClient
 }
 
 type BotEngine struct {
@@ -162,11 +164,20 @@ func performDraftAction(bot *common.Bot, e BotEngine) error {
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	err = performDraftPick(bot, e)
+	summary, err := performDraftPick(bot, e)
 	if err != nil {
 		fmt.Println("Failed to run draft using bot")
 		fmt.Println(err)
-		draftPlayerOnInvalidResponse(bot.FantasyTeamId, e.gameState)
+		summary, err = draftPlayerOnInvalidResponse(bot.FantasyTeamId, e.gameState)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = registerPickInSheets(summary, int(e.gameState.CurrentPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
+	if err != nil {
+		fmt.Println("Failed to write content to Google Sheets")
+		return err
 	}
 
 	err = shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
@@ -320,26 +331,26 @@ func shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLog
 // 	return nil
 // }
 
-func performDraftPick(bot *common.Bot, e BotEngine) error {
+func performDraftPick(bot *common.Bot, e BotEngine) (string, error) {
 	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentPick, team.Name, team.Owner)
 
 	draftPick, err := callBotRPC(e.gameState)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Println("Received response from bot")
-	err = validateAndMakeDraftPick(bot.FantasyTeamId, draftPick.PlayerId, e.gameState)
+	summary, err := validateAndMakeDraftPick(bot.FantasyTeamId, draftPick.PlayerId, e.gameState)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return summary, nil
 }
 
 func findCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
@@ -351,29 +362,29 @@ func findCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*co
 	return gameState.Teams[teamIdx], nil
 }
 
-func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *common.GameState) error {
+func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *common.GameState) (string, error) {
 	if len(playerId) <= 0 {
-		return fmt.Errorf("Cannot draft empty player id")
+		return "", fmt.Errorf("Cannot draft empty player id")
 	}
 
 	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
 	if idx < 0 {
-		return fmt.Errorf("Could not find player with selected id")
+		return "", fmt.Errorf("Could not find player with selected id")
 	}
 
 	player := gameState.Players[idx]
 
 	if player.DraftStatus.Availability == common.DraftStatus_DRAFTED {
-		return fmt.Errorf("Cannot draft player again")
+		return "", fmt.Errorf("Cannot draft player again")
 	}
 
 	if len(playerId) <= 0 {
-		return fmt.Errorf("Cannot draft empty player")
+		return "", fmt.Errorf("Cannot draft empty player")
 	}
 
 	team, err := findCurrentTeamById(fantasyTeamId, gameState)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	player.DraftStatus.TeamIdChosen = team.Id
@@ -382,10 +393,12 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 
 	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentPick, team.Name, team.Owner, player.FullName)
 
-	return nil
+	summary := player.FullName + "(" + player.AllowedPositions[0] + ")"
+
+	return summary, nil
 }
 
-func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameState) error {
+func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameState) (string, error) {
 	fmt.Println("Auto-drafting due to failure")
 	playerCount := len(gameState.Players)
 	index := rand.Intn(playerCount)
@@ -393,8 +406,8 @@ func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameSt
 	for index < playerCount && !hasLooped {
 		player := gameState.Players[index]
 		if player.DraftStatus.Availability == common.DraftStatus_AVAILABLE {
-			validateAndMakeDraftPick(fantasyTeamId, player.Id, gameState)
-			return nil
+			summary, err := validateAndMakeDraftPick(fantasyTeamId, player.Id, gameState)
+			return summary, err
 		}
 
 		index += 1
@@ -404,7 +417,7 @@ func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameSt
 		}
 	}
 
-	return fmt.Errorf("Could not find a valid player to auto-draft")
+	return "", fmt.Errorf("Could not find a valid player to auto-draft")
 }
 
 func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
@@ -602,4 +615,17 @@ func createAndStartContainer() (string, error) {
 	// TODO: could we potentially check that the container is running?
 
 	return createResponse.ID, nil
+}
+
+func registerPickInSheets(summary string, currentPick int, teamCount int, fantasyTeamId string, client *SheetsClient) error {
+	if client == nil {
+		return nil
+	}
+
+	zero_based_round := ((currentPick - 1) / teamCount) + 1
+	indexOfFantasyTeam, _ := strconv.Atoi(fantasyTeamId)
+	newCol := rune(int(InitialCol) + indexOfFantasyTeam + 1)
+
+	err := WriteContentToCell(IntialRow+zero_based_round, newCol, summary, client)
+	return err
 }
