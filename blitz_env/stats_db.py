@@ -139,7 +139,7 @@ def fp_stats_dynamic(page, **kwargs):
     return stats_df
 
 class StatsDB:
-    def __init__(self, years: List[int]):
+    def __init__(self, years: List[int], include_k_def: False):
         """
         Initialize the StatsDB with a list of years and loads NFL data into memory.
 
@@ -153,11 +153,11 @@ class StatsDB:
         self.weekly_df = nfl.import_weekly_data(years)
         # self.pbp_df = nfl.import_pbp_data(years)
         self.seasonal_df = nfl.import_seasonal_data(years)
-       
-        self.def_seasonal_df = fp_seasonal_years("dst", years)
-        self.def_weekly_df = fp_weekly_years("dst", years)
-        self.k_seasonal_df = fp_seasonal_years("k", years)
-        self.k_weekly_df = fp_weekly_years("k", years)
+        if include_k_def:
+            self.def_seasonal_df = fp_seasonal_years("dst", years)
+            self.def_weekly_df = fp_weekly_years("dst", years)
+            self.k_seasonal_df = fp_seasonal_years("k", years)
+            self.k_weekly_df = fp_weekly_years("k", years)
 
         self.ids_df = nfl.import_ids()
 
