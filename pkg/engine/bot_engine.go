@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
 )
 
 const pyServerHostAndPort = "localhost:8080"
@@ -25,6 +26,8 @@ const botResourceFolderName = "/tmp"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const digits = "0123456789"
 
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
@@ -67,6 +70,29 @@ func (e BotEngine) Summarize() string {
 	}
 
 	return builder.String()
+}
+
+func SaveGameState(e BotEngine) error {
+	// Serialize the Person object to a binary format
+	serializedData, err := proto.Marshal(e.gameState)
+	if err != nil {
+		return err
+	}
+
+	// Save the serialized data to a file
+	fileName := "gameState-" + strconv.Itoa(int(e.gameState.LeagueSettings.Year)) + "-" + GenerateRandomString(6) + ".bin"
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(serializedData)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e BotEngine) Run() error {
@@ -149,6 +175,8 @@ func runDraft(e BotEngine) error {
 
 		curRound += 1
 	}
+
+	SaveGameState(e)
 
 	return nil
 }
@@ -626,4 +654,19 @@ func registerPickInSheets(summary string, currentPick int, teamCount int, fantas
 
 	err := WriteContentToCell(IntialRow+zero_based_round, newCol, summary, client)
 	return err
+}
+
+func GenerateRandomString(length int) string {
+	var result []rune
+	// Combine letters and digits
+	charSet := letters + digits
+
+	for i := 0; i < length; i++ {
+		// Get a random index from the character set
+		randomIndex := rand.Intn(len(charSet))
+		// Append the character at that index to the result
+		result = append(result, rune(charSet[randomIndex]))
+	}
+
+	return string(result)
 }

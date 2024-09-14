@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1) // Crash hard
 	}
 
-	draftName := "Draft_" + generateRandomString(6)
+	draftName := "Draft_" + engine.GenerateRandomString(6)
 	var sheetClient *engine.SheetsClient = nil
 	if *enableGoogleSheets {
 		fmt.Printf("Starting Draft Sheet: %s\n", draftName)
@@ -308,22 +308,6 @@ func loadPlayers(year int) ([]*common.Player, error) {
 
 // 	return &landscape
 // }
-
-func generateRandomString(length int) string {
-
-	var result []rune
-	// Combine letters and digits
-	charSet := letters + digits
-
-	for i := 0; i < length; i++ {
-		// Get a random index from the character set
-		randomIndex := rand.Intn(len(charSet))
-		// Append the character at that index to the result
-		result = append(result, rune(charSet[randomIndex]))
-	}
-
-	return string(result)
-}
 
 func initializeDraftSheet(sheetName string, gameState *common.GameState) (*engine.SheetsClient, error) {
 	client, err := engine.CreateSheetsClient(sheetName)
