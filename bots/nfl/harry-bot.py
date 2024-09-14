@@ -1,15 +1,6 @@
 from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState
 from typing import List
 
-drafted_qb_count = 0
-drafted_rb_count = 0
-drafted_wr_count = 0
-drafted_k_count = 0
-drafted_te_count = 0
-drafted_player_count = 0
-drafted_dst_count = 0
-rbwr_diff = 0
-
 def draft_player(game_state: GameState) -> str:
     """
     Selects a player to draft based on the highest rank, ensuring only one QB is drafted.
@@ -20,20 +11,32 @@ def draft_player(game_state: GameState) -> str:
     Returns:
         str: The id of the drafted player.
     """
-    global drafted_qb_count
-    global drafted_rb_count
-    global drafted_wr_count
-    global drafted_k_count
-    global drafted_te_count
-    global drafted_player_count
-    global rbwr_diff
 
     # my team
     draft_id = game_state.drafting_team_id
     my_team = [player for player in game_state.players if player.draft_status.team_id_chosen == draft_id]
 
-    # all players except for panthers and tua
-    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa']
+    # declare variables
+    drafted_qb_count = 0
+    drafted_rb_count = 0
+    drafted_wr_count = 0
+    drafted_k_count = 0
+    drafted_te_count = 0
+    drafted_player_count = 0
+    rbwr_diff = 0
+
+
+    # check team for specific positions and create a count
+    for player in my_team:
+      drafted_rb_count += 1 if "RB" in player.allowed_positions else 0
+      drafted_wr_count += 1 if "WR" in player.allowed_positions else 0
+      drafted_te_count += 1 if "TE" in player.allowed_positions else 0
+      drafted_qb_count += 1 if "QB" in player.allowed_positions else 0
+      drafted_k_count += 1 if "K" in player.allowed_positions else 0
+      drafted_player_count += 1
+
+    # all players except for panthers and tua and defense
+    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa' and player.allowed_positions[0] != 'DST']
     # rb and wr list
     undrafted_rbswrs = [player for player in undrafted_players if  player.allowed_positions[0] == 'RB' or player.allowed_positions[0] == 'WR']
     # qb list
@@ -82,12 +85,12 @@ def draft_player(game_state: GameState) -> str:
           drafted_player = min(undrafted_rbs, key=lambda p: p.rank)
 
     # adjust position counts
-    drafted_rb_count += 1 if "RB" in drafted_player.allowed_positions else 0
-    drafted_wr_count += 1 if "WR" in drafted_player.allowed_positions else 0
-    drafted_te_count += 1 if "TE" in drafted_player.allowed_positions else 0
-    drafted_qb_count += 1 if "QB" in drafted_player.allowed_positions else 0
-    drafted_k_count += 1 if "K" in drafted_player.allowed_positions else 0
-    drafted_player_count += 1    
+    # drafted_rb_count += 1 if "RB" in drafted_player.allowed_positions else 0
+    # drafted_wr_count += 1 if "WR" in drafted_player.allowed_positions else 0
+    # drafted_te_count += 1 if "TE" in drafted_player.allowed_positions else 0
+    # drafted_qb_count += 1 if "QB" in drafted_player.allowed_positions else 0
+    # drafted_k_count += 1 if "K" in drafted_player.allowed_positions else 0
+    # drafted_player_count += 1    
     # print("drafted rb count", drafted_rb_count)
     # print("drafted wr count", drafted_wr_count)
     # print("drafted te count", drafted_te_count)
@@ -98,7 +101,16 @@ def draft_player(game_state: GameState) -> str:
     # print(drafted_player)
     
     # for player in my_team:
-    #   print(player.full_name)
+    #   print(player)
     # print(undrafted_players)
 
+
+
     return drafted_player.id
+
+
+
+game_state = simulate_draft(draft_player, 2024)
+
+
+visualize_draft_board(game_state)
