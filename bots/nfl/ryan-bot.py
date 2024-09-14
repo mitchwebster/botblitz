@@ -6,11 +6,10 @@ import json
 # requirements.txt changes
 # pip install openai
 
-stats_db = StatsDB([2023])
 # openai_api_key = userdata.get('OPENAI_API_TOKEN')
 openai_api_key = ""
 
-def get_player_stats(player: Player) -> str:
+def get_player_stats(player: Player, stats_db: StatsDB) -> str:
     """
     Retrieves the seasonal stats for a player from the stats_db and formats them for inclusion in the prompt.
     """
@@ -37,6 +36,7 @@ def get_player_stats(player: Player) -> str:
 
 def draft_player(game_state: GameState) -> str:
     openai_client = OpenAI(api_key=openai_api_key)
+    stats_db = StatsDB([game_state.league_settings.year])
 
     my_team = {
         "QB": None,
@@ -132,7 +132,7 @@ def draft_player(game_state: GameState) -> str:
 
     # Append stats to each player's description for the prompt
     available_players_info = [
-        f"{player.full_name} (ID {player.id}, Rank {player.rank}, Position(s) {', '.join(player.allowed_positions)}, {get_player_stats(player)})"
+        f"{player.full_name} (ID {player.id}, Rank {player.rank}, Position(s) {', '.join(player.allowed_positions)}, {get_player_stats(player, stats_db)})"
         for player in undrafted_players
     ]
 
