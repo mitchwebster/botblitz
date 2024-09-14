@@ -36,10 +36,17 @@ def draft_player(game_state: GameState) -> str:
     Returns:
         str: The id of the drafted player.
     """
+    
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
-
+    team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == game_state.drafting_team_id]
+    
+    # Populate team from GameState
+    populate_team(team_players)
+    # print("TEAM PLAYERS")
+    # print(list(map(lambda p: str(p.full_name), team_players)))
+    
     # Select the player with the highest rank (lowest rank number)
     if undrafted_players:
         # Default boilerplate
@@ -80,7 +87,8 @@ def experiment(undrafted_players: List[Player], drafted_players: List[Player]):
   best_player = players_ranked[0].player
 
   # Store the player
-  store_player(best_player)
+  # NOTE: this is commented in favor of reloading each time since hosted env will wipe in-memory each iteration
+  # store_player(best_player)
 
   return best_player
 
@@ -203,6 +211,19 @@ def is_rb(player: Player):
 def get_all_drafted_players():
   return drafted_wrs + drafted_rbs + drafted_tes + drafted_qbs + drafted_ks + drafted_dsts
 
+def populate_team(team_players: List[Player]):
+  # If running locally, clear existing values
+  drafted_wrs.clear()
+  drafted_rbs.clear()
+  drafted_tes.clear()
+  drafted_qbs.clear()
+  drafted_ks.clear()
+  drafted_dsts.clear()
+
+  # Populate local list of positions
+  for player in team_players:
+    store_player(player)
+
 def store_player(player: Player):
   match player.allowed_positions[0]:
     case "WR":
@@ -229,3 +250,5 @@ class ScoredPlayer:
   def __init__(self, player: Player, score: float):
       self.player = player
       self.score = score
+
+game_state = simulate_draft(draft_player, 2024)
