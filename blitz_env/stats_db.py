@@ -181,7 +181,7 @@ class StatsDB:
         self.weekly_df = import_weekly_data(years)
         # self.pbp_df = nfl.import_pbp_data(years)
         self.seasonal_df = import_seasonal_data(years)
-        self.ids_df = nfl.import_ids()
+        self.ids_df = import_ids()
 
     def get_weekly_data(self, player: Player) -> pd.DataFrame:
         """
