@@ -16,4 +16,5 @@ six==1.16.0
 tzdata==2024.1
 urllib3==1.26.12
 nfl-data-py==0.3.1
+openai==1.45.0
 https://github.com/mitchwebster/botblitz/raw/9d0429f094759e4df4f0fe271b290b51e3b8f64e/dist/blitz_env-0.1.0-py3-none-any.whl

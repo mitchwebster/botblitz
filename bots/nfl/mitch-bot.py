@@ -82,6 +82,17 @@ def draft_player(game_state: GameState) -> str:
         str: The id of the drafted player.
     """
 
+    player_deny_map = {
+        "Marvin Harrison Jr.": "",
+        "Drake London": "",
+        "Zamir White" : "",
+        "Tua Tagovailoa": ""
+    }
+
+    team_deny_map = {
+        "CAR": "",
+    }
+
     # relevant current game state
     my_team_id = game_state.drafting_team_id
     drafted_team = get_drafted_team(game_state.players, my_team_id)
@@ -92,7 +103,11 @@ def draft_player(game_state: GameState) -> str:
     position_map = list_to_map(target_positions)
 
     # players we are looking for
-    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.allowed_positions[0] in position_map]
+    undrafted_players = [player for player in game_state.players 
+                        if not is_drafted(player)
+                        and player.allowed_positions[0] in position_map
+                        and player.full_name not in player_deny_map
+                        and player.professional_team not in team_deny_map]
 
 
 

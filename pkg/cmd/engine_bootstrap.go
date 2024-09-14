@@ -41,7 +41,7 @@ func main() {
 	}
 
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: false,
+		VerboseLoggingEnabled: true,
 		SheetsClient:          sheetClient,
 	}
 
@@ -68,6 +68,8 @@ func fetchFantasyTeams() []*common.FantasyTeam {
 		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
 		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
 		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
+		{Id: "7", Name: "Justin's Team", Owner: "Justin"},
+		{Id: "8", Name: "Ryan's Team", Owner: "Ryan"},
 	}
 }
 
@@ -121,6 +123,12 @@ func fetchBotList() []*common.Bot {
 			SourcePath:    "/bots/nfl/justin-bot.py",
 			FantasyTeamId: "7",
 		},
+		{
+			Id:            "Ryans's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/ryan-bot.py",
+			FantasyTeamId: "8",
+		},
 	}
 }
 
@@ -162,7 +170,7 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        5,
+		TotalRounds:        2,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
