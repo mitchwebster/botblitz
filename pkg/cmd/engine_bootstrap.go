@@ -63,7 +63,7 @@ func fetchFantasyTeams() []*common.FantasyTeam {
 	return []*common.FantasyTeam{
 		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
 		{Id: "1", Name: "Tyler's Team", Owner: "Tyler"},
-		{Id: "2", Name: "Missing in Action", Owner: "Drew"},
+		{Id: "2", Name: "Jon's Team", Owner: "Jon"},
 		{Id: "3", Name: "Chris's Team", Owner: "Chris"},
 		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
 		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
@@ -88,9 +88,9 @@ func fetchBotList() []*common.Bot {
 			FantasyTeamId: "1",
 		},
 		{
-			Id:            "Standard Bot",
+			Id:            "Jon Bot",
 			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/standard-bot.py",
+			SourcePath:    "/bots/nfl/jon-bot.py",
 			FantasyTeamId: "2",
 		},
 		{
@@ -163,14 +163,27 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	}
 
 	player_slots := []*common.PlayerSlot{
-		{Name: "QB"},
-		{Name: "RB"},
+		{AllowedPlayerPositions: []string{"QB"}},
+		{AllowedPlayerPositions: []string{"RB"}},
+		{AllowedPlayerPositions: []string{"RB"}},
+		{AllowedPlayerPositions: []string{"WR"}},
+		{AllowedPlayerPositions: []string{"WR"}},
+		{AllowedPlayerPositions: []string{"TE"}},
+		{AllowedPlayerPositions: []string{"RB", "WR", "TE"}},
+		{AllowedPlayerPositions: []string{"K"}},
+		{AllowedPlayerPositions: []string{"DST"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
+		{AllowedPlayerPositions: []string{"Bench"}},
 	}
 
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        2,
+		TotalRounds:        15,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
