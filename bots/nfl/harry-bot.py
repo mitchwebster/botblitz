@@ -35,8 +35,8 @@ def draft_player(game_state: GameState) -> str:
       drafted_k_count += 1 if "K" in player.allowed_positions else 0
       drafted_player_count += 1
 
-    # all players except for panthers and tua and defense
-    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa' and player.allowed_positions[0] != 'DST']
+    # all players except for panthers and tua
+    undrafted_players = [player for player in game_state.players if not is_drafted(player) and player.professional_team != 'CAR' and player.full_name != 'Tua Tagovailoa']
     # rb and wr list
     undrafted_rbswrs = [player for player in undrafted_players if  player.allowed_positions[0] == 'RB' or player.allowed_positions[0] == 'WR']
     # qb list
