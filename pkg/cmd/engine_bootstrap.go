@@ -22,7 +22,7 @@ func main() {
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
 
-	// shuffleFantasyTeamsAndBots(fantasyTeams, bots)
+	shuffleFantasyTeamsAndBots(fantasyTeams, bots)
 
 	gameState, err := genDraftGameState(year, fantasyTeams)
 	if err != nil {
@@ -65,6 +65,9 @@ func fetchFantasyTeams() []*common.FantasyTeam {
 		{Id: "1", Name: "Tyler's Team", Owner: "Tyler"},
 		{Id: "2", Name: "Missing in Action", Owner: "Drew"},
 		{Id: "3", Name: "Chris's Team", Owner: "Chris"},
+		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
+		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
+		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
 	}
 }
 
@@ -93,6 +96,24 @@ func fetchBotList() []*common.Bot {
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/chris-bot.py",
 			FantasyTeamId: "3",
+		},
+		{
+			Id:            "Harry's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/harry-bot.py",
+			FantasyTeamId: "4",
+		},
+		{
+			Id:            "Parker's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/parker-bot.py",
+			FantasyTeamId: "5",
+		},
+		{
+			Id:            "Matt's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/matt-bot.py",
+			FantasyTeamId: "6",
 		},
 	}
 }
@@ -135,7 +156,7 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        10,
+		TotalRounds:        5,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
