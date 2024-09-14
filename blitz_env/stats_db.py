@@ -8,17 +8,17 @@ from bs4 import BeautifulSoup
 import re
 
 def fp_seasonal_years(page, years):
-    df = pd.DataFrame()
+    dfs= []
     for year in years:
-        df = pd.concat(df, fp_stats_dynamic(page, year=year))
-    return df
+        dfs.append(fp_stats_dynamic(page, year=year))
+    return pd.concat(dfs)
 
 def fp_weekly_years(page, years):
-    df = pd.DataFrame()
+    dfs = []
     for year in years:
         for week in range(1, 18):
-            df = pd.concat(df, fp_stats_dynamic(page, year=year, week=week))
-    return df 
+           dfs.append(fp_stats_dynamic(page, year=year, week=week))
+    return dfs
 
 def fp_stats_dynamic(page, **kwargs):
     url_query = f"https://www.fantasypros.com/nfl/stats/{page}.php"
