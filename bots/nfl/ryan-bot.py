@@ -226,4 +226,4 @@ def draft_player(game_state: GameState) -> str:
             print("All positions are filled")
     return ""
 
-game_state = simulate_draft(draft_player, 2024)
+# game_state = simulate_draft(draft_player, 2024)
