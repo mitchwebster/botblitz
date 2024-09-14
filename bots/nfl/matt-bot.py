@@ -48,7 +48,6 @@ def draft_player(game_state: GameState) -> str:
 
     # Populate max player position contants
     populate_num_player_max_constants()
-    print("wr: " + str(MAX_POS_RANK_WR) + " rb: " + str(MAX_POS_RANK_RB) + " te: " + str(MAX_POS_RANK_TE) + " qb: " + str(MAX_POS_RANK_QB) + " k: " + str(MAX_POS_RANK_K) + " dst: " + str(MAX_POS_RANK_DST) + " all: " + str(MAX_RANK_ALL_PLAYERS ))
     
     # Select the player with the highest rank (lowest rank number)
     if undrafted_players:
