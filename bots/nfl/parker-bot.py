@@ -48,4 +48,4 @@ def draft_player(game_state: GameState) -> str:
             return remaining_players[i].id
     
     # Otherwise pick the next highest player
-    return remaining_players[0]
+    return remaining_players[0].id
