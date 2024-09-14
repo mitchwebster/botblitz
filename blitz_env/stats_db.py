@@ -7,7 +7,7 @@ from .agent_pb2 import Player
 from .projections_db import fp_projections_parse
 
 def import_def_seasonal_data(
-        kwargs
+        **kwargs
     ):
     url_query = f"https://www.fantasypros.com/nfl/stats/dst.php"
     params = kwargs
