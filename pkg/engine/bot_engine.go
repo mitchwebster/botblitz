@@ -173,6 +173,7 @@ func performDraftAction(bot *common.Bot, e BotEngine) error {
 		if err != nil {
 			return err
 		}
+		summary += '*'
 	}
 
 	err = registerPickInSheets(summary, int(e.gameState.CurrentPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
