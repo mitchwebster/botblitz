@@ -5,30 +5,6 @@ import json
 
 # requirements.txt changes
 # pip install openai
-# pip install json
-
-MY_TEAM: Dict[str, Player] = {
-    "QB": None,
-    "RB": None,
-    "RB2": None,
-    "WR": None,
-    "WR2": None,
-    "RB/WR/TE": None,
-    "TE": None,
-    "K": None,
-    "DST": None,
-    "BENCH": None,
-    "BENCH2": None,
-    "BENCH3": None,
-    "BENCH4": None,
-    "BENCH5": None,
-    "BENCH6": None,
-}
-
-openai_api_key = ""
-openai_client = OpenAI(api_key=openai_api_key)
-
-# Assuming stats_db has been initialized with the relevant data
 stats_db = StatsDB([2023])
 
 def get_player_stats(player: Player) -> str:
@@ -57,6 +33,68 @@ def get_player_stats(player: Player) -> str:
     return stats_summary
 
 def draft_player(game_state: GameState) -> str:
+    openai_api_key = userdata.get('OPENAI_API_TOKEN')
+    openai_client = OpenAI(api_key=openai_api_key)
+
+    my_team = {
+        "QB": None,
+        "RB": None,
+        "RB2": None,
+        "WR": None,
+        "WR2": None,
+        "RB/WR/TE": None,
+        "TE": None,
+        "K": None,
+        "DST": None,
+        "BENCH": None,
+        "BENCH2": None,
+        "BENCH3": None,
+        "BENCH4": None,
+        "BENCH5": None,
+        "BENCH6": None,
+    }
+
+    for player in game_state.players:
+        if player.draft_status.team_id_chosen == game_state.drafting_team_id:
+            placed = False
+            for position in player.allowed_positions:
+                if position in my_team:
+                    if position == "RB" and my_team["RB"] is None:
+                        my_team["RB"] = player
+                        placed = True
+                        break
+                    elif position == "RB" and my_team["RB2"] is None:
+                        my_team["RB2"] = player
+                        placed = True
+                        break
+                    elif position == "WR" and my_team["WR"] is None:
+                        my_team["WR"] = player
+                        placed = True
+                        break
+                    elif position == "WR" and my_team["WR2"] is None:
+                        my_team["WR2"] = player
+                        placed = True
+                        break
+                    elif my_team[position] is None:
+                        my_team[position] = player
+                        placed = True
+                        break
+            
+            if not placed and my_team["RB/WR/TE"] is None and any(pos in ["RB", "WR", "TE"] for pos in player.allowed_positions):
+                my_team["RB/WR/TE"] = player
+                placed = True
+            
+            if not placed:
+                for bench in ["BENCH", "BENCH2", "BENCH3", "BENCH4", "BENCH5", "BENCH6"]:
+                    if my_team[bench] is None:
+                        my_team[bench] = player
+                        break
+
+
+    # injured_players = nfl.import_injuries([2024])
+    # print("Injured players:")
+    # print(injured_players)
+
     # Filter out already drafted players
     undrafted_players = [
         player for player in game_state.players 
@@ -65,7 +103,7 @@ def draft_player(game_state: GameState) -> str:
     undrafted_players.sort(key=lambda x: x.rank)
     # Check if all starting positions are filled
     starting_positions = ["QB", "RB", "RB", "WR", "WR2", "RB/WR/TE", "TE", "BENCH", "BENCH2"]
-    all_starters_filled = all(MY_TEAM[pos] is not None for pos in starting_positions)
+    all_starters_filled = all(my_team[pos] is not None for pos in starting_positions)
 
     if all_starters_filled:
         # If all starters are filled, only consider K and DST
@@ -73,15 +111,15 @@ def draft_player(game_state: GameState) -> str:
             player for player in undrafted_players 
             if any(pos in ["K", "DST"] for pos in player.allowed_positions)
         ]
-    undrafted_players = undrafted_players[:40]
+    undrafted_players = undrafted_players[:50]
 
     if not undrafted_players:
         return ""  # Return empty string if no eligible players are available
 
-    my_team_flat = [player for player in MY_TEAM.values() if player is not None]
+    my_team_flat = [player for player in my_team.values() if player is not None]
 
     roster = []
-    for position, player in MY_TEAM.items():
+    for position, player in my_team.items():
         roster.append(f"{position}: {player.full_name if player else 'None'}")
 
     # Append stats to each player's description for the prompt
@@ -99,7 +137,7 @@ def draft_player(game_state: GameState) -> str:
     Make sure each starting position has at least one player, do not add a player to a position that's already filled. 
     You can add any player to the bench, only after all starting positions are filled.
 
-    Return the response in the json format {{ "id": number, position: position_str }} where 'number' is the player ID and position_str is the position to add the player to from {', '.join(MY_TEAM.keys())}.
+    Return the response in the json format {{ "id": number, position: position_str }} where 'number' is the player ID and position_str is the position to add the player to from {', '.join(my_team.keys())}.
     """
 
     prompt = f"""
@@ -135,14 +173,14 @@ def draft_player(game_state: GameState) -> str:
         drafted_player = next(filter(lambda player: player.id == f"{suggested_player_id}", undrafted_players), None)
         
         if drafted_player:
-            if MY_TEAM[position_str] is None:
+            if my_team[position_str] is None:
                 print(f"Drafted player {drafted_player.full_name} to position {position_str}")
-                MY_TEAM[position_str] = drafted_player
+                my_team[position_str] = drafted_player
             else:
                 for bench in ["BENCH", "BENCH2", "BENCH3", "BENCH4", "BENCH5", "BENCH6"]:
-                    if MY_TEAM[bench] is None:
+                    if my_team[bench] is None:
                         print(f"Position {position_str} filled. Drafted player {drafted_player.full_name} to {bench}")
-                        MY_TEAM[bench] = drafted_player
+                        my_team[bench] = drafted_player
                         break
                 else:
                     print(f"Error: No available positions to draft {drafted_player.full_name}")
@@ -155,10 +193,29 @@ def draft_player(game_state: GameState) -> str:
         print(f"Error calling ChatGPT API: {e}")
 
     # Fallback: select the player with the highest rank if the API call fails or player not found
-    # TODO: Must account for positions, or just iterate through positions, trim index, and add player to that position. Bench won't matter
     if not drafted_player:
-        drafted_player = min(undrafted_players, key=lambda p: p.rank)
-        MY_TEAM[drafted_player.allowed_positions[0]] = drafted_player
-        return drafted_player.id
-
+        # Find the next empty position directly from my_team
+        next_empty_position = next((pos for pos, player in my_team.items() if player is None), None)
+        
+        if next_empty_position:
+            # Find the highest ranked player for the empty position
+            if next_empty_position.startswith("BENCH"):
+                drafted_player = min(undrafted_players, key=lambda p: p.rank)
+            else:
+                drafted_player = min(
+                    (p for p in undrafted_players if next_empty_position in p.allowed_positions),
+                    key=lambda p: p.rank,
+                    default=None
+                )
+            
+            if drafted_player:
+                my_team[next_empty_position] = drafted_player
+                print(f"Drafted player {drafted_player.full_name} to position {next_empty_position}")
+                return drafted_player.id
+            else:
+                print(f"No available players for position {next_empty_position}")
+        else:
+            print("All positions are filled")
     return ""
+
+game_state = simulate_draft(draft_player, 2024)
