@@ -506,6 +506,8 @@ func callBotRPC(gameState *common.GameState) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
+	// container port may not be listening yet - wait for it
+	opts = append(opts, grpc.WithBlock())
 
 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
@@ -608,9 +610,6 @@ func createAndStartContainer() (string, error) {
 		// TODO: delete the container we created if we can't start it?
 		return "", fmt.Errorf("couldn't start container: %v", err)
 	}
-
-	time.Sleep(2 * time.Second) // Give container 2 seconds to start up
-	// TODO: could we potentially check that the container is running?
 
 	return createResponse.ID, nil
 }
