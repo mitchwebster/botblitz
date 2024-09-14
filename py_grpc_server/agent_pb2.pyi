@@ -147,8 +147,8 @@ class Bot(_message.Message):
     source_repo_username: str
     source_repo_name: str
     source_path: str
-    fantasy_team_id: int
-    def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[int] = ...) -> None: ...
+    fantasy_team_id: str
+    def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[str] = ...) -> None: ...
 
 class Simulation(_message.Message):
     __slots__ = ("id", "landscape", "num_iterations")

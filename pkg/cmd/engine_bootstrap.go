@@ -26,7 +26,7 @@ func main() {
 	print(gameState)
 
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: true,
+		VerboseLoggingEnabled: false,
 	}
 
 	engine := engine.NewBotEngine(gameState, bots, engineSettings)
@@ -43,13 +43,33 @@ func main() {
 	}
 }
 
+func fetchFantasyTeams() []*common.FantasyTeam {
+	return []*common.FantasyTeam{
+		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
+		{Id: "1", Name: "Best Bots", Owner: "Tyler"},
+		{Id: "2", Name: "Evil Bot", Owner: "Drew"},
+	}
+}
+
 func fetchBotList() []*common.Bot {
 	return []*common.Bot{
 		{
 			Id:            "Standard NFL Bot",
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/standard-bot.py",
-			FantasyTeamId: 0,
+			FantasyTeamId: "0",
+		},
+		{
+			Id:            "Request Bot Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/request-bot.py",
+			FantasyTeamId: "1",
+		},
+		{
+			Id:            "Broken Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/broken-bot.py",
+			FantasyTeamId: "2",
 		},
 		// {
 		// 	Id:                 "Remote bot",
@@ -68,10 +88,7 @@ func genDraftGameState(year int) (*common.GameState, error) {
 		return nil, err
 	}
 
-	fantasy_teams := []*common.FantasyTeam{
-		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
-		{Id: "1", Name: "Best Bots", Owner: "Tyler"},
-	}
+	fantasy_teams := fetchFantasyTeams()
 
 	player_slots := []*common.PlayerSlot{
 		{Name: "QB"},
@@ -81,7 +98,7 @@ func genDraftGameState(year int) (*common.GameState, error) {
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasy_teams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        15,
+		TotalRounds:        3,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
@@ -151,7 +168,7 @@ func loadPlayers(year int) ([]*common.Player, error) {
 
 		draft_status := common.DraftStatus{
 			Availability: common.DraftStatus_AVAILABLE,
-			PickChosen:   -1,
+			PickChosen:   0,
 			TeamIdChosen: "",
 		}
 

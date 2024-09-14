@@ -1,6 +1,8 @@
 module github.com/mitchwebster/botblitz/pkg/engine
 
-go 1.21
+go 1.22.0
+
+toolchain go1.22.7
 
 replace github.com/mitchwebster/botblitz/pkg/common v0.0.0 => ../common
 
@@ -31,6 +33,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.23.1 // indirect
 	go.opentelemetry.io/otel/sdk v1.23.1 // indirect
 	go.opentelemetry.io/otel/trace v1.23.1 // indirect
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
