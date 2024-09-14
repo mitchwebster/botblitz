@@ -4,164 +4,139 @@ import numpy as np
 from typing import List
 import requests
 from .agent_pb2 import Player
-from .projections_db import fp_projections_parse
+from bs4 import BeautifulSoup
+import re
 
-def import_def_seasonal_data(
-        **kwargs
-    ):
-    url_query = f"https://www.fantasypros.com/nfl/stats/dst.php"
+def fp_seasonal_years(page, years):
+    df = pd.DataFrame()
+    for year in years:
+        df = pd.concat(df, fp_stats_dynamic(page, year=year))
+    return df
+
+def fp_weekly_years(page, years):
+    df = pd.DataFrame()
+    for year in years:
+        for week in range(1, 18):
+            df = pd.concat(df, fp_stats_dynamic(page, year=year, week=week))
+    return df 
+
+def fp_stats_dynamic(page, **kwargs):
+    url_query = f"https://www.fantasypros.com/nfl/stats/{page}.php"
     params = kwargs
     response = requests.get(url_query, params=params)
 
-    response_obj = {
-        'content': response.content,
-        'query': response.url,
-        'sport': 'nfl',
-        'response': response
-    }
+    if response.status_code != 200:
+        raise Exception(f"Failed to retrieve data: Status code {response.status_code}")
 
-    parsed_projections = fp_projections_parse(response_obj)
-    
-    return parsed_projections['projections']
+    content = response.content
+    soup = BeautifulSoup(content, 'html.parser')
 
-def import_weekly_data(
-        years, 
-        columns=None, 
-        downcast=True,
-        player_type="offense"
-    ):
-    """Imports weekly player data
-    
-    Args:
-        years (List[int]): years to get weekly data for
-        columns (List[str]): only return these columns
-        downcast (bool): convert float64 to float32, default True
-        player_type (str): one of "offense" (default), "kicking", "def" 
-    Returns:
-        DataFrame
-    """
-    
-    # check variable types
-    if not isinstance(years, (list, range)):
-        raise ValueError('Input must be list or range.')
-        
-    if min(years) < 1999:
-        raise ValueError('Data not available before 1999.')
-    
-    if not columns:
-        columns = []
+    # Find the table with id 'data'
+    table_html = soup.find(id='data')
 
-    player_type_prefix = ""
-    if player_type == "def":
-        player_type_prefix = "_def"
-    elif player_type == "kicking":
-        player_type_prefix = "_kicking"
-    url = r'https://github.com/nflverse/nflverse-data/releases/download/player_stats/player_stats{0}_{1}.parquet'
+    # Get the header rows
+    header_rows = table_html.find('thead').find_all('tr')
+    column_names = []
 
-    data = pd.concat([pd.read_parquet(url.format(player_type_prefix, x), engine='auto') for x in years])        
+    # Process all header rows to build the column names
+    for row in header_rows:
+        cells = row.find_all(['th', 'td'])
+        row_headers = []
+        for cell in cells:
+            # Get text from <small> tag if present
+            small_tag = cell.find('small')
+            if small_tag:
+                header_text = small_tag.get_text(strip=True)
+            else:
+                header_text = cell.get_text(strip=True)
+            colspan = int(cell.get('colspan', 1))
+            row_headers.extend([header_text] * colspan)
+        # If column_names is empty, initialize it
+        if not column_names:
+            column_names = row_headers
+        else:
+            # Combine with previous headers
+            column_names = [f"{prev}_{curr}" if prev else curr for prev, curr in zip(column_names, row_headers)]
 
-    if columns:
-        data = data[columns]
+    # Clean up column names
+    column_names = [name.strip().replace(' ', '_') for name in column_names]
 
-    # converts float64 to float32, saves ~30% memory
-    if downcast:
-        print('Downcasting floats.')
-        cols = data.select_dtypes(include=[np.float64]).columns
-        data[cols] = data[cols].astype(np.float32)
+    # Get the data rows
+    data_rows = table_html.find('tbody').find_all('tr')
 
-    return data
+    data = []
+    for row in data_rows:
+        cells = row.find_all('td')
+        row_data = []
+        # Process the first cell (Rank)
+        rank_cell = cells[0]
+        rank_text = rank_cell.get_text(strip=True)
+        row_data.append(rank_text)
+        # Process the second cell (Player)
+        player_cell = cells[1]
+        # Extract player info
+        fp_player_link = player_cell.find('a', class_='fp-player-link')
+        if fp_player_link:
+            # Get fantasypros_id from class attribute
+            fp_player_class = fp_player_link.get('class', [])
+            fp_id = None
+            for cls in fp_player_class:
+                m = re.search(r'fp-id-(\d+)', cls)
+                if m:
+                    fp_id = m.group(1)
+                    break
+            if fp_id is None:
+                fp_id = fp_player_link.get('fp-player-id', None)
+            player_name = fp_player_link.get('fp-player-name', None)
+            # The team info is in the text of the cell
+            team_text = player_cell.get_text(strip=True)
+            team = team_text.replace(fp_player_link.get_text(strip=True), '').strip()
+            # Extract team abbreviation from parentheses
+            team = re.sub(r'[\(\)]', '', team)
+        else:
+            fp_id = None
+            player_name = None
+            team = None
+        # Append player info to row_data
+        row_data.extend([fp_id, player_name, team])
+        # Process the remaining cells
+        for cell in cells[2:]:
+            text = cell.get_text(strip=True)
+            row_data.append(text)
+        data.append(row_data)
 
-def import_seasonal_data(
-        years,
-        s_type='REG',
-        player_type='offense'):
-    """Imports seasonal player data
-    
-    Args:
-        years (List[int]): years to get seasonal data for
-        s_type (str): season type to include in average ('ALL','REG','POST')
-        player_type (str): one of "offense" (default), "kicking", "def" 
-    Returns:
-        DataFrame
-    """
-    
-    # check variable types
-    if not isinstance(years, (list, range)):
-        raise ValueError('years input must be list or range.')
-        
-    if min(years) < 1999:
-        raise ValueError('Data not available before 1999.')
-        
-    if s_type not in ('REG','ALL','POST'):
-        raise ValueError('Only REG, ALL, POST allowed for s_type.')
-    
+    # Create column names including player info
+    # Remove 'Player' column from headers since we processed it separately
+    stats_columns = column_names.copy()
+    stats_columns.pop(1)  # Remove 'Player' column
 
-    player_type_prefix = ""
-    if player_type == "def":
-        player_type_prefix = "_def"
-    elif player_type == "kicking":
-        player_type_prefix = "_kicking"
-    url = r'https://github.com/nflverse/nflverse-data/releases/download/player_stats/player_stats{0}_season_{1}.parquet'
+    # Our final columns are:
+    # ['Rank', 'fantasypros_id', 'player_name', 'team'] + stats_columns[1:]
+    columns = ['Rank', 'fantasypros_id', 'player_name', 'team'] + stats_columns[1:]
 
-    data = pd.concat([pd.read_parquet(url.format(player_type_prefix, x), engine='auto') for x in years])
+    # Create DataFrame
+    stats_df = pd.DataFrame(data, columns=columns)
 
-    if s_type == 'REG':
-        data = data[data['season_type'] == 'REG']
-    if s_type == 'POST':
-        data = data[data['season_type'] == 'POST']
-    
-    return data
+    # Identify numeric columns dynamically
+    non_numeric_cols = ['fantasypros_id', 'player_name', 'team']
+    for col in stats_df.columns:
+        if col not in non_numeric_cols:
+            # Clean and convert to numeric
+            stats_df[col] = stats_df[col].str.replace(',', '').str.rstrip('%')
+            stats_df[col] = pd.to_numeric(stats_df[col], errors='coerce')
 
-def import_ids(columns=None, ids=None):
-    """Import mapping table of ids for most major data providers
-    
-    Args:
-        columns (List[str]): list of columns to return
-        ids (List[str]): list of specific ids to return
-        
-    Returns:
-        DataFrame
-    """
-    
-    # create list of id options
-    avail_ids = ['mfl_id', 'sportradar_id', 'fantasypros_id', 'gsis_id', 'pff_id',
-       'sleeper_id', 'nfl_id', 'espn_id', 'yahoo_id', 'fleaflicker_id',
-       'cbs_id', 'rotowire_id', 'rotoworld_id', 'ktc_id', 'pfr_id',
-       'cfbref_id', 'stats_id', 'stats_global_id', 'fantasy_data_id']
-    avail_sites = [x[:-3] for x in avail_ids]
-    
-    # check variable types
-    if columns is None:
-        columns = []
-    
-    if ids is None:
-        ids = []
+    # Convert 'ROST' column to float percentage if it exists
+    rost_col = [col for col in stats_df.columns if 'ROST' in col.upper()]
+    if rost_col:
+        col = rost_col[0]
+        stats_df[col] = stats_df[col] / 100.0
 
-    if not isinstance(columns, list):
-        raise ValueError('columns variable must be list.')
-        
-    if not isinstance(ids, list):
-        raise ValueError('ids variable must be list.')
-        
-    # confirm id is in table
-    if False in [x in avail_sites for x in ids]:
-        raise ValueError('ids variable can only contain ' + ', '.join(avail_sites))
-        
-    # import data
-    df = pd.read_csv(r'https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv')
-    
-    rem_cols = [x for x in df.columns if x not in avail_ids]
-    tgt_ids = [x + '_id' for x in ids]
-        
-    # filter df to just specified columns
-    if len(columns) > 0 and len(ids) > 0:
-        df = df[set(tgt_ids + columns)]
-    elif len(columns) > 0 and len(ids) == 0:
-        df = df[set(avail_ids + columns)]
-    elif len(columns) == 0 and len(ids) > 0:
-        df = df[set(tgt_ids + rem_cols)]
-    
-    return df
+    # Reorder columns if needed
+    # stats_df = stats_df[['fantasypros_id', 'player_name', 'team'] + [col for col in projections_df.columns if col not in ['fantasypros_id', 'player_name', 'team']]]
+
+    # Return stats DataFrame
+    stats_df['fantasy_points_ppr'] = stats_df['FPTS']
+    return stats_df
 
 class StatsDB:
     def __init__(self, years: List[int]):
@@ -175,10 +150,16 @@ class StatsDB:
         years (List[int]): A list of integers representing years for which data is to be loaded.
         """
         self.years = years
-        self.weekly_df = import_weekly_data(years)
+        self.weekly_df = nfl.import_weekly_data(years)
         # self.pbp_df = nfl.import_pbp_data(years)
-        self.seasonal_df = import_seasonal_data(years)
-        self.ids_df = import_ids()
+        self.seasonal_df = nfl.import_seasonal_data(years)
+       
+        self.def_seasonal_df = fp_seasonal_years("dst", years)
+        self.def_weekly_df = fp_weekly_years("dst", years)
+        self.k_seasonal_df = fp_seasonal_years("k", years)
+        self.k_weekly_df = fp_weekly_years("k", years)
+
+        self.ids_df = nfl.import_ids()
 
     def get_weekly_data(self, player: Player) -> pd.DataFrame:
         """
