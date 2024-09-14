@@ -11,14 +11,14 @@ def fp_seasonal_years(page, years):
     dfs= []
     for year in years:
         dfs.append(fp_stats_dynamic(page, year=year))
-    return pd.concat(dfs)
+    return pd.concat(dfs).reset_index()
 
 def fp_weekly_years(page, years):
     dfs = []
     for year in years:
         for week in range(1, 18):
            dfs.append(fp_stats_dynamic(page, year=year, week=week))
-    return dfs
+    return pd.concat(dfs).reset_index()
 
 def fp_stats_dynamic(page, **kwargs):
     url_query = f"https://www.fantasypros.com/nfl/stats/{page}.php"
