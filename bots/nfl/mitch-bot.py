@@ -86,8 +86,11 @@ def draft_player(game_state: GameState) -> str:
         "Marvin Harrison Jr.": "",
         "Drake London": "",
         "Zamir White" : "",
-        "Tua Tagovailoa": ""
     }
+
+    # Do not draft Tua this year
+    if game_state.league_settings.year == 2024:
+        player_deny_map["Tua Tagovailoa"] = ""
 
     team_deny_map = {
         "CAR": "",
