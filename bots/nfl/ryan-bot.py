@@ -5,7 +5,10 @@ import json
 
 # requirements.txt changes
 # pip install openai
+
 stats_db = StatsDB([2023])
+# openai_api_key = userdata.get('OPENAI_API_TOKEN')
+openai_api_key = ""
 
 def get_player_stats(player: Player) -> str:
     """
@@ -33,7 +36,6 @@ def get_player_stats(player: Player) -> str:
     return stats_summary
 
 def draft_player(game_state: GameState) -> str:
-    openai_api_key = userdata.get('OPENAI_API_TOKEN')
     openai_client = OpenAI(api_key=openai_api_key)
 
     my_team = {
@@ -90,6 +92,12 @@ def draft_player(game_state: GameState) -> str:
                         my_team[bench] = player
                         break
 
+    print("My team:")
+    for position, player in my_team.items():
+        if player:
+            print(f"{position}: {player.full_name}")
+        else:
+            print(f"{position}: None")
 
     # injured_players = nfl.import_injuries([2024])
     # print("Injured players:")
