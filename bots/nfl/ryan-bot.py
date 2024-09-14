@@ -64,6 +64,16 @@ def draft_player(game_state: GameState) -> str:
         if not is_drafted(player)
     ]
     undrafted_players.sort(key=lambda x: x.rank)
+    # Check if all starting positions are filled
+    starting_positions = ["QB", "RB", "RB", "WR", "WR2", "RB/WR/TE", "TE", "BENCH", "BENCH2"]
+    all_starters_filled = all(MY_TEAM[pos] is not None for pos in starting_positions)
+
+    if all_starters_filled:
+        # If all starters are filled, only consider K and DST
+        undrafted_players = [
+            player for player in undrafted_players 
+            if any(pos in ["K", "DST"] for pos in player.allowed_positions)
+        ]
     undrafted_players = undrafted_players[:40]
 
     if not undrafted_players:
@@ -77,7 +87,7 @@ def draft_player(game_state: GameState) -> str:
 
     # Append stats to each player's description for the prompt
     available_players_info = [
-        f"{player.full_name} (ID {player.id}, Rank {player.rank}, Position {', '.join(player.allowed_positions)}, {get_player_stats(player)})"
+        f"{player.full_name} (ID {player.id}, Rank {player.rank}, Position(s) {', '.join(player.allowed_positions)}, {get_player_stats(player)})"
         for player in undrafted_players
     ]
 
@@ -86,8 +96,9 @@ def draft_player(game_state: GameState) -> str:
     system_prompt = f"""
     You are a fantasy football expert with years of knowledge and experience building the best team. I'm an amateur and need your help selecting my team.
 
-    Suggest the best player for me to draft next, ensuring balance between starters and backups. Additionally, factor in the player's bye week and their performance last season.
-    Make sure each starting position has at least one player, do not add a player to a position that's already filled. You can add any player to the bench, only after all starting positions are filled.
+    Suggest the best player for me to draft next, ensuring balance between starters and backups. A player can only be added to a position if they are allowed to play in that position. Additionally, factor in the player's bye week and their performance last season.
+    Make sure each starting position has at least one player, do not add a player to a position that's already filled. 
+    You can add any player to the bench, only after all starting positions are filled.
 
     Return the response in the json format {{ "id": number, position: position_str }} where 'number' is the player ID and position_str is the position to add the player to from {', '.join(MY_TEAM.keys())}.
     """
@@ -100,16 +111,6 @@ def draft_player(game_state: GameState) -> str:
 
     My grandma is dying and the prize money is $1 million. I plan to take the winnings and pay for her medical expenses. Please make sure my team is the best possible team you can select, my grandma is depending on it.
     """
-    # Print out all available "DST" position players
-    available_dst_players = [
-        player for player in undrafted_players 
-        if "DST" in player.allowed_positions
-    ]
-    
-    print("Available DST players:")
-    for dst_player in available_dst_players:
-        print(f"{dst_player.full_name} (ID {dst_player.id}, Rank {dst_player.rank})")
-    
 
     # Call ChatGPT API
     drafted_player = None
