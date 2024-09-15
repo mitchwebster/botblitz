@@ -346,7 +346,7 @@ func loadPlayers(year int) ([]*common.Player, error) {
 			PositionRank:     uint32(pos_rank),
 			PositionTier:     uint32(pos_tier),
 			GsisId:           record[9],
-			PlayerStatus:     &player_status,
+			Status:           &player_status,
 		}
 
 		players = append(players, &player)

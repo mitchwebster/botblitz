@@ -17,4 +17,4 @@ tzdata==2024.1
 urllib3==1.26.12
 nfl-data-py==0.3.1
 openai==1.45.0
-https://github.com/mitchwebster/botblitz/raw/08fcd9e93422d784cbbc74f983116fcd687f27f2/dist/blitz_env-0.1.0-py3-none-any.whl
+https://github.com/mitchwebster/botblitz/raw/96f1b48ee4b3ab7e18f7d8f72a7f13a6ad5991e4/dist/blitz_env-0.1.0-py3-none-any.whl
