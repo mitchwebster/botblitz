@@ -3,8 +3,8 @@ package engine
 import (
 	"context"
 	"errors"
-	"io"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"strconv"
@@ -81,8 +81,15 @@ func (e *BotEngine) SaveGameState() error {
 	}
 
 	// Save the serialized data to a file
-	fileName := "gameState-" + strconv.Itoa(int(e.gameState.LeagueSettings.Year)) + "-" + GenerateRandomString(6) + ".bin"
-	file, err := os.Create(fileName)
+	saveFolder := "data/game_states"
+	fileName := saveFolder + "/gameState-" + strconv.Itoa(int(e.gameState.LeagueSettings.Year)) + "-" + GenerateRandomString(6) + ".bin"
+
+	fullFilePath, err := BuildLocalAbsolutePath(fileName)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(fullFilePath)
 	if err != nil {
 		return err
 	}
