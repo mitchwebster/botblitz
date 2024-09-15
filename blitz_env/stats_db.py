@@ -181,9 +181,9 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the weekly data for the specified player.
         """
-        if player.allowed_positions[0] == 'K' and self.k_weekly_df != None:
+        if player.allowed_positions[0] == 'K' and self.k_weekly_df is not None:
             return self.k_weekly_df[self.k_weekly_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST' and self.dst_weekly_df != None:
+        if player.allowed_positions[0] == 'DST' and self.dst_weekly_df is not None:
             return self.dst_weekly_df[self.dst_weekly_df['fantasypros_id'] == player.id]
 
         return self.weekly_df[self.weekly_df.player_id == player.gsis_id]
@@ -198,9 +198,9 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the seasonal data for the specified player.
         """
-        if player.allowed_positions[0] == 'K' and self.k_seasonal_df != None:
+        if player.allowed_positions[0] == 'K' and self.k_seasonal_df is not None:
             return self.k_seasonal_df[self.k_seasonal_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST' and self.dst_seasonal_df != None:
+        if player.allowed_positions[0] == 'DST' and self.dst_seasonal_df is not None:
             return self.dst_seasonal_df[self.dst_seasonal_df['fantasypros_id'] == player.id]
         
         return self.seasonal_df[self.seasonal_df.player_id == player.gsis_id]
