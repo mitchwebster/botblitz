@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -17,13 +18,66 @@ import (
 
 var (
 	enableGoogleSheets = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
+	gameMode           = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
 )
+
+// Define the enum type
+type GameMode int
+
+// Define constants for the enum values
+const (
+	Draft GameMode = iota
+	WeeklyFantasy
+)
+
+func (s GameMode) String() string {
+	return [...]string{"Draft", "WeeklyFantasy"}[s]
+}
+
+func GameModeFromString(s string) (GameMode, error) {
+	switch strings.ToLower(s) {
+	case "draft":
+		return Draft, nil
+	case "weeklyfantasy":
+		return WeeklyFantasy, nil
+	default:
+		return -1, fmt.Errorf("invalid status: %s", s)
+	}
+}
 
 func main() {
 	fmt.Println("Starting up...")
 
 	flag.Parse()
 
+	mode, err := GameModeFromString(*gameMode)
+	if err != nil {
+		fmt.Println("Failed to determine GameMode")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	}
+
+	if mode == Draft {
+		bootstrapDraft()
+	} else if mode == WeeklyFantasy {
+		bootstrapWeeklyFantasy()
+	} else {
+		fmt.Println("Invalid GameMode provided")
+		os.Exit(1)
+	}
+}
+
+func bootstrapWeeklyFantasy() {
+	lastGameState, err := engine.LoadLastGameState()
+	if err != nil {
+		fmt.Println("Failed to load last game state")
+		os.Exit(1)
+	}
+
+	fmt.Println(lastGameState.LeagueSettings.Year)
+}
+
+func bootstrapDraft() {
 	year := 2023
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
@@ -37,9 +91,9 @@ func main() {
 		os.Exit(1) // Crash hard
 	}
 
-	draftName := "Draft_" + engine.GenerateRandomString(6)
 	var sheetClient *engine.SheetsClient = nil
 	if *enableGoogleSheets {
+		draftName := "Draft_" + engine.GenerateRandomString(6)
 		fmt.Printf("Starting Draft Sheet: %s\n", draftName)
 		sheetClient, err = initializeDraftSheet(draftName, gameState)
 		if err != nil {
@@ -50,7 +104,7 @@ func main() {
 	}
 
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: true,
+		VerboseLoggingEnabled: false,
 		SheetsClient:          sheetClient,
 	}
 
@@ -62,10 +116,10 @@ func main() {
 	// register for ctrl+c signal and make it call cancelFunc
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	go func(){
-	    for _ = range c {
-	        cancelFunc()
-	    }
+	go func() {
+		for _ = range c {
+			cancelFunc()
+		}
 	}()
 	defer cancelFunc()
 

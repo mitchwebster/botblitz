@@ -20,8 +20,11 @@ test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go work sync -C
 	go list -f '{{.Dir}}' -m | xargs -L1 go test -C
 
-run-engine:
-	go run pkg/cmd/engine_bootstrap.go
+run-draft:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
+
+run-fantasy:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy
 
 build-docker:
 	docker build -f py-server-dockerfile -t py_grpc_server ./py_grpc_server

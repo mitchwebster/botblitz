@@ -19,7 +19,6 @@ import (
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
 )
 
 const pyServerHostAndPort = "localhost:8080"
@@ -71,36 +70,6 @@ func (e *BotEngine) Summarize() string {
 	}
 
 	return builder.String()
-}
-
-func (e *BotEngine) SaveGameState() error {
-	// Serialize the Person object to a binary format
-	serializedData, err := proto.Marshal(e.gameState)
-	if err != nil {
-		return err
-	}
-
-	// Save the serialized data to a file
-	saveFolder := "data/game_states"
-	fileName := saveFolder + "/gameState-" + strconv.Itoa(int(e.gameState.LeagueSettings.Year)) + "-" + GenerateRandomString(6) + ".bin"
-
-	fullFilePath, err := BuildLocalAbsolutePath(fileName)
-	if err != nil {
-		return err
-	}
-
-	file, err := os.Create(fullFilePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Write(serializedData)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (e *BotEngine) Run(ctx context.Context) error {
@@ -192,7 +161,7 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		curRound += 1
 	}
 
-	e.SaveGameState()
+	SaveGameState(e.gameState)
 
 	return nil
 }
@@ -237,8 +206,10 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) err
 		return err
 	}
 
-	if err := e.saveBotLogsToFile(containerId); err != nil {
-		return err
+	if e.settings.VerboseLoggingEnabled {
+		if err := e.saveBotLogsToFile(containerId); err != nil {
+			return err
+		}
 	}
 
 	return returnError
