@@ -444,7 +444,7 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 
 	player := gameState.Players[idx]
 
-	if player.DraftStatus.Availability == common.DraftStatus_DRAFTED {
+	if player.Status.Availability == common.PlayerStatus_DRAFTED {
 		return "", fmt.Errorf("Cannot draft player again")
 	}
 
@@ -453,9 +453,9 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 		return "", err
 	}
 
-	player.DraftStatus.TeamIdChosen = team.Id
-	player.DraftStatus.Availability = common.DraftStatus_DRAFTED
-	player.DraftStatus.PickChosen = gameState.CurrentDraftPick
+	player.Status.CurrentFantasyTeamId = team.Id
+	player.Status.Availability = common.PlayerStatus_DRAFTED
+	player.Status.PickChosen = gameState.CurrentDraftPick
 
 	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentDraftPick, team.Name, team.Owner, player.FullName)
 
@@ -471,7 +471,7 @@ func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameSt
 	hasLooped := false
 	for index < playerCount && !hasLooped {
 		player := gameState.Players[index]
-		if player.DraftStatus.Availability == common.DraftStatus_AVAILABLE {
+		if player.Status.Availability == common.PlayerStatus_AVAILABLE {
 			summary, err := validateAndMakeDraftPick(fantasyTeamId, player.Id, gameState)
 			return summary, err
 		}

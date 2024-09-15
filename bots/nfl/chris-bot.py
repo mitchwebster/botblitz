@@ -37,7 +37,7 @@ def draft_player(game_state: GameState) -> str:
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
 
     # Find players currently on team
-    team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == game_state.current_bot_team_id]
+    team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
 
     def get_expected_points(stats_db, projections_db, player):
         preseason_projections = get_preseason_projections(projections_db, player, game_state.league_settings.year)

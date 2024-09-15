@@ -1,5 +1,5 @@
 from typing import Callable, List, Mapping
-from .agent_pb2 import Player, DraftStatus, FantasyTeam, GameState, PlayerSlot
+from .agent_pb2 import Player, PlayerStatus, FantasyTeam, GameState, PlayerSlot
 from .blitz_env import load_players
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -8,7 +8,7 @@ import random
 import copy
 
 def is_drafted(player: Player) -> bool:
-    return player.draft_status.availability == DraftStatus.Availability.DRAFTED
+    return player.status.availability == PlayerStatus.Availability.DRAFTED
 
 def init_team(id: str, name: str, owner: str) -> FantasyTeam:
     team = FantasyTeam()
@@ -118,9 +118,9 @@ def run_draft(game_state, draft_strategy_map):
             if player.id == player_id:
                 if is_drafted(player):
                     raise Exception(f"Player id: {player_id} already drafted")
-                player.draft_status.availability = DraftStatus.DRAFTED
-                player.draft_status.pick_chosen = game_state.current_draft_pick
-                player.draft_status.team_id_chosen = game_state.current_bot_team_id 
+                player.status.availability = PlayerStatus.DRAFTED
+                player.status.pick_chosen = game_state.current_draft_pick
+                player.status.current_fantasy_team_id = game_state.current_bot_team_id 
         # update for next pick
         game_state.current_draft_pick += 1
         game_state.current_bot_team_id = get_picking_team_id(game_state, game_state.current_draft_pick)
@@ -168,10 +168,10 @@ def visualize_draft_board(game_state: GameState):
 
     # Plotting each player
     for player in game_state.players:
-        if player.draft_status.availability != DraftStatus.Availability.DRAFTED:
+        if player.status.availability != PlayerStatus.Availability.DRAFTED:
             continue
-        round_number = (player.draft_status.pick_chosen - 1) // num_teams
-        team_index = get_picking_team_index(game_state, player.draft_status.pick_chosen)
+        round_number = (player.status.pick_chosen - 1) // num_teams
+        team_index = get_picking_team_index(game_state, player.status.pick_chosen)
         # Determine the color based on the first allowed position (assuming the position list is not empty)
         position_color = position_colors.get(player.allowed_positions[0], 'lightgrey')  # Default to lightgrey if no match
 

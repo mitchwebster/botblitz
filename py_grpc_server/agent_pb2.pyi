@@ -87,7 +87,7 @@ class PlayerSlot(_message.Message):
     def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ...) -> None: ...
 
 class Player(_message.Message):
-    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "draft_status", "gsis_id")
+    __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "status", "gsis_id")
     ID_FIELD_NUMBER: _ClassVar[int]
     FULL_NAME_FIELD_NUMBER: _ClassVar[int]
     ALLOWED_POSITIONS_FIELD_NUMBER: _ClassVar[int]
@@ -97,7 +97,7 @@ class Player(_message.Message):
     TIER_FIELD_NUMBER: _ClassVar[int]
     POSITION_RANK_FIELD_NUMBER: _ClassVar[int]
     POSITION_TIER_FIELD_NUMBER: _ClassVar[int]
-    DRAFT_STATUS_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
     GSIS_ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     full_name: str
@@ -108,25 +108,27 @@ class Player(_message.Message):
     tier: int
     position_rank: int
     position_tier: int
-    draft_status: DraftStatus
+    status: PlayerStatus
     gsis_id: str
-    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ..., draft_status: _Optional[_Union[DraftStatus, _Mapping]] = ..., gsis_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., full_name: _Optional[str] = ..., allowed_positions: _Optional[_Iterable[str]] = ..., professional_team: _Optional[str] = ..., player_bye_week: _Optional[int] = ..., rank: _Optional[int] = ..., tier: _Optional[int] = ..., position_rank: _Optional[int] = ..., position_tier: _Optional[int] = ..., status: _Optional[_Union[PlayerStatus, _Mapping]] = ..., gsis_id: _Optional[str] = ...) -> None: ...
 
-class DraftStatus(_message.Message):
-    __slots__ = ("availability", "pick_chosen", "team_id_chosen")
+class PlayerStatus(_message.Message):
+    __slots__ = ("availability", "pick_chosen", "current_fantasy_team_id")
     class Availability(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
-        AVAILABLE: _ClassVar[DraftStatus.Availability]
-        DRAFTED: _ClassVar[DraftStatus.Availability]
-    AVAILABLE: DraftStatus.Availability
-    DRAFTED: DraftStatus.Availability
+        AVAILABLE: _ClassVar[PlayerStatus.Availability]
+        DRAFTED: _ClassVar[PlayerStatus.Availability]
+        ON_HOLD: _ClassVar[PlayerStatus.Availability]
+    AVAILABLE: PlayerStatus.Availability
+    DRAFTED: PlayerStatus.Availability
+    ON_HOLD: PlayerStatus.Availability
     AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
     PICK_CHOSEN_FIELD_NUMBER: _ClassVar[int]
-    TEAM_ID_CHOSEN_FIELD_NUMBER: _ClassVar[int]
-    availability: DraftStatus.Availability
+    CURRENT_FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    availability: PlayerStatus.Availability
     pick_chosen: int
-    team_id_chosen: str
-    def __init__(self, availability: _Optional[_Union[DraftStatus.Availability, str]] = ..., pick_chosen: _Optional[int] = ..., team_id_chosen: _Optional[str] = ...) -> None: ...
+    current_fantasy_team_id: str
+    def __init__(self, availability: _Optional[_Union[PlayerStatus.Availability, str]] = ..., pick_chosen: _Optional[int] = ..., current_fantasy_team_id: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
     __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id")
@@ -161,23 +163,37 @@ class Simulation(_message.Message):
     def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
 
 class GameState(_message.Message):
-    __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick", "waiver_priority")
+    __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick", "current_waiver_priority")
     PLAYERS_FIELD_NUMBER: _ClassVar[int]
     TEAMS_FIELD_NUMBER: _ClassVar[int]
     LEAGUE_SETTINGS_FIELD_NUMBER: _ClassVar[int]
     CURRENT_BOT_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
     CURRENT_DRAFT_PICK_FIELD_NUMBER: _ClassVar[int]
-    WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
     players: _containers.RepeatedCompositeFieldContainer[Player]
     teams: _containers.RepeatedCompositeFieldContainer[FantasyTeam]
     league_settings: LeagueSettings
     current_bot_team_id: str
     current_draft_pick: int
-    waiver_priority: int
-    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., current_bot_team_id: _Optional[str] = ..., current_draft_pick: _Optional[int] = ..., waiver_priority: _Optional[int] = ...) -> None: ...
+    current_waiver_priority: int
+    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., current_bot_team_id: _Optional[str] = ..., current_draft_pick: _Optional[int] = ..., current_waiver_priority: _Optional[int] = ...) -> None: ...
 
 class DraftSelection(_message.Message):
     __slots__ = ("player_id",)
     PLAYER_ID_FIELD_NUMBER: _ClassVar[int]
     player_id: str
     def __init__(self, player_id: _Optional[str] = ...) -> None: ...
+
+class AttemptedFantasyActions(_message.Message):
+    __slots__ = ("add_drop_selections",)
+    ADD_DROP_SELECTIONS_FIELD_NUMBER: _ClassVar[int]
+    add_drop_selections: _containers.RepeatedCompositeFieldContainer[AddDropSelection]
+    def __init__(self, add_drop_selections: _Optional[_Iterable[_Union[AddDropSelection, _Mapping]]] = ...) -> None: ...
+
+class AddDropSelection(_message.Message):
+    __slots__ = ("player_to_drop_id", "player_to_add_id")
+    PLAYER_TO_DROP_ID_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_TO_ADD_ID_FIELD_NUMBER: _ClassVar[int]
+    player_to_drop_id: str
+    player_to_add_id: str
+    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ...) -> None: ...

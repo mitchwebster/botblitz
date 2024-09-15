@@ -4,7 +4,7 @@ import argparse
 import sys
 import os
 from .stats_db import StatsDB
-from .agent_pb2 import GameState, DraftStatus
+from .agent_pb2 import GameState, PlayerStatus
 from rich.console import Console
 from rich.table import Table
 from rich import box
@@ -162,9 +162,9 @@ def print_draft_board(game_state, stats_db, year, player_contributions, week=Non
 
     # Populate the draft board with picks
     for player in game_state.players:
-        if player.draft_status.availability != DraftStatus.Availability.DRAFTED:
+        if player.status.availability != PlayerStatus.Availability.DRAFTED:
             continue
-        pick_number = player.draft_status.pick_chosen
+        pick_number = player.status.pick_chosen
         round_number = (pick_number - 1) // num_teams
         pick_in_round = (pick_number - 1) % num_teams
 
@@ -244,7 +244,7 @@ def main():
     # Compute best possible score and player contributions for each team
     for team in game_state.teams:
         # Get the players drafted by the team
-        team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == team.id]
+        team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == team.id]
 
         if week is not None:
             # Compute the team's best possible score for the specified week

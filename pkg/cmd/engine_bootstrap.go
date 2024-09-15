@@ -329,10 +329,10 @@ func loadPlayers(year int) ([]*common.Player, error) {
 			pos_tier = 0
 		}
 
-		draft_status := common.DraftStatus{
-			Availability: common.DraftStatus_AVAILABLE,
-			PickChosen:   0,
-			TeamIdChosen: "",
+		player_status := common.PlayerStatus{
+			Availability:         common.PlayerStatus_AVAILABLE,
+			PickChosen:           0,
+			CurrentFantasyTeamId: "",
 		}
 
 		player := common.Player{
@@ -346,7 +346,7 @@ func loadPlayers(year int) ([]*common.Player, error) {
 			PositionRank:     uint32(pos_rank),
 			PositionTier:     uint32(pos_tier),
 			GsisId:           record[9],
-			DraftStatus:      &draft_status,
+			PlayerStatus:     &player_status,
 		}
 
 		players = append(players, &player)

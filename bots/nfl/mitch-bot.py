@@ -20,7 +20,7 @@ def get_drafted_team(players, team_id):
         D_POS : []
     }
 
-    for player in [player for player in players if is_drafted(player) and player.draft_status.team_id_chosen == team_id]:
+    for player in [player for player in players if is_drafted(player) and player.status.current_fantasy_team_id == team_id]:
         main_pos = player.allowed_positions[0]
         roster[main_pos].append(player)
 

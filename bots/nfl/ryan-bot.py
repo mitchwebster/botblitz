@@ -21,7 +21,7 @@ def draft_player(game_state: GameState) -> str:
     }
 
     for player in game_state.players:
-        if player.draft_status.team_id_chosen == game_state.current_bot_team_id:
+        if player.status.current_fantasy_team_id == game_state.current_bot_team_id:
             for position in player.allowed_positions:
                 if position in my_team:
                     my_team[position].append(player)

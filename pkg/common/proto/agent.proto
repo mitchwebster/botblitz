@@ -68,18 +68,20 @@ message Player {
     uint32 tier = 7;
     uint32 position_rank = 8;
     uint32 position_tier = 9;
-    DraftStatus draft_status = 10;
+    PlayerStatus status = 10;
     string gsis_id = 11;
 }
 
-message DraftStatus {
+message PlayerStatus {
     enum Availability {
         AVAILABLE = 0;
         DRAFTED = 1;
+        ON_HOLD = 2;
     }
+
     Availability availability = 1;
     uint32 pick_chosen = 2;
-    string team_id_chosen = 3;
+    string current_fantasy_team_id = 3;
 }
 
 message Bot {
@@ -109,9 +111,18 @@ message GameState {
     LeagueSettings league_settings = 3;
     string current_bot_team_id = 4;
     uint32 current_draft_pick = 5;
-    uint32 waiver_priority = 6;
+    uint32 current_waiver_priority = 6;
 }
 
 message DraftSelection {
     string player_id = 1;
+}
+
+message AttemptedFantasyActions {
+    repeated AddDropSelection add_drop_selections = 1;
+}
+
+message AddDropSelection {
+    string player_to_drop_id = 1;
+    string player_to_add_id = 2;
 }

@@ -41,7 +41,7 @@ def draft_player(game_state: GameState) -> str:
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
-    team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == game_state.current_bot_team_id]
+    team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
     
     # Populate team from GameState
     populate_team(team_players)
