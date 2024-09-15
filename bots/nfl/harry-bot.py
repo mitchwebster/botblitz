@@ -13,7 +13,7 @@ def draft_player(game_state: GameState) -> str:
     """
 
     # my team
-    draft_id = game_state.drafting_team_id
+    draft_id = game_state.current_bot_team_id
     my_team = [player for player in game_state.players if player.draft_status.team_id_chosen == draft_id]
 
     # declare variables
@@ -98,7 +98,7 @@ def draft_player(game_state: GameState) -> str:
     # print("drafted k count", drafted_k_count)
     # print("drafted player count", drafted_player_count)
     # print(rbwr_diff)
-    # print(game_state.drafting_team_id)
+    # print(game_state.current_bot_team_id)
     # print(drafted_player)
     
     # for player in my_team:

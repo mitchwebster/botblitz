@@ -41,7 +41,7 @@ def draft_player(game_state: GameState) -> str:
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
-    team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == game_state.drafting_team_id]
+    team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == game_state.current_bot_team_id]
     
     # Populate team from GameState
     populate_team(team_players)
@@ -55,7 +55,7 @@ def draft_player(game_state: GameState) -> str:
         # drafted_player = min(undrafted_players, key=lambda p: p.rank)
         # drafted_player = undrafted_players.sorted(undrafted_players, key=lambda player:player.)
 
-        print("\n\nHERE IS A NEW ROUND - PICK " + str(game_state.current_pick) + " \n\n")
+        print("\n\nHERE IS A NEW ROUND - PICK " + str(game_state.current_draft_pick) + " \n\n")
 
         drafted_player = experiment(undrafted_players, drafted_players)
 

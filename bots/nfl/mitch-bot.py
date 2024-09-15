@@ -56,7 +56,7 @@ def get_target_positions(drafted_team, cur_round, total_rounds):
     return target_positions
 
 def get_current_round(game_state: GameState) -> int:
-    zero_based_round = (game_state.current_pick - 1) // len(game_state.teams)
+    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.teams)
     return zero_based_round + 1
 
 def list_to_map(list):
@@ -97,7 +97,7 @@ def draft_player(game_state: GameState) -> str:
     }
 
     # relevant current game state
-    my_team_id = game_state.drafting_team_id
+    my_team_id = game_state.current_bot_team_id
     drafted_team = get_drafted_team(game_state.players, my_team_id)
     cur_round = get_current_round(game_state)
 

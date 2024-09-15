@@ -59,8 +59,8 @@ def init_game_state(year) -> GameState:
     game_state = GameState()
     game_state.players.extend(players)
     game_state.teams.extend(teams)
-    game_state.current_pick = 1
-    game_state.drafting_team_id = teams[0].id
+    game_state.current_draft_pick = 1
+    game_state.current_bot_team_id = teams[0].id
     game_state.league_settings.is_snake_draft = True
     game_state.league_settings.num_teams = 10
     game_state.league_settings.total_rounds = 15
@@ -110,8 +110,8 @@ def get_picking_team_id(game_state: GameState, pick: int) -> int:
 
 def run_draft(game_state, draft_strategy_map):
     total_picks = game_state.league_settings.total_rounds * len(game_state.teams)
-    while game_state.current_pick <= total_picks:
-        draft_strategy = draft_strategy_map[game_state.drafting_team_id]
+    while game_state.current_draft_pick <= total_picks:
+        draft_strategy = draft_strategy_map[game_state.current_bot_team_id]
         
         player_id = draft_strategy(copy.deepcopy(game_state))
         for player in game_state.players:
@@ -119,11 +119,11 @@ def run_draft(game_state, draft_strategy_map):
                 if is_drafted(player):
                     raise Exception(f"Player id: {player_id} already drafted")
                 player.draft_status.availability = DraftStatus.DRAFTED
-                player.draft_status.pick_chosen = game_state.current_pick
-                player.draft_status.team_id_chosen = game_state.drafting_team_id 
+                player.draft_status.pick_chosen = game_state.current_draft_pick
+                player.draft_status.team_id_chosen = game_state.current_bot_team_id 
         # update for next pick
-        game_state.current_pick += 1
-        game_state.drafting_team_id = get_picking_team_id(game_state, game_state.current_pick)
+        game_state.current_draft_pick += 1
+        game_state.current_bot_team_id = get_picking_team_id(game_state, game_state.current_draft_pick)
 
 def simulate_draft(draft_player: Callable[[List[Player]], str], year: int):
     game_state = init_game_state(year)

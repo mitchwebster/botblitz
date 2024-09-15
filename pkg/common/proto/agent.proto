@@ -106,9 +106,10 @@ message Simulation {
 message GameState {
     repeated Player players = 1;
     repeated FantasyTeam teams = 2;
-    uint32 current_pick = 3;
-    string drafting_team_id = 5;
-    LeagueSettings league_settings = 6;
+    LeagueSettings league_settings = 3;
+    string current_bot_team_id = 4;
+    uint32 current_draft_pick = 5;
+    uint32 waiver_priority = 6;
 }
 
 message DraftSelection {

@@ -21,7 +21,7 @@ def draft_player(game_state: GameState) -> str:
     }
 
     for player in game_state.players:
-        if player.draft_status.team_id_chosen == game_state.drafting_team_id:
+        if player.draft_status.team_id_chosen == game_state.current_bot_team_id:
             for position in player.allowed_positions:
                 if position in my_team:
                     my_team[position].append(player)
@@ -51,7 +51,7 @@ def draft_player(game_state: GameState) -> str:
         return stats_summary
 
     
-    current_round = ((game_state.current_pick - 1) // len(game_state.teams)) + 1
+    current_round = ((game_state.current_draft_pick - 1) // len(game_state.teams)) + 1
     is_last_three_rounds = game_state.league_settings.total_rounds - current_round < 3
     
     # Filter out already drafted players

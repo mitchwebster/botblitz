@@ -161,18 +161,20 @@ class Simulation(_message.Message):
     def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
 
 class GameState(_message.Message):
-    __slots__ = ("players", "teams", "current_pick", "drafting_team_id", "league_settings")
+    __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick", "waiver_priority")
     PLAYERS_FIELD_NUMBER: _ClassVar[int]
     TEAMS_FIELD_NUMBER: _ClassVar[int]
-    CURRENT_PICK_FIELD_NUMBER: _ClassVar[int]
-    DRAFTING_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
     LEAGUE_SETTINGS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_BOT_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_DRAFT_PICK_FIELD_NUMBER: _ClassVar[int]
+    WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
     players: _containers.RepeatedCompositeFieldContainer[Player]
     teams: _containers.RepeatedCompositeFieldContainer[FantasyTeam]
-    current_pick: int
-    drafting_team_id: str
     league_settings: LeagueSettings
-    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., current_pick: _Optional[int] = ..., drafting_team_id: _Optional[str] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ...) -> None: ...
+    current_bot_team_id: str
+    current_draft_pick: int
+    waiver_priority: int
+    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., current_bot_team_id: _Optional[str] = ..., current_draft_pick: _Optional[int] = ..., waiver_priority: _Optional[int] = ...) -> None: ...
 
 class DraftSelection(_message.Message):
     __slots__ = ("player_id",)

@@ -78,7 +78,7 @@ func bootstrapWeeklyFantasy() {
 }
 
 func bootstrapDraft() {
-	year := 2023
+	year := 2024
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
 
@@ -261,18 +261,18 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        15,
+		TotalRounds:        1,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
 	}
 
 	game_state := common.GameState{
-		CurrentPick:    1,
-		DraftingTeamId: "0",
-		LeagueSettings: &settings,
-		Teams:          fantasyTeams,
-		Players:        players,
+		CurrentDraftPick: 1,
+		CurrentBotTeamId: "0",
+		LeagueSettings:   &settings,
+		Teams:            fantasyTeams,
+		Players:          players,
 	}
 
 	return &game_state, nil

@@ -149,13 +149,13 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 			}
 
 			curBot := e.bots[index]
-			e.gameState.DraftingTeamId = curBot.FantasyTeamId
+			e.gameState.CurrentBotTeamId = curBot.FantasyTeamId
 			err := e.performDraftAction(ctx, curBot)
 			if err != nil {
 				return err
 			}
 			index += increment
-			e.gameState.CurrentPick += 1
+			e.gameState.CurrentDraftPick += 1
 		}
 
 		curRound += 1
@@ -200,7 +200,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) err
 		summary += string('*')
 	}
 
-	err = registerPickInSheets(summary, int(e.gameState.CurrentPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
+	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
 	if err != nil {
 		fmt.Println("Failed to write content to Google Sheets")
 		return err
@@ -407,7 +407,7 @@ func (e *BotEngine) performDraftPick(ctx context.Context, bot *common.Bot) (stri
 		return "", err
 	}
 
-	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentPick, team.Name, team.Owner)
+	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentDraftPick, team.Name, team.Owner)
 
 	draftPick, err := callBotRPC(ctx, e.gameState)
 	if err != nil {
@@ -455,9 +455,9 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 
 	player.DraftStatus.TeamIdChosen = team.Id
 	player.DraftStatus.Availability = common.DraftStatus_DRAFTED
-	player.DraftStatus.PickChosen = gameState.CurrentPick
+	player.DraftStatus.PickChosen = gameState.CurrentDraftPick
 
-	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentPick, team.Name, team.Owner, player.FullName)
+	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentDraftPick, team.Name, team.Owner, player.FullName)
 
 	summary := player.FullName + "(" + player.AllowedPositions[0] + ")"
 
@@ -683,12 +683,12 @@ func createAndStartContainer() (string, error) {
 	return createResponse.ID, nil
 }
 
-func registerPickInSheets(summary string, currentPick int, teamCount int, fantasyTeamId string, client *SheetsClient) error {
+func registerPickInSheets(summary string, currentDraftPick int, teamCount int, fantasyTeamId string, client *SheetsClient) error {
 	if client == nil {
 		return nil
 	}
 
-	zero_based_round := ((currentPick - 1) / teamCount) + 1
+	zero_based_round := ((currentDraftPick - 1) / teamCount) + 1
 	indexOfFantasyTeam, _ := strconv.Atoi(fantasyTeamId)
 	newCol := rune(int(InitialCol) + indexOfFantasyTeam + 1)
 

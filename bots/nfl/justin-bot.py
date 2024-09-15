@@ -21,7 +21,7 @@ def draft_player(game_state: GameState) -> str:
         number_of_teams = len(game_state.teams)
         is_snake_draft = game_state.league_settings.is_snake_draft
         # Adjust pick to be zero-based for easier modulo calculations
-        pick_adjusted = game_state.current_pick - 1
+        pick_adjusted = game_state.current_draft_pick - 1
 
         # Determine the round of the pick
         round_number = pick_adjusted // number_of_teams
@@ -56,7 +56,7 @@ def draft_player(game_state: GameState) -> str:
 
 
     # Get a list of who's on our team already
-    my_team_id = game_state.drafting_team_id
+    my_team_id = game_state.current_bot_team_id
     my_players = [player for player in game_state.players if is_drafted(player) and player.draft_status.team_id_chosen == my_team_id]
     print(f"my players: {[p.full_name for p in my_players]}")
     print()

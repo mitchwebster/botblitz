@@ -177,7 +177,7 @@ def draft_player(game_state: GameState) -> str:
     for player in game_state.players:
         player.rank = jons_rank(player)
 
-    my_team_id = game_state.drafting_team_id
+    my_team_id = game_state.current_bot_team_id
     my_team = get_drafted_team(game_state=game_state, team_id=my_team_id)
     player_to_draft = determine_player(my_team, get_all_undrafted_players(game_state))
     return player_to_draft.id
