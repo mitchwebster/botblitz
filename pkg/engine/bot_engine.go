@@ -103,13 +103,13 @@ func (e *BotEngine) SaveGameState() error {
 	return nil
 }
 
-func (e *BotEngine) Run() error {
+func (e *BotEngine) Run(ctx context.Context) error {
 	err := e.performValidations()
 	if err != nil {
 		return err
 	}
 
-	return e.run()
+	return e.run(ctx)
 }
 
 func (e *BotEngine) PrintResults() {
@@ -140,7 +140,7 @@ func (e *BotEngine) performValidations() error {
 	return nil
 }
 
-func (e *BotEngine) run() error {
+func (e *BotEngine) run(ctx context.Context) error {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Running engine")
 	}
@@ -155,10 +155,10 @@ func (e *BotEngine) run() error {
 		return err
 	}
 
-	return e.runDraft()
+	return e.runDraft(ctx)
 }
 
-func (e *BotEngine) runDraft() error {
+func (e *BotEngine) runDraft(ctx context.Context) error {
 	curRound := 1
 	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
@@ -174,9 +174,17 @@ func (e *BotEngine) runDraft() error {
 		}
 
 		for index >= 0 && index <= arrayEdge {
+			// check if ctx is canceled
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			curBot := e.bots[index]
 			e.gameState.DraftingTeamId = curBot.FantasyTeamId
-			e.performDraftAction(curBot)
+			err := e.performDraftAction(ctx, curBot)
+			if err != nil {
+				return err
+			}
 			index += increment
 			e.gameState.CurrentPick += 1
 		}
@@ -189,11 +197,22 @@ func (e *BotEngine) runDraft() error {
 	return nil
 }
 
-func (e *BotEngine) performDraftAction(bot *common.Bot) error {
+func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) error {
+	var returnError error
+
 	containerId, err := e.startBotContainer(bot)
 	if err != nil {
 		return err
 	}
+
+	// schedule cleanup to run right before the function returns
+	defer func() {
+		err = shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
+		if err != nil {
+			fmt.Println("CRITICAL!! Failed to clean after bot run")
+			returnError = err
+		}
+	}()
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
@@ -201,7 +220,7 @@ func (e *BotEngine) performDraftAction(bot *common.Bot) error {
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	summary, err := e.performDraftPick(bot)
+	summary, err := e.performDraftPick(ctx, bot)
 	if err != nil {
 		fmt.Println("Failed to run draft using bot")
 		fmt.Println(err)
@@ -222,13 +241,7 @@ func (e *BotEngine) performDraftAction(bot *common.Bot) error {
 		return err
 	}
 
-	err = shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
-	if err != nil {
-		fmt.Println("CRITICAL!! Failed to clean after bot run")
-		return err
-	}
-
-	return nil
+	return returnError
 }
 
 // TODO: the resulting log file has some binary bs at the beginning of each
@@ -417,7 +430,7 @@ func shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLog
 // 	return nil
 // }
 
-func (e *BotEngine) performDraftPick(bot *common.Bot) (string, error) {
+func (e *BotEngine) performDraftPick(ctx context.Context, bot *common.Bot) (string, error) {
 	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
 	if err != nil {
 		return "", err
@@ -425,7 +438,7 @@ func (e *BotEngine) performDraftPick(bot *common.Bot) (string, error) {
 
 	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentPick, team.Name, team.Owner)
 
-	draftPick, err := callBotRPC(e.gameState)
+	draftPick, err := callBotRPC(ctx, e.gameState)
 	if err != nil {
 		return "", err
 	}
@@ -587,7 +600,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func callBotRPC(gameState *common.GameState) (*common.DraftSelection, error) {
+func callBotRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -602,7 +615,7 @@ func callBotRPC(gameState *common.GameState) (*common.DraftSelection, error) {
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
 	selections, err := client.PerformFantasyActions(ctx, gameState)
 	if err != nil {
 		fmt.Println("Failed calling bot")
