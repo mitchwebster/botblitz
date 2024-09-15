@@ -159,6 +159,10 @@ class StatsDB:
         self.weekly_df = nfl.import_weekly_data(years)
         # self.pbp_df = nfl.import_pbp_data(years)
         self.seasonal_df = nfl.import_seasonal_data(years)
+        self.dst_seasonal_df = None
+        self.dst_weekly_df = None
+        self.k_seasonal_df = None
+        self.k_weekly_df = None
         if include_k_dst:
             self.dst_seasonal_df = fp_seasonal_years("dst", years)
             self.dst_weekly_df = fp_weekly_years("dst", years)
@@ -177,9 +181,9 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the weekly data for the specified player.
         """
-        if player.allowed_positions[0] == 'K':
+        if player.allowed_positions[0] == 'K' and self.k_weekly_df != None:
             return self.k_weekly_df[self.k_weekly_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST':
+        if player.allowed_positions[0] == 'DST' and self.dst_weekly_df != None:
             return self.dst_weekly_df[self.dst_weekly_df['fantasypros_id'] == player.id]
 
         return self.weekly_df[self.weekly_df.player_id == player.gsis_id]
@@ -194,9 +198,9 @@ class StatsDB:
         Returns:
         pd.DataFrame: A DataFrame containing the seasonal data for the specified player.
         """
-        if player.allowed_positions[0] == 'K':
+        if player.allowed_positions[0] == 'K' and self.k_seasonal_df != None:
             return self.k_seasonal_df[self.k_seasonal_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST':
+        if player.allowed_positions[0] == 'DST' and self.dst_seasonal_df != None:
             return self.dst_seasonal_df[self.dst_seasonal_df['fantasypros_id'] == player.id]
         
         return self.seasonal_df[self.seasonal_df.player_id == player.gsis_id]
