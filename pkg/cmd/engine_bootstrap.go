@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strconv"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
@@ -52,11 +54,26 @@ func main() {
 		SheetsClient:          sheetClient,
 	}
 
+	// Use a context object to tell the engine to gracefully shutdown when the
+	// process is signaled(i.e. when ctrl+c is pressed)
+	ctx := context.Background()
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	// register for ctrl+c signal and make it call cancelFunc
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func(){
+	    for _ = range c {
+	        cancelFunc()
+	    }
+	}()
+	defer cancelFunc()
+
 	engine := engine.NewBotEngine(gameState, bots, engineSettings)
 
 	fmt.Println(engine.Summarize())
 
-	err = engine.Run()
+	err = engine.Run(ctx)
 	if err != nil {
 		fmt.Println("Engine failed unexpectedly")
 		fmt.Println(err)
