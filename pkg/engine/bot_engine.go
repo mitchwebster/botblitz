@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 	"errors"
+	"io"
+	"log"
 	"fmt"
 	"math/rand"
 	"os"
@@ -210,11 +212,59 @@ func (e *BotEngine) performDraftAction(bot *common.Bot) error {
 		return err
 	}
 
+	if err := e.saveBotLogsToFile(containerId); err != nil {
+		return err
+	}
+
 	err = shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
 	if err != nil {
 		fmt.Println("CRITICAL!! Failed to clean after bot run")
 		return err
 	}
+
+	return nil
+}
+
+// TODO: the resulting log file has some binary bs at the beginning of each
+// line - unsure why. I think the docs here explain it:
+// https://pkg.go.dev/github.com/moby/moby/client#Client.ContainerLogs.
+//
+// TODO: the bots seem to be dropping stdout (i.e. calling print() in your bot
+// doesn't result in anything coming out of the container). This needs to be
+// fixed/changed on the container/python side of things.
+func (e *BotEngine) saveBotLogsToFile(containerId string) error {
+	// Connect to docker api.
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	defer apiClient.Close()
+	apiClient.NegotiateAPIVersion(context.Background())
+
+	// Request logs for this container.
+	ctx := context.Background()
+	reader, err := apiClient.ContainerLogs(ctx, containerId, container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create temp file.
+	// TODO: include bot name and draft round in file name
+	f, err := os.CreateTemp("", "draft.*.txt")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Copy logs to temp file.
+	_, err = io.Copy(f, reader)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	fmt.Printf("Wrote bot logs to %q\n", f.Name())
 
 	return nil
 }
