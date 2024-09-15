@@ -8,9 +8,11 @@ from bs4 import BeautifulSoup
 import re
 
 def fp_seasonal_years(page, years):
-    dfs= []
+    dfs = []
     for year in years:
-        dfs.append(fp_stats_dynamic(page, year=year))
+        df = fp_stats_dynamic(page, year=year)
+        df["season"] = year
+        dfs.append(df)
     return pd.concat(dfs).reset_index()
 
 def fp_weekly_years(page, years):
@@ -21,6 +23,7 @@ def fp_weekly_years(page, years):
             try:
                 df = fp_stats_dynamic(page, year=year, range="week", week=week)
                 df["week"] = week
+                df["season"] = year
                 dfs.append(df)
             except:
                 print(f"Failed to get week {week}")
