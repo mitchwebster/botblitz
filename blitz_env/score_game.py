@@ -9,23 +9,15 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 import numpy as np
-# import google.protobuf.internal.decoder as decoder
 
 def get_points(stats_db, player, year, week):
     df = stats_db.get_weekly_data(player)
     return df[(df["season"] == year) & (df["week"] == week)]["fantasy_points_ppr"].iloc[0]
 
-def get_season_points(stats_db, player, year):
-    df = stats_db.get_seasonal_data(player)
-    try:
-        return df[df["season"] == year]["fantasy_points_ppr"].iloc[0]
-    except:
-        return 0
-
-
 def get_best_possible_score(stats_db, players, player_slots, year, week):
     total_score = 0
     used_player_ids = set()
+    player_contributions = {}  # New dictionary to track player contributions for the week
 
     # Sort slots by the size of allowed positions (ascending)
     sorted_slots = sorted(player_slots, key=lambda slot: len(slot.allowed_player_positions))
@@ -56,49 +48,47 @@ def get_best_possible_score(stats_db, players, player_slots, year, week):
             total_score += best_points
             used_player_ids.add(best_player.id)
             slot.assigned_player_id = best_player.id  # Assign the player to the slot
+            # Track the player's contribution
+            player_contributions[best_player.id] = player_contributions.get(best_player.id, 0) + best_points
 
-    return total_score
+    return total_score, player_contributions
 
 total_weeks = 17
 def get_best_possible_score_season(stats_db, players, player_slots, year):
     total_score = 0.0
-    for week in range(1, total_weeks + 1):
-        total_score += get_best_possible_score(stats_db, players, player_slots, year, week)
-    return total_score
+    season_contributions = {}  # Dictionary to accumulate player contributions over the season
 
-def print_top_teams_by_best_possible_score(game_state, stats_db, year):
-    team_scores = []
-    
-    for team in game_state.teams:
-        # Get the players drafted by the team
-        team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == team.id]
-    
-        # Compute the team's best possible score over the season
-        best_possible_score = get_best_possible_score_season(stats_db, team_players, game_state.league_settings.slots_per_team, year)
-    
-        # Append to the list
-        team_scores.append((team.owner, best_possible_score))
-    
+    for week in range(1, total_weeks + 1):
+        weekly_score, weekly_contributions = get_best_possible_score(stats_db, players, player_slots, year, week)
+        total_score += weekly_score
+
+        # Accumulate weekly contributions into season contributions
+        for player_id, points in weekly_contributions.items():
+            season_contributions[player_id] = season_contributions.get(player_id, 0) + points
+
+    return total_score, season_contributions
+
+def print_top_teams_by_best_possible_score(team_scores):
     # Sort the teams by best_possible_score in descending order
     team_scores.sort(key=lambda x: x[1], reverse=True)
-    
+
     # Find the maximum score to normalize the bar lengths
     max_score = team_scores[0][1]
-    
+    if max_score == 0:
+        max_score = 1  # Avoid division by zero
+
     # Determine the width needed for the rank numbers
     rank_width = len(str(len(team_scores)))
-    
+
     # Function to color the bar (optional)
     def color_bar(bar, color_code):
         return f"\033[{color_code}m{bar}\033[0m"
-    
+
     # Print out the teams with a simple bar chart
-    print("Top teams by best possible score:")
+    print("\nTop teams by best possible score:")
     for rank, (owner, score) in enumerate(team_scores, start=1):
         bar_length = int((score / max_score) * 50)  # Adjust 50 for the maximum bar length
         bar = '█' * bar_length
-        percentage = (score / max_score) * 100
-    
         # Optionally color the bar (e.g., green for the top team, blue for others)
         if rank == 1:
             bar = color_bar(bar, '92')  # Bright green
@@ -108,9 +98,17 @@ def print_top_teams_by_best_possible_score(game_state, stats_db, year):
         # Adjust the rank formatting
         print(f"{rank:>{rank_width}}. {owner:<15} | {bar} {score:.2f} points")
 
-def print_draft_board(game_state, stats_db, year):
+def print_draft_board(game_state, stats_db, year, player_contributions, week=None):
     console = Console()
-    
+
+    # Adjust the title and caption based on whether we're displaying a single week or the entire season
+    if week is not None:
+        title = f"Fantasy Draft Board - Week {week}"
+        caption = "*pts are each player's contribution towards the ideal roster for the week"
+    else:
+        title = "Fantasy Draft Board - Season"
+        caption = "*pts are each player's contribution towards the ideal season roster"
+
     # Get the number of teams and prepare the board layout
     num_teams = len(game_state.teams)
     num_rounds = game_state.league_settings.total_rounds
@@ -119,17 +117,12 @@ def print_draft_board(game_state, stats_db, year):
     teams = game_state.teams
     team_id_to_info = {team.id: {'name': team.name, 'owner': team.owner} for team in teams}
 
-    # Collect season points for all drafted players
-    player_points = {}
-    for player in game_state.players:
-        if player.draft_status.availability == DraftStatus.Availability.DRAFTED:
-            points = get_season_points(stats_db, player, year)
-            player_points[player.id] = points
-
-    # Get min and max points
-    points_values = list(player_points.values())
-    min_points = min(points_values)
-    max_points = max(points_values)
+    # Get min and max contributions
+    contributions_values = list(player_contributions.values())
+    min_contribution = min(contributions_values)
+    max_contribution = max(contributions_values)
+    if max_contribution == 0:
+        max_contribution = 1  # Avoid division by zero
 
     # Function to format player's name (e.g., "C. McCaffrey")
     def format_player_name(full_name):
@@ -142,10 +135,10 @@ def print_draft_board(game_state, stats_db, year):
             formatted_name = full_name  # If only one name, keep it as is
         return formatted_name
 
-    # Function to get color based on points using a gradient from red to green
-    def get_color_for_points(points, min_points, max_points):
+    # Function to get color based on contribution using a gradient from red to green
+    def get_color_for_contribution(contribution, min_contribution, max_contribution):
         # Normalize the score between 0 and 1
-        normalized = (points - min_points) / (max_points - min_points) if max_points > min_points else 0.5
+        normalized = (contribution - min_contribution) / (max_contribution - min_contribution) if max_contribution > min_contribution else 0.5
         # Interpolate between red and green
         # Start color (red): (255, 0, 0)
         # End color (green): (0, 255, 0)
@@ -157,7 +150,7 @@ def print_draft_board(game_state, stats_db, year):
         return color_hex
 
     # Create a table with team headers
-    table = Table(title="Fantasy Draft Board", box=box.SQUARE)
+    table = Table(title=title, caption=caption, box=box.SQUARE)
 
     # Add columns for each team
     for team in teams:
@@ -181,16 +174,22 @@ def print_draft_board(game_state, stats_db, year):
         else:
             team_index = num_teams - 1 - pick_in_round
 
-        # Get player's total season points
-        points = player_points.get(player.id, 0)
+        # Get player's total contribution
+        contribution = player_contributions.get(player.id, 0)
 
-        # Get color based on points
-        color = get_color_for_points(points, min_points, max_points)
+        # Handle players who did not contribute in the specified week
+        if week is not None and contribution == 0:
+            contribution_str = "DNP"  # Did Not Play
+            color = "#808080"  # Gray color for DNP
+        else:
+            contribution_str = f"{contribution:.1f} pts"
+            # Get color based on contribution
+            color = get_color_for_contribution(contribution, min_contribution, max_contribution)
 
-        # Build the player info string with name, position, and points
+        # Build the player info string with name, position, and contribution
         formatted_name = format_player_name(player.full_name)
         position = player.allowed_positions[0] if player.allowed_positions else 'N/A'
-        player_info = f"{formatted_name}\n{position}\n{points:.1f} pts"
+        player_info = f"{formatted_name}\n{position}\n{contribution_str}"
 
         # Apply color
         colored_player_info = f"[{color}]{player_info}[/{color}]"
@@ -208,14 +207,21 @@ def print_draft_board(game_state, stats_db, year):
 def main():
     parser = argparse.ArgumentParser(description='Compute and display top teams by best possible score from a GameState protobuf.')
     parser.add_argument('game_state_file', type=str, help='Path to the GameState .bin file')
+    parser.add_argument('--week', type=int, default=None, help='Week number to compute the best possible score (1-17). If not provided, computes for the entire season.')
 
     args = parser.parse_args()
 
     game_state_file = args.game_state_file
+    week = args.week
 
     # Check if the file exists
     if not os.path.isfile(game_state_file):
         print(f"Error: File '{game_state_file}' does not exist.")
+        sys.exit(1)
+
+    # Validate week number
+    if week is not None and (week < 1 or week > total_weeks):
+        print(f"Error: Invalid week number '{week}'. Week must be between 1 and {total_weeks}.")
         sys.exit(1)
 
     # Read and deserialize the GameState protobuf
@@ -231,11 +237,45 @@ def main():
     # Create stats_db instance
     stats_db = StatsDB([game_state.league_settings.year], include_k_dst=True)
 
-    # Print the draft board
-    print_draft_board(game_state, stats_db=stats_db, year=game_state.league_settings.year)
-    
-    # Compute and print the top teams
-    print_top_teams_by_best_possible_score(game_state, stats_db, game_state.league_settings.year)
+    # Initialize variables
+    player_contributions = {}  # Mapping player_id to total points contributed to best possible score
+    team_scores = []
+
+    # Compute best possible score and player contributions for each team
+    for team in game_state.teams:
+        # Get the players drafted by the team
+        team_players = [player for player in game_state.players if player.draft_status.team_id_chosen == team.id]
+
+        if week is not None:
+            # Compute the team's best possible score for the specified week
+            best_possible_score, team_contributions = get_best_possible_score(
+                stats_db, team_players, game_state.league_settings.slots_per_team, game_state.league_settings.year, week
+            )
+        else:
+            # Compute the team's best possible score over the season and player contributions
+            best_possible_score, team_contributions = get_best_possible_score_season(
+                stats_db, team_players, game_state.league_settings.slots_per_team, game_state.league_settings.year
+            )
+
+        # Append to the list
+        team_scores.append((team.owner, best_possible_score))
+
+        # Accumulate team contributions into global player_contributions
+        for player_id, points in team_contributions.items():
+            # For a single week, no need to accumulate
+            player_contributions[player_id] = points
+
+    # Now we can print the draft board, passing player_contributions
+    print_draft_board(
+        game_state,
+        stats_db=stats_db,
+        year=game_state.league_settings.year,
+        player_contributions=player_contributions,
+        week=week
+    )
+
+    # Print the top teams
+    print_top_teams_by_best_possible_score(team_scores)
 
 if __name__ == '__main__':
     main()
