@@ -52,7 +52,7 @@ func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotE
 	}
 }
 
-func (e BotEngine) Summarize() string {
+func (e *BotEngine) Summarize() string {
 	var builder strings.Builder
 
 	// write configs
@@ -72,7 +72,7 @@ func (e BotEngine) Summarize() string {
 	return builder.String()
 }
 
-func SaveGameState(e BotEngine) error {
+func (e *BotEngine) SaveGameState() error {
 	// Serialize the Person object to a binary format
 	serializedData, err := proto.Marshal(e.gameState)
 	if err != nil {
@@ -95,16 +95,16 @@ func SaveGameState(e BotEngine) error {
 	return nil
 }
 
-func (e BotEngine) Run() error {
-	err := performValidations(e)
+func (e *BotEngine) Run() error {
+	err := e.performValidations()
 	if err != nil {
 		return err
 	}
 
-	return run(e)
+	return e.run()
 }
 
-func (e BotEngine) PrintResults() {
+func (e *BotEngine) PrintResults() {
 	for botId, simulationMap := range e.botResults {
 		fmt.Printf("%s:\n", botId)
 		for simulationId, results := range simulationMap {
@@ -113,13 +113,13 @@ func (e BotEngine) PrintResults() {
 	}
 }
 
-func performValidations(e BotEngine) error {
+func (e *BotEngine) performValidations() error {
 	botValidation := common.ValidateBotConfigs(e.bots)
 	if !botValidation {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
 
-	draftValidation := validateDraftState(e)
+	draftValidation := e.validateDraftState()
 	if draftValidation != nil {
 		return draftValidation
 	}
@@ -132,25 +132,25 @@ func performValidations(e BotEngine) error {
 	return nil
 }
 
-func run(e BotEngine) error {
+func (e *BotEngine) run() error {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Running engine")
 	}
 
-	err := collectBotResources(e)
+	err := e.collectBotResources()
 	if err != nil {
 		return err
 	}
 
-	err = initializeBots(e)
+	err = e.initializeBots()
 	if err != nil {
 		return err
 	}
 
-	return runDraft(e)
+	return e.runDraft()
 }
 
-func runDraft(e BotEngine) error {
+func (e *BotEngine) runDraft() error {
 	curRound := 1
 	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
@@ -168,7 +168,7 @@ func runDraft(e BotEngine) error {
 		for index >= 0 && index <= arrayEdge {
 			curBot := e.bots[index]
 			e.gameState.DraftingTeamId = curBot.FantasyTeamId
-			performDraftAction(curBot, e)
+			e.performDraftAction(curBot)
 			index += increment
 			e.gameState.CurrentPick += 1
 		}
@@ -176,13 +176,13 @@ func runDraft(e BotEngine) error {
 		curRound += 1
 	}
 
-	SaveGameState(e)
+	e.SaveGameState()
 
 	return nil
 }
 
-func performDraftAction(bot *common.Bot, e BotEngine) error {
-	containerId, err := startBotContainer(bot, e)
+func (e *BotEngine) performDraftAction(bot *common.Bot) error {
+	containerId, err := e.startBotContainer(bot)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func performDraftAction(bot *common.Bot, e BotEngine) error {
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	summary, err := performDraftPick(bot, e)
+	summary, err := e.performDraftPick(bot)
 	if err != nil {
 		fmt.Println("Failed to run draft using bot")
 		fmt.Println(err)
@@ -219,7 +219,7 @@ func performDraftAction(bot *common.Bot, e BotEngine) error {
 	return nil
 }
 
-func validateDraftState(e BotEngine) error {
+func (e *BotEngine) validateDraftState() error {
 	if !e.gameState.LeagueSettings.IsSnakeDraft {
 		return fmt.Errorf("I only know how to snake draft")
 	}
@@ -243,7 +243,7 @@ func validateDraftState(e BotEngine) error {
 	return nil
 }
 
-func collectBotResources(e BotEngine) error {
+func (e *BotEngine) collectBotResources() error {
 	folderPath, err := BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return err
@@ -268,13 +268,13 @@ func collectBotResources(e BotEngine) error {
 	return nil
 }
 
-func initializeBots(e BotEngine) error {
+func (e *BotEngine) initializeBots() error {
 	fmt.Printf("\n-----------------------------------------\n")
 	fmt.Println("Initializing Bots")
 
 	for _, bot := range e.bots {
 		e.botResults[bot.Id] = make(map[string][]*common.FantasySelections)
-		byteCode, err := fetchSourceCode(bot, e)
+		byteCode, err := e.fetchSourceCode(bot)
 		if err != nil {
 			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)
 			return err
@@ -361,7 +361,7 @@ func shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLog
 // 	return nil
 // }
 
-func performDraftPick(bot *common.Bot, e BotEngine) (string, error) {
+func (e *BotEngine) performDraftPick(bot *common.Bot) (string, error) {
 	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
 	if err != nil {
 		return "", err
@@ -446,7 +446,7 @@ func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameSt
 	return "", fmt.Errorf("Could not find a valid player to auto-draft")
 }
 
-func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
+func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
 	var botCode []byte
 
 	if bot.SourceType == common.Bot_REMOTE {
@@ -474,7 +474,7 @@ func fetchSourceCode(bot *common.Bot, e BotEngine) ([]byte, error) {
 	return botCode, nil
 }
 
-func startBotContainer(bot *common.Bot, e BotEngine) (string, error) {
+func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("\n-----------------------------------------\n")
 		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
