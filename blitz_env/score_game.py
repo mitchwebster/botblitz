@@ -20,7 +20,6 @@ def get_season_points(stats_db, player, year):
     try:
         return df[df["season"] == year]["fantasy_points_ppr"].iloc[0]
     except:
-        print(f"player {player.full_name} returned 0 points")
         return 0
 
 
