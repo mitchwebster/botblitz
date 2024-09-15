@@ -22,7 +22,7 @@ func main() {
 
 	flag.Parse()
 
-	year := 2024
+	year := 2023
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
 
