@@ -5,6 +5,7 @@ option go_package = ".;common";
 
 service AgentService {
     rpc DraftPlayer(GameState) returns (DraftSelection) {}
+    rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
 }
 
 message FantasyLandscape {
