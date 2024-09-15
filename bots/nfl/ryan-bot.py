@@ -111,7 +111,7 @@ def draft_player(game_state: GameState) -> str:
     ]
     undrafted_players.sort(key=lambda x: x.rank)
     # Check if all starting positions are filled
-    starting_positions = ["QB", "RB", "RB2", "WR", "WR2", "RB/WR/TE", "TE", "BENCH", "BENCH2", "BENCH3"]
+    starting_positions = ["QB", "RB", "RB2", "WR", "WR2", "RB/WR/TE", "TE", "BENCH", "BENCH2", "BENCH3", "BENCH4", "BENCH5", "BENCH6"]
     all_starters_filled = all(my_team[pos] is not None for pos in starting_positions)
 
     if all_starters_filled:
