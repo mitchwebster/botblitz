@@ -34,8 +34,8 @@ class AgentServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.PerformFantasyActions = channel.unary_unary(
-                '/AgentService/PerformFantasyActions',
+        self.DraftPlayer = channel.unary_unary(
+                '/AgentService/DraftPlayer',
                 request_serializer=agent__pb2.GameState.SerializeToString,
                 response_deserializer=agent__pb2.DraftSelection.FromString,
                 _registered_method=True)
@@ -44,7 +44,7 @@ class AgentServiceStub(object):
 class AgentServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def PerformFantasyActions(self, request, context):
+    def DraftPlayer(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -53,8 +53,8 @@ class AgentServiceServicer(object):
 
 def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'PerformFantasyActions': grpc.unary_unary_rpc_method_handler(
-                    servicer.PerformFantasyActions,
+            'DraftPlayer': grpc.unary_unary_rpc_method_handler(
+                    servicer.DraftPlayer,
                     request_deserializer=agent__pb2.GameState.FromString,
                     response_serializer=agent__pb2.DraftSelection.SerializeToString,
             ),
@@ -70,7 +70,7 @@ class AgentService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def PerformFantasyActions(request,
+    def DraftPlayer(request,
             target,
             options=(),
             channel_credentials=None,
@@ -83,7 +83,7 @@ class AgentService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/AgentService/PerformFantasyActions',
+            '/AgentService/DraftPlayer',
             agent__pb2.GameState.SerializeToString,
             agent__pb2.DraftSelection.FromString,
             options,

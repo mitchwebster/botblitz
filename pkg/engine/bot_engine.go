@@ -587,7 +587,7 @@ func callBotRPC(ctx context.Context, gameState *common.GameState) (*common.Draft
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.PerformFantasyActions(ctx, gameState)
+	selections, err := client.DraftPlayer(ctx, gameState)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -608,7 +608,7 @@ func callBotRPC(ctx context.Context, gameState *common.GameState) (*common.Draft
 // 	defer conn.Close()
 // 	client := common.NewAgentServiceClient(conn)
 
-// 	selections, err := client.PerformFantasyActions(context.Background(), landscape)
+// 	selections, err := client.DraftPlayer(context.Background(), landscape)
 // 	if err != nil {
 // 		return nil, err
 // 	}

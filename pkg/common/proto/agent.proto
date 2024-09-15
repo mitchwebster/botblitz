@@ -4,7 +4,7 @@ syntax = "proto3";
 option go_package = ".;common";
 
 service AgentService {
-    rpc PerformFantasyActions(GameState) returns (DraftSelection) {}
+    rpc DraftPlayer(GameState) returns (DraftSelection) {}
 }
 
 message FantasyLandscape {

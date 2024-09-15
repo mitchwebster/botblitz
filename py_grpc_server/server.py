@@ -13,7 +13,7 @@ class AgentServiceServicer(AgentServiceServicer):
     def __init__(self):
         print("Initialized gRPC server")
 
-    def PerformFantasyActions(self, request, context):
+    def DraftPlayer(self, request, context):
         print("Input from GRPC: ")
         print(request)
 

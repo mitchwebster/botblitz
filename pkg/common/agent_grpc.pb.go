@@ -19,14 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_PerformFantasyActions_FullMethodName = "/AgentService/PerformFantasyActions"
+	AgentService_DraftPlayer_FullMethodName = "/AgentService/DraftPlayer"
 )
 
 // AgentServiceClient is the client API for AgentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
-	PerformFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error)
+	DraftPlayer(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error)
 }
 
 type agentServiceClient struct {
@@ -37,10 +37,10 @@ func NewAgentServiceClient(cc grpc.ClientConnInterface) AgentServiceClient {
 	return &agentServiceClient{cc}
 }
 
-func (c *agentServiceClient) PerformFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error) {
+func (c *agentServiceClient) DraftPlayer(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DraftSelection)
-	err := c.cc.Invoke(ctx, AgentService_PerformFantasyActions_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AgentService_DraftPlayer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *agentServiceClient) PerformFantasyActions(ctx context.Context, in *Game
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
-	PerformFantasyActions(context.Context, *GameState) (*DraftSelection, error)
+	DraftPlayer(context.Context, *GameState) (*DraftSelection, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -62,8 +62,8 @@ type AgentServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentServiceServer struct{}
 
-func (UnimplementedAgentServiceServer) PerformFantasyActions(context.Context, *GameState) (*DraftSelection, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PerformFantasyActions not implemented")
+func (UnimplementedAgentServiceServer) DraftPlayer(context.Context, *GameState) (*DraftSelection, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DraftPlayer not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -86,20 +86,20 @@ func RegisterAgentServiceServer(s grpc.ServiceRegistrar, srv AgentServiceServer)
 	s.RegisterService(&AgentService_ServiceDesc, srv)
 }
 
-func _AgentService_PerformFantasyActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AgentService_DraftPlayer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GameState)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServiceServer).PerformFantasyActions(ctx, in)
+		return srv.(AgentServiceServer).DraftPlayer(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AgentService_PerformFantasyActions_FullMethodName,
+		FullMethod: AgentService_DraftPlayer_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServiceServer).PerformFantasyActions(ctx, req.(*GameState))
+		return srv.(AgentServiceServer).DraftPlayer(ctx, req.(*GameState))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -112,8 +112,8 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AgentServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "PerformFantasyActions",
-			Handler:    _AgentService_PerformFantasyActions_Handler,
+			MethodName: "DraftPlayer",
+			Handler:    _AgentService_DraftPlayer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
