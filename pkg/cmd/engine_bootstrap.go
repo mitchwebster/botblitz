@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -21,53 +20,56 @@ var (
 	gameMode           = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
 )
 
-// Define the enum type
-type GameMode int
-
-// Define constants for the enum values
-const (
-	Draft GameMode = iota
-	WeeklyFantasy
-)
-
-func (s GameMode) String() string {
-	return [...]string{"Draft", "WeeklyFantasy"}[s]
-}
-
-func GameModeFromString(s string) (GameMode, error) {
-	switch strings.ToLower(s) {
-	case "draft":
-		return Draft, nil
-	case "weeklyfantasy":
-		return WeeklyFantasy, nil
-	default:
-		return -1, fmt.Errorf("invalid status: %s", s)
-	}
-}
-
 func main() {
 	fmt.Println("Starting up...")
 
 	flag.Parse()
 
-	mode, err := GameModeFromString(*gameMode)
+	mode, err := engine.GameModeFromString(*gameMode)
 	if err != nil {
 		fmt.Println("Failed to determine GameMode")
 		fmt.Println(err)
 		os.Exit(1) // Crash hard
 	}
 
-	if mode == Draft {
-		bootstrapDraft()
-	} else if mode == WeeklyFantasy {
-		bootstrapWeeklyFantasy()
+	var botEngine *engine.BotEngine = nil
+	if mode == engine.Draft {
+		botEngine = bootstrapDraft()
+	} else if mode == engine.WeeklyFantasy {
+		botEngine = bootstrapWeeklyFantasy()
 	} else {
 		fmt.Println("Invalid GameMode provided")
 		os.Exit(1)
 	}
+
+	// Use a context object to tell the engine to gracefully shutdown when the
+	// process is signaled(i.e. when ctrl+c is pressed)
+	ctx := context.Background()
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	// register for ctrl+c signal and make it call cancelFunc
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for _ = range c {
+			cancelFunc()
+		}
+	}()
+	defer cancelFunc()
+
+	fmt.Println(botEngine.Summarize())
+
+	err = botEngine.Run(ctx)
+	if err != nil {
+		fmt.Println("Engine failed unexpectedly")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	} else {
+		botEngine.PrintResults()
+	}
 }
 
-func bootstrapWeeklyFantasy() {
+func bootstrapWeeklyFantasy() *engine.BotEngine {
 	lastGameState, err := engine.LoadLastGameState()
 	if err != nil {
 		fmt.Println("Failed to load last game state")
@@ -75,9 +77,18 @@ func bootstrapWeeklyFantasy() {
 	}
 
 	fmt.Println(lastGameState.LeagueSettings.Year)
+
+	bots := fetchBotList()
+	engineSettings := engine.BotEngineSettings{
+		VerboseLoggingEnabled: false,
+		SheetsClient:          nil, // No sheets client for weekly updates
+		GameMode:              engine.WeeklyFantasy,
+	}
+
+	return engine.NewBotEngine(lastGameState, bots, engineSettings)
 }
 
-func bootstrapDraft() {
+func bootstrapDraft() *engine.BotEngine {
 	year := 2024
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
@@ -106,35 +117,10 @@ func bootstrapDraft() {
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: false,
 		SheetsClient:          sheetClient,
+		GameMode:              engine.Draft,
 	}
 
-	// Use a context object to tell the engine to gracefully shutdown when the
-	// process is signaled(i.e. when ctrl+c is pressed)
-	ctx := context.Background()
-	ctx, cancelFunc := context.WithCancel(ctx)
-
-	// register for ctrl+c signal and make it call cancelFunc
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for _ = range c {
-			cancelFunc()
-		}
-	}()
-	defer cancelFunc()
-
-	engine := engine.NewBotEngine(gameState, bots, engineSettings)
-
-	fmt.Println(engine.Summarize())
-
-	err = engine.Run(ctx)
-	if err != nil {
-		fmt.Println("Engine failed unexpectedly")
-		fmt.Println(err)
-		os.Exit(1) // Crash hard
-	} else {
-		engine.PrintResults()
-	}
+	return engine.NewBotEngine(gameState, bots, engineSettings)
 }
 
 func fetchFantasyTeams() []*common.FantasyTeam {
