@@ -111,6 +111,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 	return nil
 }
 
+// TODO: Env variables
 func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("\n-----------------------------------------\n")
@@ -133,7 +134,28 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		return "", err
 	}
 
-	containerId, err := createAndStartContainer()
+	var env []string := []
+	if bot.EnvPath != nil {
+		envFile, err := os.Open(bot.EnvPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open env file: %v", err)
+		}
+		defer envFile.Close()
+
+		scanner := bufio.NewScanner(envFile)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "#") {
+				env = append(env, line)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return "", fmt.Errorf("error reading env file: %v", err)
+		}
+	}
+
+	containerId, err := createAndStartContainer(env)
 	if err != nil {
 		return "", err
 	}
@@ -158,7 +180,8 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer() (string, error) {
+// TODO: Env variables
+func createAndStartContainer(envVars []string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -194,6 +217,7 @@ func createAndStartContainer() (string, error) {
 		context.Background(),
 		&container.Config{
 			Image: "py_grpc_server",
+			Env:   env,
 		},
 		&container.HostConfig{
 			PortBindings: portBinding,

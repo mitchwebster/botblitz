@@ -48,9 +48,7 @@ message PlayerStatus {
     enum Availability {
         AVAILABLE = 0;
         DRAFTED = 1;
-        ON_HOLD = 2;
     }
-
     Availability availability = 1;
     uint32 pick_chosen = 2;
     string current_fantasy_team_id = 3;
@@ -69,6 +67,7 @@ message Bot {
     string source_repo_name = 4;
     string source_path = 5;
     string fantasy_team_id = 6;
+    string env_path = 7;
 }
 
 message GameState {
@@ -81,13 +80,4 @@ message GameState {
 
 message DraftSelection {
     string player_id = 1;
-}
-
-message AttemptedFantasyActions {
-    repeated AddDropSelection add_drop_selections = 1;
-}
-
-message AddDropSelection {
-    string player_to_drop_id = 1;
-    string player_to_add_id = 2;
 }
