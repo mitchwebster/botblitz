@@ -4,34 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
-	"golang.org/x/exp/slices"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
-const pyServerHostAndPort = "localhost:8080"
-const botResourceFolderName = "/tmp"
-const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
-const containerServerPort = "8080"
-const botResourceFolderNameInContainer = "/botblitz"
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const digits = "0123456789"
 
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
 	SheetsClient          *SheetsClient
+	GameMode              GameMode
 }
 
 type BotEngine struct {
@@ -62,6 +48,13 @@ func (e *BotEngine) Summarize() string {
 	fmt.Fprintf(&builder, "Settings:\n")
 	// fmt.Fprintf(&builder, "\tNumSimulations: %d\n", len(e.simulations))
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
+	if e.settings.SheetsClient == nil {
+		fmt.Fprintf(&builder, "\tSheetsClient: Not Configured\n")
+	} else {
+		fmt.Fprintf(&builder, "\tSheetsClient: Configured!\n")
+	}
+
+	fmt.Fprintf(&builder, "\tGameMode: %s\n", e.settings.GameMode)
 
 	fmt.Fprintf(&builder, "\nBots:\n")
 	fmt.Fprintf(&builder, "\tCount: %d\n", len(e.bots))
@@ -96,15 +89,12 @@ func (e *BotEngine) performValidations() error {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
 
-	draftValidation := e.validateDraftState()
-	if draftValidation != nil {
-		return draftValidation
+	if e.settings.GameMode == Draft {
+		draftValidation := e.validateDraftState()
+		if draftValidation != nil {
+			return draftValidation
+		}
 	}
-
-	// simulationValidation := common.ValidateSimulation(e.simulations)
-	// if !simulationValidation {
-	// 	return errors.New("Simulation validation failed, please check provided simulations")
-	// }
 
 	return nil
 }
@@ -124,161 +114,15 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return err
 	}
 
-	return e.runDraft(ctx)
+	if e.settings.GameMode == Draft {
+		return e.runDraft(ctx)
+	}
+
+	return e.runWeeklyFantasy(ctx)
 }
 
-func (e *BotEngine) runDraft(ctx context.Context) error {
-	curRound := 1
-	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
-		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
-
-		index := 0
-		increment := 1
-		arrayEdge := len(e.gameState.Teams) - 1
-
-		shouldUseReverseOrder := (curRound % 2) == 0
-		if shouldUseReverseOrder {
-			index = arrayEdge
-			increment = -1
-		}
-
-		for index >= 0 && index <= arrayEdge {
-			// check if ctx is canceled
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-
-			curBot := e.bots[index]
-			e.gameState.CurrentBotTeamId = curBot.FantasyTeamId
-			err := e.performDraftAction(ctx, curBot)
-			if err != nil {
-				return err
-			}
-			index += increment
-			e.gameState.CurrentDraftPick += 1
-		}
-
-		curRound += 1
-	}
-
-	SaveGameState(e.gameState)
-
-	return nil
-}
-
-func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) error {
-	var returnError error
-
-	containerId, err := e.startBotContainer(bot)
-	if err != nil {
-		return err
-	}
-
-	// schedule cleanup to run right before the function returns
-	defer func() {
-		err = shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
-		if err != nil {
-			fmt.Println("CRITICAL!! Failed to clean after bot run")
-			returnError = err
-		}
-	}()
-
-	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
-	}
-
-	summary, err := e.performDraftPick(ctx, bot)
-	if err != nil {
-		fmt.Println("Failed to run draft using bot")
-		fmt.Println(err)
-		summary, err = draftPlayerOnInvalidResponse(bot.FantasyTeamId, e.gameState)
-		if err != nil {
-			return err
-		}
-		summary += string('*')
-	}
-
-	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
-	if err != nil {
-		fmt.Println("Failed to write content to Google Sheets")
-		return err
-	}
-
-	if e.settings.VerboseLoggingEnabled {
-		if err := e.saveBotLogsToFile(containerId); err != nil {
-			return err
-		}
-	}
-
-	return returnError
-}
-
-// TODO: the resulting log file has some binary bs at the beginning of each
-// line - unsure why. I think the docs here explain it:
-// https://pkg.go.dev/github.com/moby/moby/client#Client.ContainerLogs.
-//
-// TODO: the bots seem to be dropping stdout (i.e. calling print() in your bot
-// doesn't result in anything coming out of the container). This needs to be
-// fixed/changed on the container/python side of things.
-func (e *BotEngine) saveBotLogsToFile(containerId string) error {
-	// Connect to docker api.
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return err
-	}
-	defer apiClient.Close()
-	apiClient.NegotiateAPIVersion(context.Background())
-
-	// Request logs for this container.
-	ctx := context.Background()
-	reader, err := apiClient.ContainerLogs(ctx, containerId, container.LogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Create temp file.
-	// TODO: include bot name and draft round in file name
-	f, err := os.CreateTemp("", "draft.*.txt")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	// Copy logs to temp file.
-	_, err = io.Copy(f, reader)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	fmt.Printf("Wrote bot logs to %q\n", f.Name())
-
-	return nil
-}
-
-func (e *BotEngine) validateDraftState() error {
-	if !e.gameState.LeagueSettings.IsSnakeDraft {
-		return fmt.Errorf("I only know how to snake draft")
-	}
-
-	if e.gameState.LeagueSettings.TotalRounds <= 0 {
-		return fmt.Errorf("Must have at least one round")
-	}
-
-	if len(e.gameState.Teams) <= 0 {
-		return fmt.Errorf("Must have have at least one team")
-	}
-
-	if len(e.bots) <= 0 {
-		return fmt.Errorf("Must have have at least one bot")
-	}
-
-	if len(e.bots) != len(e.gameState.Teams) {
-		return fmt.Errorf("Must have a bot for every team")
-	}
+func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
+	fmt.Println("Playing Weekly Fantasy!!")
 
 	return nil
 }
@@ -328,164 +172,6 @@ func (e *BotEngine) initializeBots() error {
 	return nil
 }
 
-func shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLoggingEnabled bool) error {
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return err
-	}
-	defer apiClient.Close()
-
-	apiClient.NegotiateAPIVersion(context.Background())
-
-	if isVerboseLoggingEnabled {
-		fmt.Println("Killing container")
-	}
-
-	err = apiClient.ContainerKill(context.Background(), containerId, "")
-	if err != nil {
-		return err
-	}
-
-	if isVerboseLoggingEnabled {
-		fmt.Println("Force deleting container")
-	}
-
-	err = apiClient.ContainerRemove(context.Background(), containerId, container.RemoveOptions{Force: true})
-	if err != nil {
-		return err
-	}
-
-	if isVerboseLoggingEnabled {
-		fmt.Println("Force deleted container")
-	}
-
-	err = cleanBotResources()
-	if err != nil {
-		return err
-	}
-
-	if isVerboseLoggingEnabled {
-		fmt.Printf("Finished cleaning server for bot (%s)\n", bot.Id)
-	}
-
-	fmt.Printf("\n-----------------------------------------\n")
-
-	return nil
-}
-
-// func runSimulationsOnBot(bot *common.Bot, e BotEngine) error {
-
-// 	for _, simulation := range e.simulations {
-// 		fmt.Printf("\n-----------------------------------------\n")
-// 		fmt.Printf("Running simulation (%s) on bot (%s)\n", simulation.Id, bot.Id)
-// 		selectionsForSimulation := []*common.FantasySelections{}
-
-// 		for iteration := uint32(1); iteration <= simulation.NumIterations; iteration++ {
-// 			fmt.Printf("\n\tIteration (%d): Making gRPC call\n", iteration)
-// 			selectionsForIteration, err := callBotRPC(simulation.Landscape)
-// 			if err != nil {
-// 				fmt.Printf("\tIteration (%d): Failed to make gRPC call\n", iteration)
-// 				fmt.Println(err)
-// 				selectionsForSimulation = append(selectionsForSimulation, nil)
-// 			} else {
-// 				fmt.Printf("\tIteration (%d): bot ran successfully!\n", iteration)
-// 				selectionsForSimulation = append(selectionsForSimulation, selectionsForIteration)
-// 			}
-
-// 		}
-
-// 		e.botResults[bot.Id][simulation.Id] = selectionsForSimulation
-// 		fmt.Printf("\n-----------------------------------------\n") // Add formatting to make separate runs clear
-// 	}
-
-// 	return nil
-// }
-
-func (e *BotEngine) performDraftPick(ctx context.Context, bot *common.Bot) (string, error) {
-	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentDraftPick, team.Name, team.Owner)
-
-	draftPick, err := callBotRPC(ctx, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Println("Received response from bot")
-	summary, err := validateAndMakeDraftPick(bot.FantasyTeamId, draftPick.PlayerId, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	return summary, nil
-}
-
-func findCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
-	teamIdx := slices.IndexFunc(gameState.Teams, func(t *common.FantasyTeam) bool { return t.Id == fantasyTeamId })
-	if teamIdx < 0 {
-		return nil, fmt.Errorf("Could not find team...concerning...")
-	}
-
-	return gameState.Teams[teamIdx], nil
-}
-
-func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *common.GameState) (string, error) {
-	if len(playerId) <= 0 {
-		return "", fmt.Errorf("Cannot draft empty player id")
-	}
-
-	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
-	if idx < 0 {
-		return "", fmt.Errorf("Could not find player with selected id")
-	}
-
-	player := gameState.Players[idx]
-
-	if player.Status.Availability == common.PlayerStatus_DRAFTED {
-		return "", fmt.Errorf("Cannot draft player again")
-	}
-
-	team, err := findCurrentTeamById(fantasyTeamId, gameState)
-	if err != nil {
-		return "", err
-	}
-
-	player.Status.CurrentFantasyTeamId = team.Id
-	player.Status.Availability = common.PlayerStatus_DRAFTED
-	player.Status.PickChosen = gameState.CurrentDraftPick
-
-	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentDraftPick, team.Name, team.Owner, player.FullName)
-
-	summary := player.FullName + "(" + player.AllowedPositions[0] + ")"
-
-	return summary, nil
-}
-
-func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameState) (string, error) {
-	fmt.Println("Auto-drafting due to failure")
-	playerCount := len(gameState.Players)
-	index := rand.Intn(playerCount)
-	hasLooped := false
-	for index < playerCount && !hasLooped {
-		player := gameState.Players[index]
-		if player.Status.Availability == common.PlayerStatus_AVAILABLE {
-			summary, err := validateAndMakeDraftPick(fantasyTeamId, player.Id, gameState)
-			return summary, err
-		}
-
-		index += 1
-		if index == playerCount && !hasLooped {
-			hasLooped = true
-			index = 0
-		}
-	}
-
-	return "", fmt.Errorf("Could not find a valid player to auto-draft")
-}
-
 func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
 	var botCode []byte
 
@@ -514,36 +200,6 @@ func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
 	return botCode, nil
 }
 
-func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
-	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("\n-----------------------------------------\n")
-		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
-	}
-
-	botCode := e.sourceCodeCache[bot.Id]
-
-	if e.settings.VerboseLoggingEnabled {
-		fmt.Println("Creating source code file")
-	}
-
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
-	if err != nil {
-		return "", err
-	}
-
-	err = os.WriteFile(absPath, botCode, 0755)
-	if err != nil {
-		return "", err
-	}
-
-	containerId, err := createAndStartContainer()
-	if err != nil {
-		return "", err
-	}
-
-	return containerId, nil
-}
-
 func BuildLocalAbsolutePath(relativePath string) (string, error) {
 	directory, err := os.Getwd()
 	if err != nil {
@@ -552,148 +208,6 @@ func BuildLocalAbsolutePath(relativePath string) (string, error) {
 
 	var trimmedPath = strings.Trim(relativePath, "/")
 	return fmt.Sprintf("%s/%s", directory, trimmedPath), nil
-}
-
-func cleanBotResources() error {
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
-	if err != nil {
-		return err
-	}
-
-	err = os.Remove(absPath)
-	if err != nil {
-		// Non-existence errors are ok
-		if !os.IsNotExist(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func callBotRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	opts = append(opts, grpc.WithTimeout(10*time.Second))
-	// container port may not be listening yet - wait for it
-	opts = append(opts, grpc.WithBlock())
-
-	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	defer conn.Close()
-	client := common.NewAgentServiceClient(conn)
-
-	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.DraftPlayer(ctx, gameState)
-	if err != nil {
-		fmt.Println("Failed calling bot")
-		return nil, err
-	}
-
-	return selections, nil
-}
-
-// func callBotRPC(landscape *common.FantasyLandscape) (*common.FantasySelections, error) {
-// 	var opts []grpc.DialOption
-// 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-// 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	defer conn.Close()
-// 	client := common.NewAgentServiceClient(conn)
-
-// 	selections, err := client.DraftPlayer(context.Background(), landscape)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return selections, nil
-// }
-
-func createAndStartContainer() (string, error) {
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return "", err
-	}
-	defer apiClient.Close()
-
-	apiClient.NegotiateAPIVersion(context.Background())
-
-	hostBinding := nat.PortBinding{
-		HostIP:   "0.0.0.0",
-		HostPort: "8080",
-	}
-
-	// Define resource limits
-	resources := container.Resources{
-		Memory:   512 * 1024 * 1024, // 512 MB
-		NanoCPUs: 1e9,               // 1 CPU
-	}
-
-	containerPort, err := nat.NewPort("tcp", containerServerPort)
-	if err != nil {
-		return "", fmt.Errorf("Unable to get the port: %v", err)
-	}
-
-	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
-
-	hostMountPath, err := BuildLocalAbsolutePath(botResourceFolderName)
-	if err != nil {
-		return "", err
-	}
-
-	createResponse, err := apiClient.ContainerCreate(
-		context.Background(),
-		&container.Config{
-			Image: "py_grpc_server",
-		},
-		&container.HostConfig{
-			PortBindings: portBinding,
-			Mounts: []mount.Mount{
-				{
-					Type:     mount.TypeBind,
-					ReadOnly: true,
-					Source:   hostMountPath,
-					Target:   botResourceFolderNameInContainer,
-				},
-			},
-			Resources: resources,
-		},
-		nil,
-		nil,
-		"",
-	)
-	if err != nil {
-		return "", fmt.Errorf("unable to create container: %v", err)
-	}
-
-	err = apiClient.ContainerStart(context.Background(), createResponse.ID, container.StartOptions{})
-	if err != nil {
-		fmt.Println(err)
-		// TODO: delete the container we created if we can't start it?
-		return "", fmt.Errorf("couldn't start container: %v", err)
-	}
-
-	return createResponse.ID, nil
-}
-
-func registerPickInSheets(summary string, currentDraftPick int, teamCount int, fantasyTeamId string, client *SheetsClient) error {
-	if client == nil {
-		return nil
-	}
-
-	zero_based_round := ((currentDraftPick - 1) / teamCount) + 1
-	indexOfFantasyTeam, _ := strconv.Atoi(fantasyTeamId)
-	newCol := rune(int(InitialCol) + indexOfFantasyTeam + 1)
-
-	err := WriteContentToCell(IntialRow+zero_based_round, newCol, summary, client)
-	return err
 }
 
 func GenerateRandomString(length int) string {
