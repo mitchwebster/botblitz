@@ -537,7 +537,6 @@ type Bot struct {
 	SourceRepoName     string     `protobuf:"bytes,4,opt,name=source_repo_name,json=sourceRepoName,proto3" json:"source_repo_name,omitempty"`
 	SourcePath         string     `protobuf:"bytes,5,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
 	FantasyTeamId      string     `protobuf:"bytes,6,opt,name=fantasy_team_id,json=fantasyTeamId,proto3" json:"fantasy_team_id,omitempty"`
-	EnvPath            string     `protobuf:"bytes,7,opt,name=env_path,json=envPath,proto3" json:"env_path,omitempty"`
 }
 
 func (x *Bot) Reset() {
@@ -610,13 +609,6 @@ func (x *Bot) GetSourcePath() string {
 func (x *Bot) GetFantasyTeamId() string {
 	if x != nil {
 		return x.FantasyTeamId
-	}
-	return ""
-}
-
-func (x *Bot) GetEnvPath() string {
-	if x != nil {
-		return x.EnvPath
 	}
 	return ""
 }
