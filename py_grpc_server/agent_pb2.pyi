@@ -76,8 +76,10 @@ class PlayerStatus(_message.Message):
         __slots__ = ()
         AVAILABLE: _ClassVar[PlayerStatus.Availability]
         DRAFTED: _ClassVar[PlayerStatus.Availability]
+        ON_HOLD: _ClassVar[PlayerStatus.Availability]
     AVAILABLE: PlayerStatus.Availability
     DRAFTED: PlayerStatus.Availability
+    ON_HOLD: PlayerStatus.Availability
     AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
     PICK_CHOSEN_FIELD_NUMBER: _ClassVar[int]
     CURRENT_FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
@@ -129,3 +131,17 @@ class DraftSelection(_message.Message):
     PLAYER_ID_FIELD_NUMBER: _ClassVar[int]
     player_id: str
     def __init__(self, player_id: _Optional[str] = ...) -> None: ...
+
+class AttemptedFantasyActions(_message.Message):
+    __slots__ = ("add_drop_selections",)
+    ADD_DROP_SELECTIONS_FIELD_NUMBER: _ClassVar[int]
+    add_drop_selections: _containers.RepeatedCompositeFieldContainer[AddDropSelection]
+    def __init__(self, add_drop_selections: _Optional[_Iterable[_Union[AddDropSelection, _Mapping]]] = ...) -> None: ...
+
+class AddDropSelection(_message.Message):
+    __slots__ = ("player_to_drop_id", "player_to_add_id")
+    PLAYER_TO_DROP_ID_FIELD_NUMBER: _ClassVar[int]
+    PLAYER_TO_ADD_ID_FIELD_NUMBER: _ClassVar[int]
+    player_to_drop_id: str
+    player_to_add_id: str
+    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ...) -> None: ...
