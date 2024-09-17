@@ -10,7 +10,7 @@ import (
 	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
-	"google.golang.org/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 const saveFolderRelativePath = "data/game_states"
