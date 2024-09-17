@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -149,7 +148,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		}
 
 		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
-		env := strings.Split(string(envContent), "\n")
+		env = append(strings.Split(string(envContent), "\n"))
 	}
 
 	containerId, err := createAndStartContainer(env)
