@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
 
@@ -23,13 +24,6 @@ const botFileRelativePath = botResourceFolderName + "/bot.py" // source code nam
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
 
-// TODO: the resulting log file has some binary bs at the beginning of each
-// line - unsure why. I think the docs here explain it:
-// https://pkg.go.dev/github.com/moby/moby/client#Client.ContainerLogs.
-//
-// TODO: the bots seem to be dropping stdout (i.e. calling print() in your bot
-// doesn't result in anything coming out of the container). This needs to be
-// fixed/changed on the container/python side of things.
 func (e *BotEngine) saveBotLogsToFile(containerId string) error {
 	// Connect to docker api.
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
@@ -49,20 +43,25 @@ func (e *BotEngine) saveBotLogsToFile(containerId string) error {
 		return err
 	}
 
-	// Create temp file.
+	// Create temp files.
 	// TODO: include bot name and draft round in file name
-	f, err := os.CreateTemp("", "draft.*.txt")
+	outf, err := os.CreateTemp("", "draft.*.stdout")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer outf.Close()
+	errf, err := os.CreateTemp("", "draft.*.stderr")
+	if err != nil {
+		return err
+	}
+	defer errf.Close()
 
 	// Copy logs to temp file.
-	_, err = io.Copy(f, reader)
+	_, err = stdcopy.StdCopy(outf, errf, reader)
 	if err != nil && err != io.EOF {
 		return err
 	}
-	fmt.Printf("Wrote bot logs to %q\n", f.Name())
+	fmt.Printf("Wrote bot logs to %q, %q\n", outf.Name(), errf.Name())
 
 	return nil
 }
