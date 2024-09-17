@@ -8,4 +8,4 @@
 
 `make test` - runs tests
 
-`make run-engine` - run engine
+`make run-draft` - run draft

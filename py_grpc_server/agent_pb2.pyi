@@ -102,14 +102,12 @@ class Bot(_message.Message):
     SOURCE_REPO_NAME_FIELD_NUMBER: _ClassVar[int]
     SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
     FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
-    ENV_PATH_FIELD_NUMBER: _ClassVar[int]
     id: str
     source_type: Bot.Source
     source_repo_username: str
     source_repo_name: str
     source_path: str
     fantasy_team_id: str
-    env_path: str
     def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[str] = ...) -> None: ...
 
 class GameState(_message.Message):
