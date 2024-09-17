@@ -88,7 +88,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) (re
 	}
 
 	if e.settings.VerboseLoggingEnabled {
-		if err := e.saveBotLogsToFile(containerId); err != nil {
+		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
 			return err
 		}
 	}
