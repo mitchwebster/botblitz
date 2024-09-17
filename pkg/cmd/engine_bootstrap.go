@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	enableGoogleSheets = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
+	enableGoogleSheets   = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
 	enableVerboseLogging = flag.Bool("enable_verbose_logging", false, "If enabled, additional logging is printed to the console and stdout+stderr is captured from each bot invocation and saved to files under /tmp/")
-	gameMode           = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
+	gameMode             = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
 )
 
 func main() {
@@ -133,6 +133,7 @@ func fetchFantasyTeams() []*common.FantasyTeam {
 		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
 		{Id: "7", Name: "Justin's Team", Owner: "Justin"},
 		{Id: "8", Name: "Ryan's Team", Owner: "Ryan"},
+		{Id: "9", Name: "Philip's Team", Owner: "Philip"},
 	}
 }
 
@@ -191,6 +192,12 @@ func fetchBotList() []*common.Bot {
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/ryan-bot.py",
 			FantasyTeamId: "8",
+		},
+		{
+			Id:            "Philip's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/philip-bot.py",
+			FantasyTeamId: "9",
 		},
 	}
 }
