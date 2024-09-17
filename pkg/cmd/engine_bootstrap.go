@@ -17,6 +17,7 @@ import (
 
 var (
 	enableGoogleSheets = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
+	enableVerboseLogging = flag.Bool("enable_verbose_logging", false, "If enabled, additional logging is printed to the console and stdout+stderr is captured from each bot invocation and saved to files under /tmp/")
 	gameMode           = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
 )
 
@@ -78,7 +79,7 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 
 	bots := fetchBotList()
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: false,
+		VerboseLoggingEnabled: *enableVerboseLogging,
 		SheetsClient:          nil, // No sheets client for weekly updates
 		GameMode:              engine.WeeklyFantasy,
 	}
@@ -113,7 +114,7 @@ func bootstrapDraft() *engine.BotEngine {
 	}
 
 	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: false,
+		VerboseLoggingEnabled: *enableVerboseLogging,
 		SheetsClient:          sheetClient,
 		GameMode:              engine.Draft,
 	}
