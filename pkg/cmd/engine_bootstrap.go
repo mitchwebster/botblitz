@@ -64,8 +64,6 @@ func main() {
 		fmt.Println("Engine failed unexpectedly")
 		fmt.Println(err)
 		os.Exit(1) // Crash hard
-	} else {
-		botEngine.PrintResults()
 	}
 }
 
@@ -247,7 +245,7 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        1,
+		TotalRounds:        15,
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,
@@ -340,28 +338,6 @@ func loadPlayers(year int) ([]*common.Player, error) {
 
 	return players, nil
 }
-
-// func genLandscape() *common.FantasyLandscape {
-// 	player := common.Player{
-// 		FullName: "Kevin Durant",
-// 	}
-
-// 	bet := common.Bet{
-// 		Player:               &player,
-// 		ProfessionalHomeTeam: "Golden State Warriors",
-// 		ProfessionalAwayTeam: "Phoenix Suns",
-// 		Type:                 common.Bet_UNDER,
-// 		Points:               25.5,
-// 		Price:                -115.0,
-// 	}
-
-// 	landscape := common.FantasyLandscape{
-// 		Bet:     &bet,
-// 		Players: []*common.Player{&player},
-// 	}
-
-// 	return &landscape
-// }
 
 func initializeDraftSheet(sheetName string, gameState *common.GameState) (*engine.SheetsClient, error) {
 	client, err := engine.CreateSheetsClient(sheetName)

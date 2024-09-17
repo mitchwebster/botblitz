@@ -21,7 +21,6 @@ type BotEngineSettings struct {
 }
 
 type BotEngine struct {
-	botResults      map[string]map[string][]*common.FantasySelections // Bot -> Simulation -> Simulation Selections per iteration
 	settings        BotEngineSettings
 	bots            []*common.Bot
 	sourceCodeCache map[string][]byte
@@ -32,7 +31,6 @@ func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotE
 	return &BotEngine{
 		settings:        settings,
 		bots:            bots,
-		botResults:      make(map[string]map[string][]*common.FantasySelections),
 		sourceCodeCache: make(map[string][]byte),
 		gameState:       gameState,
 	}
@@ -46,7 +44,6 @@ func (e *BotEngine) Summarize() string {
 
 	// Print settings
 	fmt.Fprintf(&builder, "Settings:\n")
-	// fmt.Fprintf(&builder, "\tNumSimulations: %d\n", len(e.simulations))
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
 	if e.settings.SheetsClient == nil {
 		fmt.Fprintf(&builder, "\tSheetsClient: Not Configured\n")
@@ -72,15 +69,6 @@ func (e *BotEngine) Run(ctx context.Context) error {
 	}
 
 	return e.run(ctx)
-}
-
-func (e *BotEngine) PrintResults() {
-	for botId, simulationMap := range e.botResults {
-		fmt.Printf("%s:\n", botId)
-		for simulationId, results := range simulationMap {
-			fmt.Printf("\t%s: %s\n", simulationId, results)
-		}
-	}
 }
 
 func (e *BotEngine) performValidations() error {
@@ -121,12 +109,6 @@ func (e *BotEngine) run(ctx context.Context) error {
 	return e.runWeeklyFantasy(ctx)
 }
 
-func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
-	fmt.Println("Playing Weekly Fantasy!!")
-
-	return nil
-}
-
 func (e *BotEngine) collectBotResources() error {
 	folderPath, err := BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
@@ -157,7 +139,6 @@ func (e *BotEngine) initializeBots() error {
 	fmt.Println("Initializing Bots")
 
 	for _, bot := range e.bots {
-		e.botResults[bot.Id] = make(map[string][]*common.FantasySelections)
 		byteCode, err := e.fetchSourceCode(bot)
 		if err != nil {
 			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)

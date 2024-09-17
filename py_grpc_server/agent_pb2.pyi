@@ -6,59 +6,17 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class FantasyLandscape(_message.Message):
-    __slots__ = ("match_number", "settings", "bot_team", "bet", "players")
-    MATCH_NUMBER_FIELD_NUMBER: _ClassVar[int]
-    SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    BOT_TEAM_FIELD_NUMBER: _ClassVar[int]
-    BET_FIELD_NUMBER: _ClassVar[int]
-    PLAYERS_FIELD_NUMBER: _ClassVar[int]
-    match_number: int
-    settings: LeagueSettings
-    bot_team: FantasyTeam
-    bet: Bet
-    players: _containers.RepeatedCompositeFieldContainer[Player]
-    def __init__(self, match_number: _Optional[int] = ..., settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., bot_team: _Optional[_Union[FantasyTeam, _Mapping]] = ..., bet: _Optional[_Union[Bet, _Mapping]] = ..., players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ...) -> None: ...
-
-class Bet(_message.Message):
-    __slots__ = ("professional_home_team", "professional_away_team", "player", "type", "points", "price")
-    class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
-        OVER: _ClassVar[Bet.Type]
-        UNDER: _ClassVar[Bet.Type]
-    OVER: Bet.Type
-    UNDER: Bet.Type
-    PROFESSIONAL_HOME_TEAM_FIELD_NUMBER: _ClassVar[int]
-    PROFESSIONAL_AWAY_TEAM_FIELD_NUMBER: _ClassVar[int]
-    PLAYER_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    POINTS_FIELD_NUMBER: _ClassVar[int]
-    PRICE_FIELD_NUMBER: _ClassVar[int]
-    professional_home_team: str
-    professional_away_team: str
-    player: Player
-    type: Bet.Type
-    points: float
-    price: float
-    def __init__(self, professional_home_team: _Optional[str] = ..., professional_away_team: _Optional[str] = ..., player: _Optional[_Union[Player, _Mapping]] = ..., type: _Optional[_Union[Bet.Type, str]] = ..., points: _Optional[float] = ..., price: _Optional[float] = ...) -> None: ...
-
-class FantasySelections(_message.Message):
-    __slots__ = ("make_bet", "slots")
-    MAKE_BET_FIELD_NUMBER: _ClassVar[int]
-    SLOTS_FIELD_NUMBER: _ClassVar[int]
-    make_bet: bool
-    slots: _containers.RepeatedCompositeFieldContainer[PlayerSlot]
-    def __init__(self, make_bet: bool = ..., slots: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ...) -> None: ...
-
 class FantasyTeam(_message.Message):
-    __slots__ = ("id", "name", "owner")
+    __slots__ = ("id", "name", "owner", "current_waiver_priority")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     OWNER_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     owner: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., owner: _Optional[str] = ...) -> None: ...
+    current_waiver_priority: int
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., owner: _Optional[str] = ..., current_waiver_priority: _Optional[int] = ...) -> None: ...
 
 class LeagueSettings(_message.Message):
     __slots__ = ("num_teams", "slots_per_team", "is_snake_draft", "total_rounds", "points_per_reception", "year")
@@ -152,31 +110,19 @@ class Bot(_message.Message):
     fantasy_team_id: str
     def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[str] = ...) -> None: ...
 
-class Simulation(_message.Message):
-    __slots__ = ("id", "landscape", "num_iterations")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    LANDSCAPE_FIELD_NUMBER: _ClassVar[int]
-    NUM_ITERATIONS_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    landscape: FantasyLandscape
-    num_iterations: int
-    def __init__(self, id: _Optional[str] = ..., landscape: _Optional[_Union[FantasyLandscape, _Mapping]] = ..., num_iterations: _Optional[int] = ...) -> None: ...
-
 class GameState(_message.Message):
-    __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick", "current_waiver_priority")
+    __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick")
     PLAYERS_FIELD_NUMBER: _ClassVar[int]
     TEAMS_FIELD_NUMBER: _ClassVar[int]
     LEAGUE_SETTINGS_FIELD_NUMBER: _ClassVar[int]
     CURRENT_BOT_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
     CURRENT_DRAFT_PICK_FIELD_NUMBER: _ClassVar[int]
-    CURRENT_WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
     players: _containers.RepeatedCompositeFieldContainer[Player]
     teams: _containers.RepeatedCompositeFieldContainer[FantasyTeam]
     league_settings: LeagueSettings
     current_bot_team_id: str
     current_draft_pick: int
-    current_waiver_priority: int
-    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., current_bot_team_id: _Optional[str] = ..., current_draft_pick: _Optional[int] = ..., current_waiver_priority: _Optional[int] = ...) -> None: ...
+    def __init__(self, players: _Optional[_Iterable[_Union[Player, _Mapping]]] = ..., teams: _Optional[_Iterable[_Union[FantasyTeam, _Mapping]]] = ..., league_settings: _Optional[_Union[LeagueSettings, _Mapping]] = ..., current_bot_team_id: _Optional[str] = ..., current_draft_pick: _Optional[int] = ...) -> None: ...
 
 class DraftSelection(_message.Message):
     __slots__ = ("player_id",)

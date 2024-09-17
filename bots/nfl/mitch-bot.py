@@ -46,7 +46,7 @@ def get_target_positions(drafted_team, cur_round, total_rounds):
         if wr_count < 5 and (rb_count + wr_count) < 10:
             target_positions.append(WR_POS)
 
-        allowed_qbs = 2 if cur_round > 5 else 1 if cur_round > 2 else 0
+        allowed_qbs = 2 if cur_round > 7 else 1 if cur_round > 2 else 0
         if cur_round > 2 and len(drafted_team[QB_POS]) < allowed_qbs:
             target_positions.append(QB_POS)
 
@@ -91,6 +91,7 @@ def draft_player(game_state: GameState) -> str:
     # Do not draft Tua this year
     if game_state.league_settings.year == 2024:
         player_deny_map["Tua Tagovailoa"] = ""
+        player_deny_map["Puka Nacua"] = ""
 
     team_deny_map = {
         "CAR": "",

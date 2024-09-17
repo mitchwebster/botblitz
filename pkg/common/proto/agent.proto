@@ -8,40 +8,11 @@ service AgentService {
     rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
 }
 
-message FantasyLandscape {
-    uint32 match_number = 1;
-    LeagueSettings settings = 2;
-    FantasyTeam bot_team = 3;
-    Bet bet = 4;
-    repeated Player players = 5;
-    /* TODO historical / statistical data */
-    /* TODO competition lineups */
-}
-
-message Bet {
-    string professional_home_team = 1;
-    string professional_away_team = 2;
-    Player player = 3;
-
-    enum Type {
-        OVER = 0;
-        UNDER = 1;
-    }
-
-    Type type = 4;
-    float points = 5;
-    float price = 6;
-}
-
-message FantasySelections {
-    bool make_bet = 1;
-    repeated PlayerSlot slots = 2;
-}
-
 message FantasyTeam {
     string id = 1;
     string name = 2;
     string owner = 3;
+    uint32 current_waiver_priority = 4;
 }
 
 message LeagueSettings {
@@ -100,19 +71,12 @@ message Bot {
     string fantasy_team_id = 6;
 }
 
-message Simulation {
-	string id = 1;
-    FantasyLandscape landscape = 2;
-    uint32 num_iterations = 3;
-}
-
 message GameState {
     repeated Player players = 1;
     repeated FantasyTeam teams = 2;
     LeagueSettings league_settings = 3;
     string current_bot_team_id = 4;
     uint32 current_draft_pick = 5;
-    uint32 current_waiver_priority = 6;
 }
 
 message DraftSelection {

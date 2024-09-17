@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_DraftPlayer_FullMethodName = "/AgentService/DraftPlayer"
+	AgentService_DraftPlayer_FullMethodName          = "/AgentService/DraftPlayer"
+	AgentService_SubmitFantasyActions_FullMethodName = "/AgentService/SubmitFantasyActions"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
 	DraftPlayer(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error)
+	SubmitFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
 }
 
 type agentServiceClient struct {
@@ -47,11 +49,22 @@ func (c *agentServiceClient) DraftPlayer(ctx context.Context, in *GameState, opt
 	return out, nil
 }
 
+func (c *agentServiceClient) SubmitFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AttemptedFantasyActions, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AttemptedFantasyActions)
+	err := c.cc.Invoke(ctx, AgentService_SubmitFantasyActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
 	DraftPlayer(context.Context, *GameState) (*DraftSelection, error)
+	SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedAgentServiceServer struct{}
 
 func (UnimplementedAgentServiceServer) DraftPlayer(context.Context, *GameState) (*DraftSelection, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DraftPlayer not implemented")
+}
+func (UnimplementedAgentServiceServer) SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitFantasyActions not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -104,6 +120,24 @@ func _AgentService_DraftPlayer_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_SubmitFantasyActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GameState)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).SubmitFantasyActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_SubmitFantasyActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).SubmitFantasyActions(ctx, req.(*GameState))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DraftPlayer",
 			Handler:    _AgentService_DraftPlayer_Handler,
+		},
+		{
+			MethodName: "SubmitFantasyActions",
+			Handler:    _AgentService_SubmitFantasyActions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
