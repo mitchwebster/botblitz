@@ -49,9 +49,7 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 	return nil
 }
 
-func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) error {
-	var returnError error
-
+func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) (returnError error) {
 	containerId, err := e.startBotContainer(bot)
 	if err != nil {
 		return err
