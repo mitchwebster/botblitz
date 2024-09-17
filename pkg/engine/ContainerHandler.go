@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"time"
+
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -111,7 +114,6 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 	return nil
 }
 
-// TODO: Env variables
 func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("\n-----------------------------------------\n")
@@ -134,25 +136,20 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		return "", err
 	}
 
-	var env []string := []
-	if bot.EnvPath != nil {
-		envFile, err := os.Open(bot.EnvPath)
+	env := []string{}
+	if bot.EnvPath != "" {
+		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to open env file: %v", err)
-		}
-		defer envFile.Close()
-
-		scanner := bufio.NewScanner(envFile)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "#") {
-				env = append(env, line)
-			}
+			return "", err
 		}
 
-		if err := scanner.Err(); err != nil {
-			return "", fmt.Errorf("error reading env file: %v", err)
+		envContent, err := os.ReadFile(envAbsPath)
+		if err != nil {
+			return "", err
 		}
+
+		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
+		env := strings.Split(string(envContent), "\n")
 	}
 
 	containerId, err := createAndStartContainer(env)
@@ -180,8 +177,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-// TODO: Env variables
-func createAndStartContainer(envVars []string) (string, error) {
+func createAndStartContainer(env []string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err

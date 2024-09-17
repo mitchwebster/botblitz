@@ -191,7 +191,7 @@ func fetchBotList() []*common.Bot {
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/ryan/ryan-bot.py",
 			FantasyTeamId: "8",
-			EnvPath:      "/bots/nfl/ryan/ryan.env"
+			EnvPath:      "/bots/nfl/ryan/ryan.env",
 		},
 	}
 }

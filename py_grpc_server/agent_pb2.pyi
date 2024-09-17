@@ -76,10 +76,8 @@ class PlayerStatus(_message.Message):
         __slots__ = ()
         AVAILABLE: _ClassVar[PlayerStatus.Availability]
         DRAFTED: _ClassVar[PlayerStatus.Availability]
-        ON_HOLD: _ClassVar[PlayerStatus.Availability]
     AVAILABLE: PlayerStatus.Availability
     DRAFTED: PlayerStatus.Availability
-    ON_HOLD: PlayerStatus.Availability
     AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
     PICK_CHOSEN_FIELD_NUMBER: _ClassVar[int]
     CURRENT_FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
@@ -89,7 +87,7 @@ class PlayerStatus(_message.Message):
     def __init__(self, availability: _Optional[_Union[PlayerStatus.Availability, str]] = ..., pick_chosen: _Optional[int] = ..., current_fantasy_team_id: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
-    __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id")
+    __slots__ = ("id", "source_type", "source_repo_username", "source_repo_name", "source_path", "fantasy_team_id", "env_path")
     class Source(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         LOCAL: _ClassVar[Bot.Source]
@@ -102,13 +100,15 @@ class Bot(_message.Message):
     SOURCE_REPO_NAME_FIELD_NUMBER: _ClassVar[int]
     SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
     FANTASY_TEAM_ID_FIELD_NUMBER: _ClassVar[int]
+    ENV_PATH_FIELD_NUMBER: _ClassVar[int]
     id: str
     source_type: Bot.Source
     source_repo_username: str
     source_repo_name: str
     source_path: str
     fantasy_team_id: str
-    def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[str] = ...) -> None: ...
+    env_path: str
+    def __init__(self, id: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., fantasy_team_id: _Optional[str] = ..., env_path: _Optional[str] = ...) -> None: ...
 
 class GameState(_message.Message):
     __slots__ = ("players", "teams", "league_settings", "current_bot_team_id", "current_draft_pick")
@@ -129,17 +129,3 @@ class DraftSelection(_message.Message):
     PLAYER_ID_FIELD_NUMBER: _ClassVar[int]
     player_id: str
     def __init__(self, player_id: _Optional[str] = ...) -> None: ...
-
-class AttemptedFantasyActions(_message.Message):
-    __slots__ = ("add_drop_selections",)
-    ADD_DROP_SELECTIONS_FIELD_NUMBER: _ClassVar[int]
-    add_drop_selections: _containers.RepeatedCompositeFieldContainer[AddDropSelection]
-    def __init__(self, add_drop_selections: _Optional[_Iterable[_Union[AddDropSelection, _Mapping]]] = ...) -> None: ...
-
-class AddDropSelection(_message.Message):
-    __slots__ = ("player_to_drop_id", "player_to_add_id")
-    PLAYER_TO_DROP_ID_FIELD_NUMBER: _ClassVar[int]
-    PLAYER_TO_ADD_ID_FIELD_NUMBER: _ClassVar[int]
-    player_to_drop_id: str
-    player_to_add_id: str
-    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ...) -> None: ...
