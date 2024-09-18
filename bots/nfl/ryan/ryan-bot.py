@@ -1,13 +1,12 @@
+import os
 from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState, StatsDB
 from openai import OpenAI
 from typing import List, Dict
 # from google.colab import userdata
 import json
 
-# openai_api_key = userdata.get('OPENAI_API_TOKEN')
-openai_api_key = ""
-
 def draft_player(game_state: GameState) -> str:
+    openai_api_key = os.environ.get('OPENAI_API_TOKEN')
     openai_client = OpenAI(api_key=openai_api_key)
     stats_db = StatsDB([game_state.league_settings.year - 1])
 

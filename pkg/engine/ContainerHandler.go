@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
+
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -133,7 +135,23 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		return "", err
 	}
 
-	containerId, err := createAndStartContainer()
+	env := []string{}
+	if bot.EnvPath != "" {
+		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
+		if err != nil {
+			return "", err
+		}
+
+		envContent, err := os.ReadFile(envAbsPath)
+		if err != nil {
+			return "", err
+		}
+
+		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
+		env = append(strings.Split(string(envContent), "\n"))
+	}
+
+	containerId, err := createAndStartContainer(env)
 	if err != nil {
 		return "", err
 	}
@@ -158,7 +176,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer() (string, error) {
+func createAndStartContainer(env []string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -194,6 +212,7 @@ func createAndStartContainer() (string, error) {
 		context.Background(),
 		&container.Config{
 			Image: "py_grpc_server",
+			Env:   env,
 		},
 		&container.HostConfig{
 			PortBindings: portBinding,
