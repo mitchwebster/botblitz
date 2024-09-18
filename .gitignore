@@ -35,3 +35,6 @@ blitz_env/agent_pb2_grpc.py
 blitz_env/agent_pb2.py
 blitz_env/agent_pb2.pyi
 sheets-creds.json
+
+# Ignore any env files that could accidentally be merged in
+*.env

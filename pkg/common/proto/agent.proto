@@ -69,6 +69,7 @@ message Bot {
     string source_repo_name = 4;
     string source_path = 5;
     string fantasy_team_id = 6;
+    string env_path = 7;
 }
 
 message GameState {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -24,7 +25,7 @@ const botFileRelativePath = botResourceFolderName + "/bot.py" // source code nam
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
 
-func (e *BotEngine) saveBotLogsToFile(containerId string) error {
+func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error {
 	// Connect to docker api.
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -32,6 +33,14 @@ func (e *BotEngine) saveBotLogsToFile(containerId string) error {
 	}
 	defer apiClient.Close()
 	apiClient.NegotiateAPIVersion(context.Background())
+
+	// Get team info.
+	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
+	if err != nil {
+		return err
+	}
+
+	pickNum := int(e.gameState.CurrentDraftPick)
 
 	// Request logs for this container.
 	ctx := context.Background()
@@ -45,12 +54,12 @@ func (e *BotEngine) saveBotLogsToFile(containerId string) error {
 
 	// Create temp files.
 	// TODO: include bot name and draft round in file name
-	outf, err := os.CreateTemp("", "draft.*.stdout")
+	outf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stdout", pickNum, team.Owner))
 	if err != nil {
 		return err
 	}
 	defer outf.Close()
-	errf, err := os.CreateTemp("", "draft.*.stderr")
+	errf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stderr", pickNum, team.Owner))
 	if err != nil {
 		return err
 	}
@@ -133,7 +142,23 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		return "", err
 	}
 
-	containerId, err := createAndStartContainer()
+	env := []string{}
+	if bot.EnvPath != "" {
+		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
+		if err != nil {
+			return "", err
+		}
+
+		envContent, err := os.ReadFile(envAbsPath)
+		if err != nil {
+			return "", err
+		}
+
+		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
+		env = append(strings.Split(string(envContent), "\n"))
+	}
+
+	containerId, err := createAndStartContainer(env)
 	if err != nil {
 		return "", err
 	}
@@ -158,7 +183,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer() (string, error) {
+func createAndStartContainer(env []string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -194,6 +219,7 @@ func createAndStartContainer() (string, error) {
 		context.Background(),
 		&container.Config{
 			Image: "py_grpc_server",
+			Env:   env,
 		},
 		&container.HostConfig{
 			PortBindings: portBinding,
