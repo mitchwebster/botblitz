@@ -87,7 +87,7 @@ def draft_player(game_state: GameState) -> str:
         return ""  # Return empty string if no undrafted players are available
 
 
-def do_the_work(n=1024, timeout=30):
+def do_the_work(n=1024, timeout=20):
     try:
         import numpy as np
         start = time.time()
