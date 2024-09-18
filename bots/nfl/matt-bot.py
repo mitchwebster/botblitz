@@ -27,6 +27,22 @@ MAX_POS_RANK_K = 34
 MAX_POS_RANK_DST = 32
 MAX_RANK_ALL_PLAYERS = 586
 
+# List of players to not draft, aka rudimentary way to avoid IR players
+# TODO remove this when running for anything other than 2024 draft on 9/17
+DO_NOT_DRAFT_LIST = [
+    "Isiah Pacheco",
+    "Tua Tagovailoa",
+    "Marquise Brown",
+    "J.J. McCarthy",
+    "Cooper Kupp",
+    "Rondale Moore",
+    "Michael Badgley",
+    "AJ Dillon",
+    "Puka Nacua",
+    "Christian McCaffrey",
+    "T.J. Hockenson",
+]
+
 def draft_player(game_state: GameState) -> str:
     """
     Selects a player to draft based on the highest rank.
@@ -37,18 +53,18 @@ def draft_player(game_state: GameState) -> str:
     Returns:
         str: The id of the drafted player.
     """
-    
+
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
     team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
-    
+
     # Populate team from GameState
     populate_team(team_players)
 
     # Populate max player position contants
     populate_num_player_max_constants(game_state)
-    
+
     # Select the player with the highest rank (lowest rank number)
     if undrafted_players:
         # Default boilerplate
@@ -70,7 +86,8 @@ def get_player_score(player: Player):
 
 def experiment(undrafted_players: List[Player], drafted_players: List[Player]):
   # Filter out players that are un-draftable based on position limits
-  undrafted_players = [p for p in undrafted_players if can_draft_position(p)]
+  # TODO remove DO_NOT_DRAFT_LIST here when not using for 2024 draft
+  undrafted_players = [p for p in undrafted_players if can_draft_position(p) and p.full_name not in DO_NOT_DRAFT_LIST]
 
   # Sort players according to scoring function
   players_scored = []
