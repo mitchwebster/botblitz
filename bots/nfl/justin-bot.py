@@ -119,6 +119,7 @@ def draft_player(game_state: GameState) -> str:
             print("no allowed players found - drafting the best-ranked undrafted player regardless of position")
             if len(undrafted_players) > 0:
                 p = min(undrafted_players, key=lambda p: p.rank)
+                print(f"drafting {p.full_name} : {p.allowed_positions}")
                 return p.id
             else:
                 return ""
@@ -130,20 +131,25 @@ def draft_player(game_state: GameState) -> str:
             for player in rank_ordered:
                 if player.allowed_positions[0] in unfilled_positions:
                     print("nearing end of draft, drafting player to fill an unfilled position")
+                    print(f"drafting {player.full_name} : {player.allowed_positions}")
                     return player.id
 
         # only draft allowed count + 1 maximum for each position, don't do more.
         for player in rank_ordered:
-            for pos, count in allowed_position_counts.items():
-                if player.allowed_positions[0] == pos and filled_position_counts[pos] - count >= 1:
-                    continue;
+            pos = player.allowed_positions[0]
+            allowed_count = allowed_position_counts[pos]
+            extras = filled_position_counts[pos] - allowed_position_counts[pos]
+            if extras >= 1:
+                # print(f"  skipping a {pos} because we already have {filled_position_counts[pos]}, which is {extras} extra")
+                # skip because we already have enough of @pos
+                continue
             print("drafting the best-ranked player, while skipping positions that we already have a lot of")
+            print(f"drafting {player.full_name} : {player.allowed_positions}")
             return player.id
 
         print("drafting the best-ranked player in allowed_players")
-        return rank_ordered[0].id
-        # drafted_player = min(undrafted_players, key=lambda p: p.rank)
-        # print(f"drafting player: {drafted_player}")
-        # return drafted_player.id
+        player = rank_ordered[0].id
+        print(f"drafting {player.full_name} : {player.allowed_positions}")
+        return player
     else:
         return ""  # Return empty string if no undrafted players are available
