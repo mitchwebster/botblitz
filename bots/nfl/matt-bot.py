@@ -87,7 +87,7 @@ def get_player_score(player: Player):
 def experiment(undrafted_players: List[Player], drafted_players: List[Player]):
   # Filter out players that are un-draftable based on position limits
   # TODO remove DO_NOT_DRAFT_LIST here when not using for 2024 draft
-  undrafted_players = [p for p in undrafted_players if can_draft_position(p) and p.full_name not in DO_NOT_DRAFT_LIST]
+  undrafted_players = [p for p in undrafted_players if can_draft_position(p)]
 
   # Sort players according to scoring function
   players_scored = []
