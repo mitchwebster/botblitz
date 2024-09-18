@@ -3,13 +3,6 @@ from typing import List
 import collections
 import copy
 
-QB_POS = "QB"
-RB_POS = "RB"
-WR_POS = "WR"
-TE_POS = "TE"
-K_POS = "K"
-D_POS = "DST"
-
 def draft_player(game_state: GameState) -> str:
     """
     Selects a player to draft based on the highest rank.
@@ -48,7 +41,6 @@ def draft_player(game_state: GameState) -> str:
             bot_module = importlib.import_module(bot_path)
 
             try:
-
                 suggested_players += bot_module.draft_player(game_state)
                 print(f"Suggestion from {bot_file}: {suggested_players[-1]}")
             except Exception as e:
