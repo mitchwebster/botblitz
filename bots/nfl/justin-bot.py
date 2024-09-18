@@ -137,6 +137,7 @@ def draft_player(game_state: GameState) -> str:
             for pos, count in allowed_position_counts.items():
                 if player.allowed_positions[0] == pos and filled_position_counts[pos] - count >= 1:
                     continue;
+            print("drafting the best-ranked player, while skipping positions that we already have a lot of")
             return player.id
 
         print("drafting the best-ranked player in allowed_players")
