@@ -6,7 +6,7 @@ from typing import List, Dict
 import json
 
 def draft_player(game_state: GameState) -> str:
-    openai_api_key = os.environ.get('OPENAI_API_TOKEN')
+    openai_api_key = os.environ.get('OPEN_AI_TOKEN')
     openai_client = OpenAI(api_key=openai_api_key)
     stats_db = StatsDB([game_state.league_settings.year - 1])
 
