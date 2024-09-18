@@ -6,6 +6,10 @@ from typing import List, Dict
 import json
 
 def draft_player(game_state: GameState) -> str:
+    if os.path.basename(__file__) == 'philip-bot.py':
+        print("nope")
+        return ["-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1"]
+
     openai_api_key = os.environ.get('OPEN_AI_TOKEN')
     openai_client = OpenAI(api_key=openai_api_key)
     stats_db = StatsDB([game_state.league_settings.year - 1])
