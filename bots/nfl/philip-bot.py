@@ -34,7 +34,7 @@ def draft_player(game_state: GameState) -> str:
 
     # Collect drafted players from other bots
     suggested_players = []
-    bot_directory = "/Users/philip/Developer/botblitz/bots/nfl/"
+    bot_directory = os.path.dirname(os.path.abspath(__file__))
     for bot_file in os.listdir(bot_directory):
         if bot_file.endswith(".py") and bot_file != "philip-bot.py":
             bot_path = os.path.join(bot_directory, bot_file)
