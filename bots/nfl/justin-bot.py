@@ -116,6 +116,7 @@ def draft_player(game_state: GameState) -> str:
         allowed_players = [player for player in undrafted_players if player.allowed_positions[0] in open_positions]
 
         if len(allowed_players) == 0:
+            print("no allowed players found - drafting the best-ranked undrafted player regardless of position")
             if len(undrafted_players) > 0:
                 p = min(undrafted_players, key=lambda p: p.rank)
                 return p.id
@@ -128,6 +129,7 @@ def draft_player(game_state: GameState) -> str:
         if game_state.league_settings.total_rounds - get_round_number(game_state) - 1 - len(unfilled_positions) <= 0:
             for player in rank_ordered:
                 if player.allowed_positions[0] in unfilled_positions:
+                    print("nearing end of draft, drafting player to fill an unfilled position")
                     return player.id
 
         # only draft allowed count + 1 maximum for each position, don't do more.
@@ -137,6 +139,7 @@ def draft_player(game_state: GameState) -> str:
                     continue;
             return player.id
 
+        print("drafting the best-ranked player in allowed_players")
         return rank_ordered[0].id
         # drafted_player = min(undrafted_players, key=lambda p: p.rank)
         # print(f"drafting player: {drafted_player}")
