@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
