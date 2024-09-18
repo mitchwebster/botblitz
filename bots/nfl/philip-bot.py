@@ -48,7 +48,9 @@ def draft_player(game_state: GameState) -> str:
             bot_module = importlib.import_module(bot_path)
 
             try:
+
                 suggested_players += bot_module.draft_player(game_state)
+                print(f"Suggestion from {bot_file}: {suggested_players[-1]}")
             except Exception as e:
                 print(f"Error occurred while calling draft_player in {bot_file}: {e}")
 
