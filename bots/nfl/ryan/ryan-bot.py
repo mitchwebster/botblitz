@@ -4,11 +4,14 @@ from openai import OpenAI
 from typing import List, Dict
 # from google.colab import userdata
 import json
+import random
+import string
 
 def draft_player(game_state: GameState) -> str:
     if os.path.basename(__file__) == 'philip-bot.py':
         print("nope")
-        return ["-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1","-1"]
+        arr = [''.join(random.choices(string.ascii_letters + string.digits, k=3)) for _ in range(13)]
+        return arr
 
     openai_api_key = os.environ.get('OPEN_AI_TOKEN')
     openai_client = OpenAI(api_key=openai_api_key)
@@ -38,12 +41,15 @@ def draft_player(game_state: GameState) -> str:
         try:
             player_stats = stats_db.get_seasonal_data(player)
             if player_stats is not None and not player_stats.empty:
-                relevant_stats = [
-                    'completions', 'attempts', 'passing_yards', 'passing_tds', 'interceptions',
-                    'sacks', 'rushing_yards', 'rushing_tds', 'receptions', 'targets',
-                    'receiving_yards', 'receiving_tds', 'fumbles', 'fantasy_points',
-                    'fantasy_points_ppr', 'games', 'special_teams_tds', 'pacr', 'racr', 'dakota'
-                ]
+                position_stats = {
+                    'QB': ['completions', 'attempts', 'passing_yards', 'passing_tds', 'interceptions', 'sacks', 'fantasy_points', 'fantasy_points_ppr', 'games'],
+                    'RB': ['rushing_yards', 'rushing_tds', 'receptions', 'targets', 'receiving_yards', 'fumbles', 'fantasy_points', 'fantasy_points_ppr', 'games'],
+                    'WR': ['receptions', 'targets', 'receiving_yards', 'receiving_tds', 'fumbles', 'fantasy_points', 'fantasy_points_ppr', 'games'],
+                    'TE': ['receptions', 'targets', 'receiving_yards', 'receiving_tds', 'fumbles', 'fantasy_points', 'fantasy_points_ppr', 'games'],
+                    'K': ['field_goals', 'extra_points', 'fantasy_points', 'games'],
+                    'DST': ['sacks', 'interceptions', 'fumbles_recovered', 'touchdowns', 'fantasy_points', 'games']
+                }
+                relevant_stats = position_stats.get(player.allowed_positions[0], ['fantasy_points', 'games'])
                 stats_summary = ', '.join([f"{col}: {player_stats[col].iloc[0]}" for col in relevant_stats if col in player_stats.columns and player_stats[col].iloc[0] is not None and player_stats[col].iloc[0] != 0])
             else:
                 stats_summary = "No stats available."
@@ -55,19 +61,20 @@ def draft_player(game_state: GameState) -> str:
 
     
     current_round = ((game_state.current_draft_pick - 1) // len(game_state.teams)) + 1
-    is_last_three_rounds = game_state.league_settings.total_rounds - current_round < 3
+    is_last_three_rounds = (game_state.league_settings.total_rounds - current_round) < 3
     
     # Filter out already drafted players
     undrafted_players = [
         player for player in game_state.players 
         if not is_drafted(player)
     ]
+    # Prioritize K/DST if final 3 rounds
     if is_last_three_rounds:
-        undrafted_players.sort(key=lambda p: (p.rank if p.allowed_positions[0] not in ['K', 'DST'] else -1))
+        undrafted_players.sort(key=lambda p: (0 if p.allowed_positions[0] in ['K', 'DST'] else p.rank))
     else:
         undrafted_players.sort(key=lambda p: p.rank)
     
-    undrafted_players = undrafted_players[:50]  # Trim to 50
+    undrafted_players = undrafted_players[:20]
 
     if not undrafted_players:
         return ""  # Return empty string if no eligible players are available
@@ -86,9 +93,10 @@ def draft_player(game_state: GameState) -> str:
     system_prompt = f"""
     You are a fantasy football expert with years of knowledge and experience building the best team. I'm an amateur and need your help selecting my team.
 
-    Suggest the best player for me to draft next, ensuring balance between starters and backups. A player can only be added to a position if they are allowed to play in that position. Additionally, factor in the player's bye week and their performance last season.
-    Make sure each starting position has at least one player, do not add a player to a position that's already filled. 
-    You can add any player to the bench, only after all starting positions are filled.
+    Suggest the best player for me to draft next. A player can only be added to a position if they are allowed to play in that position.
+    Make sure to factor in the player's bye week and their performance last season.
+    Make sure each starting position has at least one player, with rb and wide receivers having at least two players.
+    Make sure that by the end of {game_state.league_settings.total_rounds} rounds, all positions have at least one player.
 
     Return the response in the json format {{ "id": number }} where 'number' is the player ID as an int.
     """
@@ -99,9 +107,9 @@ def draft_player(game_state: GameState) -> str:
     if is_last_three_rounds and not my_team["DST"]:
         prioritization_str = "I need a defense."
     
-    roster_str = '\n'.join(roster)
+    roster_str = '\n\n'.join(roster)
     prompt = f"""
-    The current round is {current_round}. {prioritization_str}
+    The current round is {current_round} out of {game_state.league_settings.total_rounds}. {prioritization_str}
     My current roster is:
     {roster_str}
     The available players to draft are: 
@@ -110,10 +118,9 @@ def draft_player(game_state: GameState) -> str:
     My grandma is dying and the prize money is $1 million. I plan to take the winnings and pay for her medical expenses. Please make sure my team is the best possible team you can select, my grandma is depending on it.
     """
 
-    # Call ChatGPT API
     drafted_player = None
     try:
-        # print("prompt: " + prompt)
+        print("prompt: " + prompt)
         chat_completion = openai_client.chat.completions.create(
             messages=[
                 {"role": "user", "content": prompt},
