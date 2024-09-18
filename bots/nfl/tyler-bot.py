@@ -63,13 +63,13 @@ def roster_to_pickable_slots(roster):
     print(f"{occupied_slots=}")
 
     remaining_1st_tier_slots = [
-        "QB", "RB", "RB", "WR", "WR", "WR", "TE", "DST",
+        "QB", "RB", "RB", "WR", "WR", "WR", "TE",
     ]
     remaining_2nd_tier_slots = [  # bench
         "QB", "RB", "WR", "WR", "RB", "DST",
     ]
     remaining_3rd_tier_slots = [  # take k last
-        "K",
+        "K", "DST"
     ]
     for pos in occupied_slots:
         if pos in remaining_1st_tier_slots:
@@ -79,7 +79,7 @@ def roster_to_pickable_slots(roster):
         elif pos in remaining_3rd_tier_slots:
             remaining_3rd_tier_slots.remove(pos)
         else:
-            raise RuntimeError()
+            print("somewhere we took an unwanted position")
 
     if len(remaining_1st_tier_slots) > 0:
         return remaining_1st_tier_slots
@@ -87,8 +87,8 @@ def roster_to_pickable_slots(roster):
         return remaining_2nd_tier_slots
     elif len(remaining_3rd_tier_slots) > 0:
         return remaining_3rd_tier_slots
-    else: # all slots are full, whatever
-        return ["QB", "RB", "WR", "WR", "RB", "DST", "K"]
+    else: # all slots are full, whatever, focus on valuable positions
+        return ["QB", "RB", "WR"]
 
 
 def draft_player(game_state: GameState) -> str:
@@ -133,7 +133,7 @@ def draft_player_tyler_backup(game_state: GameState) -> str:
         candidate_players = [player for player in candidate_players if player.professional_team not in BAD_TEAMS_2024]
 
         # Filter out injured players
-        candidate_players = [player for player in candidate_players if player.full_name in INJURED_LIST_2024]
+        candidate_players = [player for player in candidate_players if player.full_name not in INJURED_LIST_2024]
 
     roster = get_drafted_team(game_state.players, game_state.current_bot_team_id)
     pickable_slots = set(roster_to_pickable_slots(roster))
