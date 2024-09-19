@@ -26,6 +26,26 @@ def draft_player(game_state: GameState) -> str:
         "DST": [],
     }
 
+    # Thanks Tyler and Mitch!
+    INJURED_LIST_2024 = set([
+        "Christian McCaffrey",
+        "Tua Tagovailoa",
+        "Cooper Kupp",
+        "A.J. Brown",
+        "AJ Brown",
+        "Deebo Samuel",
+        "Puka Nacua",
+        "Marquise Brown",
+        "J.J. McCarthy",
+        "Odell Beckham Jr.",
+        "Odell Beckham",
+        "T.J. Hockenson",
+        "Tyler Higbee",
+        "Kendrick Bourne",
+        "Keaton Mitchell",
+        "Nick Chubb",
+    ])
+
     for player in game_state.players:
         if player.status.current_fantasy_team_id == game_state.current_bot_team_id:
             for position in player.allowed_positions:
@@ -66,7 +86,7 @@ def draft_player(game_state: GameState) -> str:
     # Filter out already drafted players
     undrafted_players = [
         player for player in game_state.players 
-        if not is_drafted(player)
+        if not is_drafted(player) and player.full_name not in INJURED_LIST_2024
     ]
     # Prioritize K/DST if final 3 rounds
     if is_last_three_rounds:
