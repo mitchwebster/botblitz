@@ -30,16 +30,14 @@ MAX_RANK_ALL_PLAYERS = 586
 # List of players to not draft, aka rudimentary way to avoid IR players
 # TODO remove this when running for anything other than 2024 draft on 9/17
 DO_NOT_DRAFT_LIST = [
+    "Christian McCaffrey",
     "Isiah Pacheco",
     "Tua Tagovailoa",
     "Marquise Brown",
-    "J.J. McCarthy",
     "Cooper Kupp",
     "Rondale Moore",
     "Michael Badgley",
-    "AJ Dillon",
     "Puka Nacua",
-    "Christian McCaffrey",
     "T.J. Hockenson",
 ]
 
@@ -56,6 +54,8 @@ def draft_player(game_state: GameState) -> str:
 
     # Filter out already drafted players
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
+    if game_state.league_settings.year == 2024:
+      undrafted_players = [p for p in undrafted_players if p.full_name not in DO_NOT_DRAFT_LIST]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
     team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
 
