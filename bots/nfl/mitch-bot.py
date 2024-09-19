@@ -10,6 +10,26 @@ TE_POS = "TE"
 K_POS = "K"
 D_POS = "DST"
 
+# Thanks Tyler!
+INJURED_LIST_2024 = set([
+    "Christian McCaffrey",
+    "Tua Tagovailoa",
+    "Cooper Kupp",
+    "A.J. Brown",
+    "AJ Brown",
+    "Deebo Samuel",
+    "Puka Nacua",
+    "Marquise Brown",
+    "J.J. McCarthy",
+    "Odell Beckham Jr.",
+    "Odell Beckham",
+    "T.J. Hockenson",
+    "Tyler Higbee",
+    "Kendrick Bourne",
+    "Keaton Mitchell",
+    "Nick Chubb",
+])
+
 def get_drafted_team(players, team_id):
     roster = {
         QB_POS : [],
@@ -90,8 +110,8 @@ def draft_player(game_state: GameState) -> str:
 
     # Do not draft Tua this year
     if game_state.league_settings.year == 2024:
-        player_deny_map["Tua Tagovailoa"] = ""
-        player_deny_map["Puka Nacua"] = ""
+        for player in INJURED_LIST_2024:
+            player_deny_map[player] = ""
 
     team_deny_map = {
         "CAR": "",

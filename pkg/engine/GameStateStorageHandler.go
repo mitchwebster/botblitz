@@ -42,7 +42,7 @@ func LoadLastGameState() (*common.GameState, error) {
 }
 
 func SaveGameState(gameState *common.GameState) error {
-	saveFilePath, err := getSaveFileName()
+	saveFilePath, err := getSaveFileName(gameState.LeagueSettings.Year)
 	if err != nil {
 		return err
 	}
@@ -66,17 +66,22 @@ func SaveGameState(gameState *common.GameState) error {
 	return nil
 }
 
-func getSaveFileName() (string, error) {
-	timestamp := time.Now().Unix()
-	timestampStr := strconv.FormatInt(timestamp, 10)
-	fileName := filePrefix + timestampStr + fileSuffix
-	relativePath := saveFolderRelativePath + "/" + fileName
-	absPath, err := BuildLocalAbsolutePath(relativePath)
+func getSaveFileName(year uint32) (string, error) {
+	folderName := saveFolderRelativePath + "/" + strconv.Itoa(int(year))
+	absFolderPath, err := BuildLocalAbsolutePath(folderName)
 	if err != nil {
 		return "", err
 	}
 
-	return absPath, nil
+	err = os.MkdirAll(absFolderPath, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	timestamp := time.Now().Unix()
+	timestampStr := strconv.FormatInt(timestamp, 10)
+	fileName := filePrefix + timestampStr + fileSuffix
+	return absFolderPath + "/" + fileName, nil
 }
 
 func findLastSaveFilePath() (string, error) {
