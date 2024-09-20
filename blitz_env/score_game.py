@@ -3,8 +3,8 @@
 import argparse
 import sys
 import os
-from .stats_db import StatsDB
-from .agent_pb2 import GameState, PlayerStatus
+from blitz_env.stats_db import StatsDB
+from blitz_env.agent_pb2 import GameState, PlayerStatus
 from rich.console import Console
 from rich.table import Table
 from rich import box
@@ -12,12 +12,18 @@ import numpy as np
 
 def get_points(stats_db, player, year, week):
     df = stats_db.get_weekly_data(player)
-    return df[(df["season"] == year) & (df["week"] == week)]["fantasy_points_ppr"].iloc[0]
+    try:
+        return df[(df["season"] == year) & (df["week"] == week)]["fantasy_points_ppr"].iloc[0]
+    except IndexError:
+        return 0  # Player did not play that week
 
 def get_best_possible_score(stats_db, players, player_slots, year, week):
     total_score = 0
     used_player_ids = set()
     player_contributions = {}  # New dictionary to track player contributions for the week
+    player_points = {}
+    for player in players:
+        player_points[player.id] = get_points(stats_db, player, year, week)
 
     # Sort slots by the size of allowed positions (ascending)
     sorted_slots = sorted(player_slots, key=lambda slot: len(slot.allowed_player_positions))
@@ -29,12 +35,7 @@ def get_best_possible_score(stats_db, players, player_slots, year, week):
 
         for player in players:
             if player.id not in used_player_ids and any(pos in slot.allowed_player_positions for pos in player.allowed_positions):
-                try:
-                    points = get_points(stats_db, player, year, week)
-                except IndexError:
-                    # Skip players who do not have data for the specified week
-                    continue
-
+                points = player_points[player.id]
                 if points > best_points:
                     best_points = points
                     best_player = player
@@ -50,23 +51,25 @@ def get_best_possible_score(stats_db, players, player_slots, year, week):
             slot.assigned_player_id = best_player.id  # Assign the player to the slot
             # Track the player's contribution
             player_contributions[best_player.id] = player_contributions.get(best_player.id, 0) + best_points
-
-    return total_score, player_contributions
+    
+    return total_score, player_contributions, player_points
 
 total_weeks = 17
 def get_best_possible_score_season(stats_db, players, player_slots, year):
     total_score = 0.0
     season_contributions = {}  # Dictionary to accumulate player contributions over the season
+    season_player_points = {}
 
     for week in range(1, total_weeks + 1):
-        weekly_score, weekly_contributions = get_best_possible_score(stats_db, players, player_slots, year, week)
+        weekly_score, weekly_contributions, weekly_player_points = get_best_possible_score(stats_db, players, player_slots, year, week)
         total_score += weekly_score
 
         # Accumulate weekly contributions into season contributions
         for player_id, points in weekly_contributions.items():
             season_contributions[player_id] = season_contributions.get(player_id, 0) + points
-
-    return total_score, season_contributions
+        for player_id, points in weekly_player_points.items():
+            season_player_points[player_id] = season_player_points.get(player_id, 0) + points
+    return total_score, season_contributions, season_player_points
 
 def print_top_teams_by_best_possible_score(team_scores):
     # Sort the teams by best_possible_score in descending order
@@ -98,16 +101,16 @@ def print_top_teams_by_best_possible_score(team_scores):
         # Adjust the rank formatting
         print(f"{rank:>{rank_width}}. {owner:<15} | {bar} {score:.2f} points")
 
-def print_draft_board(game_state, stats_db, year, player_contributions, week=None):
-    console = Console()
+def print_draft_board(game_state, stats_db, year, player_contributions, player_total_points, week=None):
+    console = Console(force_terminal=True)  # Force ANSI codes even when output is redirected
 
     # Adjust the title and caption based on whether we're displaying a single week or the entire season
     if week is not None:
-        title = f"Fantasy Draft Board - Week {week}"
-        caption = "*pts are each player's contribution towards the ideal roster for the week"
+        title = f"Fantasy Draft Board - {year} Week {week}"
+        caption = "*points values are each player's contribution towards the ideal roster for the week.  Total is not considering"
     else:
-        title = "Fantasy Draft Board - Season"
-        caption = "*pts are each player's contribution towards the ideal season roster"
+        title = f"Fantasy Draft Board - {year} Season"
+        caption = "*points values are each player's contribution towards the ideal season roster"
 
     # Get the number of teams and prepare the board layout
     num_teams = len(game_state.teams)
@@ -115,7 +118,6 @@ def print_draft_board(game_state, stats_db, year, player_contributions, week=Non
 
     # Build a mapping of team IDs to team names and owners
     teams = game_state.teams
-    team_id_to_info = {team.id: {'name': team.name, 'owner': team.owner} for team in teams}
 
     # Get min and max contributions
     contributions_values = list(player_contributions.values())
@@ -174,15 +176,20 @@ def print_draft_board(game_state, stats_db, year, player_contributions, week=Non
         else:
             team_index = num_teams - 1 - pick_in_round
 
-        # Get player's total contribution
+        # Get player's total contribution and total season points
         contribution = player_contributions.get(player.id, 0)
+        total_points = player_total_points.get(player.id, 0)
 
-        # Handle players who did not contribute in the specified week
+        # Round to nearest integer
+        contribution_int = int(round(contribution))
+        total_points_int = int(round(total_points))
+
+        # Handle DNP case for single week
         if week is not None and contribution == 0:
-            contribution_str = "DNP"  # Did Not Play
+            contribution_str = f"DNP ({total_points_int} total)"
             color = "#808080"  # Gray color for DNP
         else:
-            contribution_str = f"{contribution:.1f} pts"
+            contribution_str = f"{contribution_int} ({total_points_int} total)"
             # Get color based on contribution
             color = get_color_for_contribution(contribution, min_contribution, max_contribution)
 
@@ -239,6 +246,7 @@ def main():
 
     # Initialize variables
     player_contributions = {}  # Mapping player_id to total points contributed to best possible score
+    player_total_points = {}
     team_scores = []
 
     # Compute best possible score and player contributions for each team
@@ -248,12 +256,12 @@ def main():
 
         if week is not None:
             # Compute the team's best possible score for the specified week
-            best_possible_score, team_contributions = get_best_possible_score(
+            best_possible_score, team_contributions, team_points = get_best_possible_score(
                 stats_db, team_players, game_state.league_settings.slots_per_team, game_state.league_settings.year, week
             )
         else:
             # Compute the team's best possible score over the season and player contributions
-            best_possible_score, team_contributions = get_best_possible_score_season(
+            best_possible_score, team_contributions, team_points = get_best_possible_score_season(
                 stats_db, team_players, game_state.league_settings.slots_per_team, game_state.league_settings.year
             )
 
@@ -264,13 +272,19 @@ def main():
         for player_id, points in team_contributions.items():
             # For a single week, no need to accumulate
             player_contributions[player_id] = points
+        
+        # Accumulate team contributions into global player_contributions
+        for player_id, points in team_points.items():
+            # For a single week, no need to accumulate
+            player_total_points[player_id] = points
 
-    # Now we can print the draft board, passing player_contributions
+    # Now we can print the draft board, passing player_contributions and player_total_points
     print_draft_board(
         game_state,
         stats_db=stats_db,
         year=game_state.league_settings.year,
         player_contributions=player_contributions,
+        player_total_points=player_total_points,
         week=week
     )
 
