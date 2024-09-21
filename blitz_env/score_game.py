@@ -107,7 +107,7 @@ def print_draft_board(game_state, stats_db, year, player_contributions, player_t
     # Adjust the title and caption based on whether we're displaying a single week or the entire season
     if week is not None:
         title = f"Fantasy Draft Board - {year} Week {week}"
-        caption = "*points values are each player's contribution towards the ideal roster for the week.  Total is not considering"
+        caption = "*points values are each player's contribution towards the ideal roster for the week"
     else:
         title = f"Fantasy Draft Board - {year} Season"
         caption = "*points values are each player's contribution towards the ideal season roster"
