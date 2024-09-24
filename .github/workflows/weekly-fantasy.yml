@@ -58,7 +58,7 @@ jobs:
       uses: peter-evans/create-pull-request@v7
       with:
         title: '[Automated] Weekly Fantasy GameState Update'
-        path: /data/game_states
+        path: data/game_states
 
     # - name: Run Engine
     #   run: make run-engine
