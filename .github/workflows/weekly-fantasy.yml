@@ -53,6 +53,9 @@ jobs:
     
     - name: Run Weekly Fantasy
       run: make run-fantasy
+    
+    - name: Create PR w/ new gamestate
+      uses: peter-evans/create-pull-request@v7
 
     # - name: Run Engine
     #   run: make run-engine
