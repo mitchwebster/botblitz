@@ -55,11 +55,20 @@ jobs:
       run: make run-fantasy
     
     - name: Create PR w/ new gamestate
+      id: cpr
       uses: peter-evans/create-pull-request@v7
       with:
         title: '[Automated] Weekly Fantasy GameState Update'
         add-paths: |
             data/game_states/*.bin
+
+    - name: Enable Pull Request Automerge
+      if: steps.cpr.outputs.pull-request-operation == 'created'
+      uses: peter-evans/enable-pull-request-automerge@v3
+      with:
+        token: ${{ secrets.PAT }}
+        pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+        merge-method: squash
 
     # - name: Run Engine
     #   run: make run-engine
