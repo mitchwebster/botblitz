@@ -1,0 +1,58 @@
+name: BotBlitz Weekly Fantasy
+
+on:
+  workflow_dispatch:
+   schedule:
+     - cron: "0 15 * * 2"
+
+jobs:
+  buildAndTest:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+  
+    - uses: actions/setup-go@v5.0.0
+      with:
+        # The Go version to download (if necessary) and use. Supports semver spec and ranges. Be sure to enclose this option in single quotation marks.
+        go-version: '1.21.7'
+    
+    - name: Check starting Go version
+      run: go version
+
+    - name: Install protoc
+      run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y protobuf-compiler
+
+    - name: Install golang proto tools
+      run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+    - name: Install GRPC proto tools
+      run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+    - name: Install python grpc tools
+      run: pip install -r py_grpc_server/requirements.txt
+
+    - name: Check protoc version
+      run: protoc --version
+
+    - name: Docker version
+      run: docker -v
+
+    - name: Clean generated proto
+      run: make clean
+
+    - name: Generate proto
+      run: make gen
+
+    - name: Test Monorepo
+      run: make test
+
+    - name: Build docker image
+      run: make build-docker
+    
+    - name: Run Weekly Fantasy
+      run: make run-fantasy
+
+    # - name: Run Engine
+    #   run: make run-engine
