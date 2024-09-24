@@ -69,9 +69,11 @@ func main() {
 }
 
 func bootstrapWeeklyFantasy() *engine.BotEngine {
-	lastGameState, err := engine.LoadLastGameState()
+	var year uint32 = 2024
+	lastGameState, err := engine.LoadLastGameState(year)
 	if err != nil {
 		fmt.Println("Failed to load last game state")
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
@@ -192,7 +194,7 @@ func fetchBotList() []*common.Bot {
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/ryan/ryan-bot.py",
 			FantasyTeamId: "8",
-			EnvPath:      "/bots/nfl/ryan/ryan.env",
+			EnvPath:       "/bots/nfl/ryan/ryan.env",
 		},
 		{
 			Id:            "Philip's Bot",

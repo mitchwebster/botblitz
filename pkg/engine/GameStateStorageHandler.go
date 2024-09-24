@@ -17,8 +17,8 @@ const saveFolderRelativePath = "data/game_states"
 const filePrefix = "gameState-"
 const fileSuffix = ".bin"
 
-func LoadLastGameState() (*common.GameState, error) {
-	filePath, err := findLastSaveFilePath()
+func LoadLastGameState(year uint32) (*common.GameState, error) {
+	filePath, err := findLastSaveFilePath(year)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +67,7 @@ func SaveGameState(gameState *common.GameState) error {
 }
 
 func getSaveFileName(year uint32) (string, error) {
-	folderName := saveFolderRelativePath + "/" + strconv.Itoa(int(year))
-	absFolderPath, err := BuildLocalAbsolutePath(folderName)
+	absFolderPath, err := getSaveFolderPath(year)
 	if err != nil {
 		return "", err
 	}
@@ -84,8 +83,18 @@ func getSaveFileName(year uint32) (string, error) {
 	return absFolderPath + "/" + fileName, nil
 }
 
-func findLastSaveFilePath() (string, error) {
-	absPath, err := BuildLocalAbsolutePath(saveFolderRelativePath)
+func getSaveFolderPath(year uint32) (string, error) {
+	folderName := saveFolderRelativePath + "/" + strconv.Itoa(int(year))
+	absPath, err := BuildLocalAbsolutePath(folderName)
+	if err != nil {
+		return "", err
+	}
+
+	return absPath, nil
+}
+
+func findLastSaveFilePath(year uint32) (string, error) {
+	absPath, err := getSaveFolderPath(year)
 	if err != nil {
 		return "", err
 	}
@@ -112,11 +121,36 @@ func findLastSaveFilePath() (string, error) {
 		return "", fmt.Errorf("Found no files")
 	}
 
-	relativePath := saveFolderRelativePath + "/" + fileNames[len(fileNames)-1]
-	lastFilePath, err := BuildLocalAbsolutePath(relativePath)
-	if err != nil {
-		return "", err
-	}
-
-	return lastFilePath, nil
+	return absPath + "/" + fileNames[len(fileNames)-1], nil
 }
+
+// func FindAvailableYears() ([]string, error) {
+// 	var subdirs []string
+
+// 	absPath, err := BuildLocalAbsolutePath(saveFolderRelativePath)
+// 	if err != nil {
+// 		return subdirs, err
+// 	}
+
+// 	// Open the directory
+// 	file, err := os.Open(absPath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer file.Close()
+
+// 	// Read the directory entries
+// 	entries, err := file.Readdir(-1) // -1 means read all files
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Filter out only the directories
+// 	for _, entry := range entries {
+// 		if entry.IsDir() {
+// 			subdirs = append(subdirs, entry.Name())
+// 		}
+// 	}
+
+// 	return subdirs, nil
+// }

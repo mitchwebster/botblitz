@@ -14,6 +14,8 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 	_ = buildTeamMap(e.gameState)
 
+	SaveGameState(e.gameState)
+
 	return nil
 }
 
