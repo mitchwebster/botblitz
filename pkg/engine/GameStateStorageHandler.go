@@ -16,6 +16,7 @@ import (
 const saveFolderRelativePath = "data/game_states"
 const filePrefix = "gameState-"
 const fileSuffix = ".bin"
+const allowedNumSaveFiles = 3
 
 func LoadLastGameState(year uint32) (*common.GameState, error) {
 	filePath, err := findLastSaveFilePath(year)
@@ -66,6 +67,29 @@ func SaveGameState(gameState *common.GameState) error {
 	return nil
 }
 
+func CleanOldGameStates(gameState *common.GameState) error {
+	paths, err := findAllSaveFiles(gameState.LeagueSettings.Year)
+	if err != nil {
+		return err
+	}
+
+	if len(paths) <= allowedNumSaveFiles {
+		fmt.Println("Nothing to clean!")
+		return nil
+	}
+
+	numFilesToRemove := len(paths) - allowedNumSaveFiles
+	for i := 0; i < numFilesToRemove; i++ {
+		err := os.Remove(paths[i])
+		if err != nil {
+			fmt.Println("Error removing file:", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func getSaveFileName(year uint32) (string, error) {
 	absFolderPath, err := getSaveFolderPath(year)
 	if err != nil {
@@ -94,18 +118,31 @@ func getSaveFolderPath(year uint32) (string, error) {
 }
 
 func findLastSaveFilePath(year uint32) (string, error) {
-	absPath, err := getSaveFolderPath(year)
+	saveFiles, err := findAllSaveFiles(year)
 	if err != nil {
 		return "", err
+	}
+
+	if len(saveFiles) == 0 {
+		return "", fmt.Errorf("Found no files")
+	}
+
+	return saveFiles[len(saveFiles)-1], nil
+}
+
+func findAllSaveFiles(year uint32) ([]string, error) {
+	fileNames := []string{}
+
+	absPath, err := getSaveFolderPath(year)
+	if err != nil {
+		return fileNames, err
 	}
 
 	// Read the directory
 	entries, err := os.ReadDir(absPath)
 	if err != nil {
-		return "", err
+		return fileNames, err
 	}
-
-	fileNames := []string{}
 
 	// Iterate over directory entries and print file names
 	for _, entry := range entries {
@@ -117,11 +154,13 @@ func findLastSaveFilePath(year uint32) (string, error) {
 
 	sort.Strings(fileNames)
 
-	if len(fileNames) == 0 {
-		return "", fmt.Errorf("Found no files")
+	sortedAbsPaths := []string{}
+	for _, fileName := range fileNames {
+		filePath := absPath + "/" + fileName
+		sortedAbsPaths = append(sortedAbsPaths, filePath)
 	}
 
-	return absPath + "/" + fileNames[len(fileNames)-1], nil
+	return sortedAbsPaths, nil
 }
 
 // func FindAvailableYears() ([]string, error) {

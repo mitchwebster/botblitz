@@ -14,7 +14,15 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 	_ = buildTeamMap(e.gameState)
 
-	SaveGameState(e.gameState)
+	err := SaveGameState(e.gameState)
+	if err != nil {
+		return err
+	}
+
+	err = CleanOldGameStates(e.gameState)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
