@@ -11,7 +11,6 @@ def fp_projections(page, sport=None, include_metadata=False, **kwargs):
         raise ValueError("Sport must be one of 'nfl', 'mlb', 'nba', 'nhl'")
 
     url_query = f"https://www.fantasypros.com/{sport}/projections/{page}.php"
-
     params = kwargs
     response = requests.get(url_query, params=params)
 
@@ -22,17 +21,16 @@ def fp_projections(page, sport=None, include_metadata=False, **kwargs):
         'response': response
     }
 
-    parsed_projections = fp_projections_parse(response_obj)
-
+    parsed_projections = fp_projections_parse(response_obj, page)
     if not include_metadata:
         return parsed_projections['projections']
 
     return parsed_projections
 
-def fp_projections_parse(response_obj):
+def fp_projections_parse(response_obj, page):
     sport = response_obj['sport']
     if sport == 'nfl':
-        return fp_projections_parse_nfl(response_obj)
+        return fp_projections_parse_nfl(response_obj, page)
     elif sport == 'mlb':
         return fp_projections_parse_mlb(response_obj)
     elif sport == 'nba':
@@ -42,7 +40,7 @@ def fp_projections_parse(response_obj):
     else:
         raise ValueError("Invalid sport")
 
-def fp_projections_parse_nfl(response):
+def fp_projections_parse_nfl(response, page):
     content = response['content']
     soup = BeautifulSoup(content, 'html.parser')
 
@@ -52,30 +50,37 @@ def fp_projections_parse_nfl(response):
     # Get the header rows
     header_rows = table_html.select('thead > tr')
 
-    # Process the first header row (grouping labels)
-    first_header_cells = header_rows[0].find_all(['th', 'td'])
-    grouping_labels = []
-    for cell in first_header_cells:
-        colspan = int(cell.get('colspan', 1))
-        label = cell.get_text(strip=True)
-        if not label:
-            labels = [''] * colspan
-        else:
-            labels = [label] * colspan
-        grouping_labels.extend(labels)
+    if len(header_rows) == 2:
+        # Process the first header row (grouping labels)
+        first_header_cells = header_rows[0].find_all(['th', 'td'])
+        grouping_labels = []
+        for cell in first_header_cells:
+            colspan = int(cell.get('colspan', 1))
+            label = cell.get_text(strip=True)
+            if not label:
+                labels = [''] * colspan
+            else:
+                labels = [label] * colspan
+            grouping_labels.extend(labels)
 
-    # Process the second header row (column names)
-    second_header_cells = header_rows[1].find_all(['th', 'td'])
-    column_labels = [cell.get_text(strip=True) for cell in second_header_cells]
+        # Process the second header row (column names)
+        second_header_cells = header_rows[1].find_all(['th', 'td'])
+        column_labels = [cell.get_text(strip=True) for cell in second_header_cells]
 
-    # Combine grouping labels and column labels
-    full_column_names = []
-    for group, col in zip(grouping_labels, column_labels):
-        if group:
-            full_name = f"{group}_{col}"
-        else:
-            full_name = col
-        full_column_names.append(full_name)
+        # Combine grouping labels and column labels
+        full_column_names = []
+        for group, col in zip(grouping_labels, column_labels):
+            if group and group != 'MISC':
+                full_name = f"{group}_{col}"
+            else:
+                full_name = col
+            full_column_names.append(full_name)
+    elif len(header_rows) == 1:
+        # Only one header row
+        header_cells = header_rows[0].find_all(['th', 'td'])
+        full_column_names = [cell.get_text(strip=True) for cell in header_cells]
+    else:
+        raise ValueError("No header rows found in the table.")
 
     # Get the data rows
     data_rows = table_html.select('tbody > tr')
@@ -101,14 +106,14 @@ def fp_projections_parse_nfl(response):
             if fp_id is None:
                 fp_id = fp_player_link.get('fp-player-id', None)
             player_name = fp_player_link.get('fp-player-name', None)
-            # The team info is in the text of first_cell
+            # The team info is in the text of first_cell after the player name
             team_text = first_cell.get_text(strip=True)
             team = team_text.replace(player_name, '').strip()
         else:
             fp_id = None
             player_name = None
             team = None
-        row_data.extend([fp_id, player_name, team])
+        row_data.extend([fp_id, player_name, team, page])
 
         # Get the rest of the cells
         for cell in cells[1:]:
@@ -117,12 +122,12 @@ def fp_projections_parse_nfl(response):
         data.append(row_data)
 
     # Create column names including player info
-    columns = ['fantasypros_id', 'player_name', 'team'] + full_column_names[1:]
+    columns = ['fantasypros_id', 'player_name', 'team', 'position'] + full_column_names[1:]
 
     projections_df = pd.DataFrame(data, columns=columns)
 
     # Convert numeric columns
-    numeric_cols = projections_df.columns.drop(['fantasypros_id', 'player_name', 'team'])
+    numeric_cols = projections_df.columns.drop(['fantasypros_id', 'player_name', 'team', 'position'])
     for col in numeric_cols:
         projections_df[col] = projections_df[col].replace(',', '', regex=True)
         projections_df[col] = pd.to_numeric(projections_df[col], errors='coerce')
