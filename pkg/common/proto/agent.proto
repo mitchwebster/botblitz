@@ -6,6 +6,7 @@ option go_package = ".;common";
 service AgentService {
     rpc DraftPlayer(GameState) returns (DraftSelection) {}
     rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
+    rpc ProposeAddDrop(GameState) returns (AddDropSelection) {}
 }
 
 message FantasyTeam {
@@ -28,6 +29,7 @@ message PlayerSlot {
     string name = 1;
     repeated string allowed_player_positions = 2;
     string assigned_player_id = 3;
+    bool allows_any_position = 4;
 }
 
 message Player {

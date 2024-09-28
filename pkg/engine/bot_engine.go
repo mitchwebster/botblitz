@@ -216,3 +216,16 @@ func FindCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*co
 
 	return gameState.Teams[teamIdx], nil
 }
+
+func FindPlayerById(playerId string, gameState *common.GameState) (*common.Player, error) {
+	if len(playerId) <= 0 {
+		return nil, fmt.Errorf("Cannot find empty player id")
+	}
+
+	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
+	if idx < 0 {
+		return nil, fmt.Errorf("Could not find player with selected id")
+	}
+
+	return gameState.Players[idx], nil
+}

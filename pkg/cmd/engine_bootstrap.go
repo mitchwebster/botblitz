@@ -77,8 +77,6 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	fmt.Println(lastGameState.LeagueSettings.Year)
-
 	var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
 	bots := fetchBotList()
 	engineSettings := engine.BotEngineSettings{
@@ -94,7 +92,7 @@ func bootstrapDraft() *engine.BotEngine {
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
 
-	shuffleBotOrder(fantasyTeams, bots)
+	shuffleBotOrder(fantasyTeams, bots) // randomize draft order
 
 	gameState, err := genDraftGameState(year, fantasyTeams)
 	if err != nil {
@@ -154,7 +152,7 @@ func fetchBotList() []*common.Bot {
 			FantasyTeamId: "1",
 		},
 		{
-			Id:            "Jon Bot",
+			Id:            "Jon's Bot",
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/jon-bot.py",
 			FantasyTeamId: "2",
@@ -205,6 +203,26 @@ func fetchBotList() []*common.Bot {
 	}
 }
 
+func fetchPlayerSlots() []*common.PlayerSlot {
+	return []*common.PlayerSlot{
+		{AllowedPlayerPositions: []string{"QB"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+	}
+}
+
 func shuffleBotOrder(teams []*common.FantasyTeam, bots []*common.Bot) {
 	n := len(teams)
 	indices := make([]int, 0, n)
@@ -229,28 +247,12 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 		return nil, err
 	}
 
-	player_slots := []*common.PlayerSlot{
-		{AllowedPlayerPositions: []string{"QB"}},
-		{AllowedPlayerPositions: []string{"RB"}},
-		{AllowedPlayerPositions: []string{"RB"}},
-		{AllowedPlayerPositions: []string{"WR"}},
-		{AllowedPlayerPositions: []string{"WR"}},
-		{AllowedPlayerPositions: []string{"TE"}},
-		{AllowedPlayerPositions: []string{"RB", "WR", "TE"}},
-		{AllowedPlayerPositions: []string{"K"}},
-		{AllowedPlayerPositions: []string{"DST"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-		{AllowedPlayerPositions: []string{"Bench"}},
-	}
+	player_slots := fetchPlayerSlots()
 
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(fantasyTeams)),
 		IsSnakeDraft:       true,
-		TotalRounds:        15,
+		TotalRounds:        uint32(len(player_slots)),
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
 		SlotsPerTeam:       player_slots,

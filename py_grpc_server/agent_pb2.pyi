@@ -35,14 +35,16 @@ class LeagueSettings(_message.Message):
     def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ..., year: _Optional[int] = ...) -> None: ...
 
 class PlayerSlot(_message.Message):
-    __slots__ = ("name", "allowed_player_positions", "assigned_player_id")
+    __slots__ = ("name", "allowed_player_positions", "assigned_player_id", "allows_any_position")
     NAME_FIELD_NUMBER: _ClassVar[int]
     ALLOWED_PLAYER_POSITIONS_FIELD_NUMBER: _ClassVar[int]
     ASSIGNED_PLAYER_ID_FIELD_NUMBER: _ClassVar[int]
+    ALLOWS_ANY_POSITION_FIELD_NUMBER: _ClassVar[int]
     name: str
     allowed_player_positions: _containers.RepeatedScalarFieldContainer[str]
     assigned_player_id: str
-    def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ...) -> None: ...
+    allows_any_position: bool
+    def __init__(self, name: _Optional[str] = ..., allowed_player_positions: _Optional[_Iterable[str]] = ..., assigned_player_id: _Optional[str] = ..., allows_any_position: bool = ...) -> None: ...
 
 class Player(_message.Message):
     __slots__ = ("id", "full_name", "allowed_positions", "professional_team", "player_bye_week", "rank", "tier", "position_rank", "position_tier", "status", "gsis_id")

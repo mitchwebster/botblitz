@@ -44,6 +44,11 @@ class AgentServiceStub(object):
                 request_serializer=agent__pb2.GameState.SerializeToString,
                 response_deserializer=agent__pb2.AttemptedFantasyActions.FromString,
                 _registered_method=True)
+        self.ProposeAddDrop = channel.unary_unary(
+                '/AgentService/ProposeAddDrop',
+                request_serializer=agent__pb2.GameState.SerializeToString,
+                response_deserializer=agent__pb2.AddDropSelection.FromString,
+                _registered_method=True)
 
 
 class AgentServiceServicer(object):
@@ -61,6 +66,12 @@ class AgentServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ProposeAddDrop(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +84,11 @@ def add_AgentServiceServicer_to_server(servicer, server):
                     servicer.SubmitFantasyActions,
                     request_deserializer=agent__pb2.GameState.FromString,
                     response_serializer=agent__pb2.AttemptedFantasyActions.SerializeToString,
+            ),
+            'ProposeAddDrop': grpc.unary_unary_rpc_method_handler(
+                    servicer.ProposeAddDrop,
+                    request_deserializer=agent__pb2.GameState.FromString,
+                    response_serializer=agent__pb2.AddDropSelection.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,6 +145,33 @@ class AgentService(object):
             '/AgentService/SubmitFantasyActions',
             agent__pb2.GameState.SerializeToString,
             agent__pb2.AttemptedFantasyActions.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ProposeAddDrop(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/AgentService/ProposeAddDrop',
+            agent__pb2.GameState.SerializeToString,
+            agent__pb2.AddDropSelection.FromString,
             options,
             channel_credentials,
             insecure,

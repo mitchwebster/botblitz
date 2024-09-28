@@ -242,6 +242,31 @@ func createAndStartContainer(env []string) (string, error) {
 	return createResponse.ID, nil
 }
 
+func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameState) (*common.AddDropSelection, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	opts = append(opts, grpc.WithTimeout(10*time.Second))
+	// container port may not be listening yet - wait for it
+	opts = append(opts, grpc.WithBlock())
+
+	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer conn.Close()
+	client := common.NewAgentServiceClient(conn)
+
+	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
+	selection, err := client.ProposeAddDrop(ctx, gameState)
+	if err != nil {
+		fmt.Println("Failed calling bot")
+		return nil, err
+	}
+
+	return selection, nil
+}
+
 func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -300,4 +325,39 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	}
 
 	return draftPick.PlayerId, returnError
+}
+
+func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *common.Bot) (selection *common.AddDropSelection, returnError error) {
+	containerId, err := e.startBotContainer(bot)
+	if err != nil {
+		return nil, err
+	}
+
+	// schedule cleanup to run right before the function returns
+	defer func() {
+		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
+		if err != nil {
+			fmt.Println("CRITICAL!! Failed to clean after bot run")
+			returnError = err
+		}
+	}()
+
+	if e.settings.VerboseLoggingEnabled {
+		fmt.Printf("Setup bot: %s\n", bot.Id)
+		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
+		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+	}
+
+	selection, err = e.callAddDropRPC(ctx, e.gameState)
+	if err != nil {
+		return nil, err
+	}
+
+	if e.settings.VerboseLoggingEnabled {
+		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
+			return nil, err
+		}
+	}
+
+	return selection, returnError
 }
