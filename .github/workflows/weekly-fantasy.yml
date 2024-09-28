@@ -58,7 +58,10 @@ jobs:
       id: cpr
       uses: peter-evans/create-pull-request@v7
       with:
+        token: ${{ github.token }}
         title: '[Automated] Weekly Fantasy GameState Update'
+        commit-message: '[Automated] Weekly Fantasy GameState Update'
+        sign-commits: true
         add-paths: |
             data/game_states/*.bin
 
