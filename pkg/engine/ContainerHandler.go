@@ -34,12 +34,6 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 	defer apiClient.Close()
 	apiClient.NegotiateAPIVersion(context.Background())
 
-	// Get team info.
-	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
-	if err != nil {
-		return err
-	}
-
 	pickNum := int(e.gameState.CurrentDraftPick)
 
 	// Request logs for this container.
@@ -54,12 +48,12 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 
 	// Create temp files.
 	// TODO: include bot name and draft round in file name
-	outf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stdout", pickNum, team.Owner))
+	outf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stdout", pickNum, bot.FantasyTeamId))
 	if err != nil {
 		return err
 	}
 	defer outf.Close()
-	errf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stderr", pickNum, team.Owner))
+	errf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stderr", pickNum, bot.FantasyTeamId))
 	if err != nil {
 		return err
 	}

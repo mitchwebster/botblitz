@@ -35,7 +35,7 @@ func CreateSheetsClient(sheetTitle string) (*SheetsClient, error) {
 	return &sheetClient, nil
 }
 
-func CreateNewDraftSheet(client *SheetsClient) error {
+func (client *SheetsClient) CreateNewDraftSheet() error {
 	// Create a request to add a new sheet
 	addSheetRequest := &sheets.AddSheetRequest{
 		Properties: &sheets.SheetProperties{
@@ -61,7 +61,7 @@ func CreateNewDraftSheet(client *SheetsClient) error {
 	return nil
 }
 
-func WriteContentToCell(row int, column rune, text string, client *SheetsClient) error {
+func (client *SheetsClient) WriteContentToCell(row int, column rune, text string) error {
 	writeRange := client.SheetTitle + "!" + string(column) + strconv.Itoa(row)
 
 	// Create the value to write into the cell

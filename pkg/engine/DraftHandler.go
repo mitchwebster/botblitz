@@ -11,13 +11,18 @@ import (
 )
 
 func (e *BotEngine) runDraft(ctx context.Context) error {
+	err := e.initializeDraftSheet()
+	if err != nil {
+		return err
+	}
+
 	curRound := 1
 	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
 
 		index := 0
 		increment := 1
-		arrayEdge := len(e.gameState.Teams) - 1
+		arrayEdge := len(e.bots) - 1
 
 		shouldUseReverseOrder := (curRound % 2) == 0
 		if shouldUseReverseOrder {
@@ -34,7 +39,7 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 			curBot := e.bots[index]
 			e.gameState.CurrentBotTeamId = curBot.FantasyTeamId
 			fmt.Printf("\n-----------------------------------------\n")
-			err := e.performDraftAction(ctx, curBot)
+			err := e.performDraftAction(ctx, curBot, index)
 			fmt.Printf("\n-----------------------------------------\n")
 			if err != nil {
 				return err
@@ -51,13 +56,55 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 	return nil
 }
 
-func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) error {
-	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
+func (e *BotEngine) initializeDraftSheet() error {
+	if e.sheetsClient == nil {
+		if e.settings.VerboseLoggingEnabled {
+			fmt.Println("Skipping Draft Sheet setup as no client was provided")
+		}
+
+		return nil // no-op if client is not created
+	}
+
+	err := e.sheetsClient.CreateNewDraftSheet()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentDraftPick, team.Name, team.Owner)
+	fmt.Println("Created Draft Sheet")
+
+	err = e.sheetsClient.WriteContentToCell(IntialRow, InitialCol, "Round / Team")
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i <= int(e.gameState.LeagueSettings.TotalRounds); i++ {
+		content := strconv.Itoa(i)
+		err = e.sheetsClient.WriteContentToCell(IntialRow+i, InitialCol, content)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := 1; i <= len(e.bots); i++ {
+		bot := e.bots[i-1]
+		team, err := FindCurrentTeamById(bot.FantasyTeamId, e.gameState)
+		if err != nil {
+			return err
+		}
+
+		content := team.Name + "(" + team.Owner + ")"
+		newCol := rune(int(InitialCol) + i)
+		err = e.sheetsClient.WriteContentToCell(IntialRow, newCol, content)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, currentBotIndex int) error {
+	fmt.Printf("[Pick: %d] Fantasy Team (%s) will choose next...", e.gameState.CurrentDraftPick, bot.FantasyTeamId)
 
 	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
 	if err != nil {
@@ -78,7 +125,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) err
 		summary += string('*')
 	}
 
-	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.gameState.Teams), bot.FantasyTeamId, e.settings.SheetsClient)
+	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.bots), currentBotIndex, e.sheetsClient)
 	if err != nil {
 		fmt.Println("Failed to write content to Google Sheets")
 		return err
@@ -111,15 +158,6 @@ func (e *BotEngine) validateDraftState() error {
 	return nil
 }
 
-func findCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
-	teamIdx := slices.IndexFunc(gameState.Teams, func(t *common.FantasyTeam) bool { return t.Id == fantasyTeamId })
-	if teamIdx < 0 {
-		return nil, fmt.Errorf("Could not find team...concerning...")
-	}
-
-	return gameState.Teams[teamIdx], nil
-}
-
 func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *common.GameState) (string, error) {
 	if len(playerId) <= 0 {
 		return "", fmt.Errorf("Cannot draft empty player id")
@@ -136,7 +174,7 @@ func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *
 		return "", fmt.Errorf("Cannot draft player again")
 	}
 
-	team, err := findCurrentTeamById(fantasyTeamId, gameState)
+	team, err := FindCurrentTeamById(fantasyTeamId, gameState)
 	if err != nil {
 		return "", err
 	}
@@ -174,15 +212,14 @@ func draftPlayerOnInvalidResponse(fantasyTeamId string, gameState *common.GameSt
 	return "", fmt.Errorf("Could not find a valid player to auto-draft")
 }
 
-func registerPickInSheets(summary string, currentDraftPick int, teamCount int, fantasyTeamId string, client *SheetsClient) error {
+func registerPickInSheets(summary string, currentDraftPick int, teamCount int, currentBotIndex int, client *SheetsClient) error {
 	if client == nil {
 		return nil
 	}
 
 	zero_based_round := ((currentDraftPick - 1) / teamCount) + 1
-	indexOfFantasyTeam, _ := strconv.Atoi(fantasyTeamId)
-	newCol := rune(int(InitialCol) + indexOfFantasyTeam + 1)
+	newCol := rune(int(InitialCol) + currentBotIndex + 1)
 
-	err := WriteContentToCell(IntialRow+zero_based_round, newCol, summary, client)
+	err := client.WriteContentToCell(IntialRow+zero_based_round, newCol, summary)
 	return err
 }

@@ -79,14 +79,14 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 
 	fmt.Println(lastGameState.LeagueSettings.Year)
 
+	var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
 	bots := fetchBotList()
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: *enableVerboseLogging,
-		SheetsClient:          nil, // No sheets client for weekly updates
 		GameMode:              engine.WeeklyFantasy,
 	}
 
-	return engine.NewBotEngine(lastGameState, bots, engineSettings)
+	return engine.NewBotEngine(lastGameState, bots, engineSettings, sheetClient)
 }
 
 func bootstrapDraft() *engine.BotEngine {
@@ -94,7 +94,7 @@ func bootstrapDraft() *engine.BotEngine {
 	bots := fetchBotList()
 	fantasyTeams := fetchFantasyTeams()
 
-	shuffleFantasyTeamsAndBots(fantasyTeams, bots)
+	shuffleBotOrder(fantasyTeams, bots)
 
 	gameState, err := genDraftGameState(year, fantasyTeams)
 	if err != nil {
@@ -107,7 +107,8 @@ func bootstrapDraft() *engine.BotEngine {
 	if *enableGoogleSheets {
 		draftName := "Draft_" + engine.GenerateRandomString(6)
 		fmt.Printf("Starting Draft Sheet: %s\n", draftName)
-		sheetClient, err = initializeDraftSheet(draftName, gameState)
+
+		sheetClient, err = engine.CreateSheetsClient(draftName)
 		if err != nil {
 			fmt.Println("Failed to setup Google Sheet connection")
 			fmt.Println(err)
@@ -117,11 +118,10 @@ func bootstrapDraft() *engine.BotEngine {
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: *enableVerboseLogging,
-		SheetsClient:          sheetClient,
 		GameMode:              engine.Draft,
 	}
 
-	return engine.NewBotEngine(gameState, bots, engineSettings)
+	return engine.NewBotEngine(gameState, bots, engineSettings, sheetClient)
 }
 
 func fetchFantasyTeams() []*common.FantasyTeam {
@@ -142,7 +142,7 @@ func fetchFantasyTeams() []*common.FantasyTeam {
 func fetchBotList() []*common.Bot {
 	return []*common.Bot{
 		{
-			Id:            "Standard NFL Bot",
+			Id:            "Mitch's Bot",
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/mitch-bot.py",
 			FantasyTeamId: "0",
@@ -205,7 +205,7 @@ func fetchBotList() []*common.Bot {
 	}
 }
 
-func shuffleFantasyTeamsAndBots(teams []*common.FantasyTeam, bots []*common.Bot) {
+func shuffleBotOrder(teams []*common.FantasyTeam, bots []*common.Bot) {
 	n := len(teams)
 	indices := make([]int, 0, n)
 
@@ -214,18 +214,12 @@ func shuffleFantasyTeamsAndBots(teams []*common.FantasyTeam, bots []*common.Bot)
 	}
 
 	rand.Shuffle(len(indices), func(i, j int) {
-		teams[i], teams[j] = teams[j], teams[i]
 		bots[i], bots[j] = bots[j], bots[i]
 	})
 
+	fmt.Println("New Bot Order:")
 	for i := 0; i < n; i++ {
-		id := strconv.Itoa(i)
-		teams[i].Id = id
-		bots[i].FantasyTeamId = id
-
-		fmt.Println(teams[i])
 		fmt.Println(bots[i])
-		fmt.Println()
 	}
 }
 
@@ -348,43 +342,4 @@ func loadPlayers(year int) ([]*common.Player, error) {
 	}
 
 	return players, nil
-}
-
-func initializeDraftSheet(sheetName string, gameState *common.GameState) (*engine.SheetsClient, error) {
-	client, err := engine.CreateSheetsClient(sheetName)
-	if err != nil {
-		return nil, err
-	}
-
-	err = engine.CreateNewDraftSheet(client)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("Created Draft Sheet")
-
-	err = engine.WriteContentToCell(engine.IntialRow, engine.InitialCol, "Round / Team", client)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 1; i <= int(gameState.LeagueSettings.TotalRounds); i++ {
-		content := strconv.Itoa(i)
-		err = engine.WriteContentToCell(engine.IntialRow+i, engine.InitialCol, content, client)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	for i := 1; i <= len(gameState.Teams); i++ {
-		team := gameState.Teams[i-1]
-		content := team.Name + "(" + team.Owner + ")"
-		newCol := rune(int(engine.InitialCol) + i)
-		err = engine.WriteContentToCell(engine.IntialRow, newCol, content, client)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return client, nil
 }

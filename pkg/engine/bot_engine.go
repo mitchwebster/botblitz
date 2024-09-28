@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
+	"golang.org/x/exp/slices"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -16,7 +17,6 @@ const digits = "0123456789"
 
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
-	SheetsClient          *SheetsClient
 	GameMode              GameMode
 }
 
@@ -25,14 +25,16 @@ type BotEngine struct {
 	bots            []*common.Bot
 	sourceCodeCache map[string][]byte
 	gameState       *common.GameState
+	sheetsClient    *SheetsClient
 }
 
-func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings) *BotEngine {
+func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient) *BotEngine {
 	return &BotEngine{
 		settings:        settings,
 		bots:            bots,
 		sourceCodeCache: make(map[string][]byte),
 		gameState:       gameState,
+		sheetsClient:    sheetsClient,
 	}
 }
 
@@ -45,7 +47,7 @@ func (e *BotEngine) Summarize() string {
 	// Print settings
 	fmt.Fprintf(&builder, "Settings:\n")
 	fmt.Fprintf(&builder, "\tVerboseLoggingEnabled: %t\n", e.settings.VerboseLoggingEnabled)
-	if e.settings.SheetsClient == nil {
+	if e.sheetsClient == nil {
 		fmt.Fprintf(&builder, "\tSheetsClient: Not Configured\n")
 	} else {
 		fmt.Fprintf(&builder, "\tSheetsClient: Configured!\n")
@@ -204,4 +206,13 @@ func GenerateRandomString(length int) string {
 	}
 
 	return string(result)
+}
+
+func FindCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
+	teamIdx := slices.IndexFunc(gameState.Teams, func(t *common.FantasyTeam) bool { return t.Id == fantasyTeamId })
+	if teamIdx < 0 {
+		return nil, fmt.Errorf("Could not find team...concerning...")
+	}
+
+	return gameState.Teams[teamIdx], nil
 }
