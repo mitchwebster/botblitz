@@ -115,14 +115,11 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 		fmt.Printf("Finished cleaning server for bot (%s)\n", bot.Id)
 	}
 
-	fmt.Printf("\n-----------------------------------------\n")
-
 	return nil
 }
 
 func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("\n-----------------------------------------\n")
 		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
 	}
 
@@ -274,4 +271,39 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameStat
 	}
 
 	return selections, nil
+}
+
+func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot *common.Bot) (playerId string, returnError error) {
+	containerId, err := e.startBotContainer(bot)
+	if err != nil {
+		return "", err
+	}
+
+	// schedule cleanup to run right before the function returns
+	defer func() {
+		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
+		if err != nil {
+			fmt.Println("CRITICAL!! Failed to clean after bot run")
+			returnError = err
+		}
+	}()
+
+	if e.settings.VerboseLoggingEnabled {
+		fmt.Printf("Setup bot: %s\n", bot.Id)
+		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
+		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+	}
+
+	draftPick, err := e.callDraftRPC(ctx, e.gameState)
+	if err != nil {
+		return "", err
+	}
+
+	if e.settings.VerboseLoggingEnabled {
+		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
+			return "", err
+		}
+	}
+
+	return draftPick.PlayerId, returnError
 }

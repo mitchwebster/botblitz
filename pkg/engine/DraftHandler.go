@@ -33,7 +33,9 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 
 			curBot := e.bots[index]
 			e.gameState.CurrentBotTeamId = curBot.FantasyTeamId
+			fmt.Printf("\n-----------------------------------------\n")
 			err := e.performDraftAction(ctx, curBot)
+			fmt.Printf("\n-----------------------------------------\n")
 			if err != nil {
 				return err
 			}
@@ -49,28 +51,23 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 	return nil
 }
 
-func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) (returnError error) {
-	containerId, err := e.startBotContainer(bot)
+func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) error {
+	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
 	if err != nil {
 		return err
 	}
 
-	// schedule cleanup to run right before the function returns
-	defer func() {
-		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
-		if err != nil {
-			fmt.Println("CRITICAL!! Failed to clean after bot run")
-			returnError = err
-		}
-	}()
+	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentDraftPick, team.Name, team.Owner)
 
-	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
+	if err != nil {
+		fmt.Println("Failed to get a response from bot")
+	} else {
+		fmt.Println("Received a response from bot")
 	}
 
-	summary, err := e.performDraftPick(ctx, bot)
+	summary, err := validateAndMakeDraftPick(bot.FantasyTeamId, playerIdFromBot, e.gameState)
+
 	if err != nil {
 		fmt.Println("Failed to run draft using bot")
 		fmt.Println(err)
@@ -87,13 +84,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot) (re
 		return err
 	}
 
-	if e.settings.VerboseLoggingEnabled {
-		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
-			return err
-		}
-	}
-
-	return returnError
+	return nil
 }
 
 func (e *BotEngine) validateDraftState() error {
@@ -118,28 +109,6 @@ func (e *BotEngine) validateDraftState() error {
 	}
 
 	return nil
-}
-
-func (e *BotEngine) performDraftPick(ctx context.Context, bot *common.Bot) (string, error) {
-	team, err := findCurrentTeamById(bot.FantasyTeamId, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Printf("[Pick: %d] %s (%s) will choose next...", e.gameState.CurrentDraftPick, team.Name, team.Owner)
-
-	draftPick, err := e.callDraftRPC(ctx, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Println("Received response from bot")
-	summary, err := validateAndMakeDraftPick(bot.FantasyTeamId, draftPick.PlayerId, e.gameState)
-	if err != nil {
-		return "", err
-	}
-
-	return summary, nil
 }
 
 func findCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
