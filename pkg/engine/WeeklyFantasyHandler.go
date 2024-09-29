@@ -149,6 +149,7 @@ func (e *BotEngine) sortBotsAccordingToWaiverPriority() {
 func (e *BotEngine) performAddDrop(ctx context.Context, bot *common.Bot, teamIdToPlayerMap map[string][]*common.Player) bool {
 	selection, err := e.startContainerAndPerformAddDropAction(ctx, bot)
 	if err != nil {
+		fmt.Println(err)
 		return false
 	}
 
@@ -173,6 +174,7 @@ func (e *BotEngine) performAddDrop(ctx context.Context, bot *common.Bot, teamIdT
 func (e *BotEngine) handleDropPlayer(playerId string, bot *common.Bot, teamIdToPlayerMap map[string][]*common.Player) {
 	player, err := FindPlayerById(playerId, e.gameState)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
@@ -207,6 +209,7 @@ func (e *BotEngine) handleDropPlayer(playerId string, bot *common.Bot, teamIdToP
 func (e *BotEngine) handleAddPlayer(playerId string, bot *common.Bot, teamIdToPlayerMap map[string][]*common.Player) {
 	player, err := FindPlayerById(playerId, e.gameState)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 

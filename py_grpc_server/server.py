@@ -4,9 +4,9 @@ import math
 import time
 
 import grpc
-from blitz_env import DraftSelection
+from blitz_env import DraftSelection, AddDropSelection
 from agent_pb2_grpc import AgentServiceServicer, add_AgentServiceServicer_to_server
-from bot import draft_player
+from bot import draft_player, propose_add_drop
 
 class AgentServiceServicer(AgentServiceServicer):
 
@@ -14,8 +14,8 @@ class AgentServiceServicer(AgentServiceServicer):
         print("Initialized gRPC server")
 
     def DraftPlayer(self, request, context):
-        print("Input from GRPC: ")
-        print(request)
+        print("Received Request: ")
+        # print(request)
 
         player_selection_id = draft_player(request)
         print("player selected: ")
@@ -24,6 +24,12 @@ class AgentServiceServicer(AgentServiceServicer):
         return DraftSelection(
             player_id=player_selection_id
         )
+    
+    def ProposeAddDrop(self, request, context):
+        print("Received Request: ")
+        # print(request)
+
+        return propose_add_drop(request)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

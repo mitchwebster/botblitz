@@ -1,4 +1,4 @@
-from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState
+from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState, AddDropSelection
 from typing import List
 
 # Drafted players for my team
@@ -278,3 +278,18 @@ class ScoredPlayer:
   def __init__(self, player: Player, score: float):
       self.player = player
       self.score = score
+
+def propose_add_drop(game_state: GameState) -> AddDropSelection:
+    """
+    Selects a player to draft based on the highest rank.
+
+    Args:
+        players (List[Player]): A list of Player objects.
+
+    Returns:
+        str: The id of the drafted player.
+    """
+    return AddDropSelection(
+        player_to_add_id="",
+        player_to_drop_id=""
+    )
