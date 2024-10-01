@@ -21,20 +21,24 @@ type BotEngineSettings struct {
 }
 
 type BotEngine struct {
-	settings        BotEngineSettings
-	bots            []*common.Bot
-	sourceCodeCache map[string][]byte
-	gameState       *common.GameState
-	sheetsClient    *SheetsClient
+	settings                    BotEngineSettings
+	bots                        []*common.Bot
+	sourceCodeCache             map[string][]byte
+	gameState                   *common.GameState
+	sheetsClient                *SheetsClient
+	weeklyFantasyTransactionLog strings.Builder
 }
 
 func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient) *BotEngine {
+	var builder strings.Builder
+
 	return &BotEngine{
-		settings:        settings,
-		bots:            bots,
-		sourceCodeCache: make(map[string][]byte),
-		gameState:       gameState,
-		sheetsClient:    sheetsClient,
+		settings:                    settings,
+		bots:                        bots,
+		sourceCodeCache:             make(map[string][]byte),
+		gameState:                   gameState,
+		sheetsClient:                sheetsClient,
+		weeklyFantasyTransactionLog: builder,
 	}
 }
 

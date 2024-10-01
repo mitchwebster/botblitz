@@ -101,9 +101,10 @@ def propose_add_drop(game_state: GameState) -> AddDropSelection:
     Returns:
         str: The id of the drafted player.
     """
+
     return AddDropSelection(
-        player_to_add_id="Real dumb",
-        player_to_drop_id="Dumb"
+        player_to_add_id="", # do not add
+        player_to_drop_id="" # do not drop
     )
 
 def draft_player(game_state: GameState) -> str:

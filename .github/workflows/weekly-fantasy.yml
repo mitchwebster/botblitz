@@ -2,8 +2,8 @@ name: BotBlitz Weekly Fantasy
 
 on:
   workflow_dispatch:
-  schedule:
-     - cron: "47 15 * * 2-4"
+  # schedule:
+  #    - cron: "47 15 * * 2-4"
 
 jobs:
   buildAndTest:
