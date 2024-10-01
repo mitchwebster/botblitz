@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	AgentService_DraftPlayer_FullMethodName          = "/AgentService/DraftPlayer"
 	AgentService_SubmitFantasyActions_FullMethodName = "/AgentService/SubmitFantasyActions"
+	AgentService_ProposeAddDrop_FullMethodName       = "/AgentService/ProposeAddDrop"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -29,6 +30,7 @@ const (
 type AgentServiceClient interface {
 	DraftPlayer(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*DraftSelection, error)
 	SubmitFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
+	ProposeAddDrop(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AddDropSelection, error)
 }
 
 type agentServiceClient struct {
@@ -59,12 +61,23 @@ func (c *agentServiceClient) SubmitFantasyActions(ctx context.Context, in *GameS
 	return out, nil
 }
 
+func (c *agentServiceClient) ProposeAddDrop(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AddDropSelection, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddDropSelection)
+	err := c.cc.Invoke(ctx, AgentService_ProposeAddDrop_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
 type AgentServiceServer interface {
 	DraftPlayer(context.Context, *GameState) (*DraftSelection, error)
 	SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error)
+	ProposeAddDrop(context.Context, *GameState) (*AddDropSelection, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedAgentServiceServer) DraftPlayer(context.Context, *GameState) 
 }
 func (UnimplementedAgentServiceServer) SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitFantasyActions not implemented")
+}
+func (UnimplementedAgentServiceServer) ProposeAddDrop(context.Context, *GameState) (*AddDropSelection, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProposeAddDrop not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -138,6 +154,24 @@ func _AgentService_SubmitFantasyActions_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentService_ProposeAddDrop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GameState)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServiceServer).ProposeAddDrop(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AgentService_ProposeAddDrop_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServiceServer).ProposeAddDrop(ctx, req.(*GameState))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentService_ServiceDesc is the grpc.ServiceDesc for AgentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SubmitFantasyActions",
 			Handler:    _AgentService_SubmitFantasyActions_Handler,
+		},
+		{
+			MethodName: "ProposeAddDrop",
+			Handler:    _AgentService_ProposeAddDrop_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1,4 +1,4 @@
-from blitz_env import load_players, StatsDB, is_drafted, simulate_draft, visualize_draft_board, Player, GameState
+from blitz_env import load_players, StatsDB, is_drafted, simulate_draft, visualize_draft_board, Player, GameState, AddDropSelection
 from typing import List
 import math
 import sys
@@ -90,6 +90,22 @@ def player_need(player, existing_players_in_position):
     other_players_penalty = 0 if existing_players_in_position < 2 else existing_players_in_position
     position_rank_penalty = 2 * (player.position_rank // 5)
     return player.rank + other_players_penalty + position_rank_penalty
+
+def propose_add_drop(game_state: GameState) -> AddDropSelection:
+    """
+    Selects a player to draft based on the highest rank.
+
+    Args:
+        players (List[Player]): A list of Player objects.
+
+    Returns:
+        str: The id of the drafted player.
+    """
+
+    return AddDropSelection(
+        player_to_add_id="", # do not add
+        player_to_drop_id="" # do not drop
+    )
 
 def draft_player(game_state: GameState) -> str:
     """

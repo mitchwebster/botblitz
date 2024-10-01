@@ -8,7 +8,7 @@ import random
 import copy
 
 def is_drafted(player: Player) -> bool:
-    return player.status.availability == PlayerStatus.Availability.DRAFTED
+    return player.status.availability == PlayerStatus.Availability.DRAFTED or player.status.availability == PlayerStatus.Availability.ON_HOLD
 
 def init_team(id: str, name: str, owner: str) -> FantasyTeam:
     team = FantasyTeam()

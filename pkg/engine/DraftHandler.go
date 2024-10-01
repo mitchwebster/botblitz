@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
-	"golang.org/x/exp/slices"
 )
 
 func (e *BotEngine) runDraft(ctx context.Context) error {
@@ -159,16 +158,10 @@ func (e *BotEngine) validateDraftState() error {
 }
 
 func validateAndMakeDraftPick(fantasyTeamId string, playerId string, gameState *common.GameState) (string, error) {
-	if len(playerId) <= 0 {
-		return "", fmt.Errorf("Cannot draft empty player id")
+	player, err := FindPlayerById(playerId, gameState)
+	if err != nil {
+		return "", err
 	}
-
-	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
-	if idx < 0 {
-		return "", fmt.Errorf("Could not find player with selected id")
-	}
-
-	player := gameState.Players[idx]
 
 	if player.Status.Availability == common.PlayerStatus_DRAFTED {
 		return "", fmt.Errorf("Cannot draft player again")
