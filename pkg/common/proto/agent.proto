@@ -80,6 +80,7 @@ message GameState {
     LeagueSettings league_settings = 3;
     string current_bot_team_id = 4;
     uint32 current_draft_pick = 5;
+    uint32 current_fantasy_week = 6;
 }
 
 message DraftSelection {
