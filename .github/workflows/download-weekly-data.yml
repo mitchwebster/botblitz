@@ -50,18 +50,12 @@ jobs:
           DIFF=$((NOW - PAST_DATE))
           CURRENT_WEEK=$(( DIFF / SECONDS_IN_A_WEEK + 1 ))
           
-          # Calculate the next week
-          NEXT_WEEK=$((CURRENT_WEEK + 1))
-          
-          # Create the week range
-          WEEK_RANGE="${CURRENT_WEEK}:${NEXT_WEEK}"
-          
           # Print out what will be run (just for logging)
-          echo "Running stats download for week range: $WEEK_RANGE"
+          echo "Running stats download for week range: $CURRENT_WEEK"
 
           # Run the python scripts with the calculated week range
-          python -m blitz_env.download_stats --year 2024 --week $WEEK_RANGE -o s3://botblitz/stats
-          python -m blitz_env.download_projections --year 2024 --week $WEEK_RANGE -o s3://botblitz/projections
+          python -m blitz_env.download_stats --year 2024 --week $CURRENT_WEEK -o s3://botblitz/stats
+          python -m blitz_env.download_projections --year 2024 --week $CURRENT_WEEK -o s3://botblitz/projections
 
       - name: Show output (optional)
         run: |
