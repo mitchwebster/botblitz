@@ -35,6 +35,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2  # or your default region
 
+      - name: Remove local blitz_env package directory
+        run: |
+          rm -rf blitz_env  # Remove the local package directory to avoid conflicts
+    
       - name: Calculate current week and run scripts
         run: |
           # Calculate the difference in seconds from September 5, 2024, 8 AM UTC
