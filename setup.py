@@ -10,7 +10,6 @@ setup(
     long_description="",
     long_description_content_type='text/markdown',
     url="https://github.com/yourusername/your-repo",
-    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -28,8 +27,7 @@ setup(
         'blitz_env': ['player_ranks_2024.csv',
                       'player_ranks_2023.csv',
                       'player_ranks_2022.csv',
-                      'player_ranks_2021.csv',
-                      '*.py'],
+                      'player_ranks_2021.csv'],
     },
     python_requires='>=3.6',
 )

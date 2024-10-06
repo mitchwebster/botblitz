@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import List
 import requests
-from .agent_pb2 import Player
+from blitz_env.agent_pb2 import Player
 from bs4 import BeautifulSoup
 import re
 

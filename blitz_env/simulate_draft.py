@@ -1,6 +1,6 @@
 from typing import Callable, List, Mapping
-from .agent_pb2 import Player, PlayerStatus, FantasyTeam, GameState, PlayerSlot
-from .blitz_env import load_players
+from blitz_env.agent_pb2 import Player, PlayerStatus, FantasyTeam, GameState, PlayerSlot
+from blitz_env.load_players import load_players
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import textwrap

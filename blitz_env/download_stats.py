@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-from .stats_db import fp_stats_dynamic  # Adjust the import as necessary
+from blitz_env.stats_db import fp_stats_dynamic  # Adjust the import as necessary
 import pandas as pd
 
 def load_and_save_stats(year, weeks, output_folder, aws_profile=None):

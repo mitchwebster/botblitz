@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-from .projections_db import fp_projections
+from blitz_env.projections_db import fp_projections
 import pandas as pd
 
 def load_and_save_projections(year, weeks, output_folder, aws_profile=None):
