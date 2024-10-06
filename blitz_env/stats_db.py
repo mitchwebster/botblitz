@@ -20,13 +20,13 @@ def fp_weekly_years(page, years):
     for year in years:
         # Note this may fail for historical data
         for week in range(1, 19):
-            try:
+            # try:
                 df = fp_stats_dynamic(page, year=year, range="week", week=week)
                 df["week"] = week
                 df["season"] = year
                 dfs.append(df)
-            except:
-                print(f"Failed to get week {week}")
+            # except:
+            #     print(f"Failed to get week {week}")
     return pd.concat(dfs).reset_index()
 
 def fp_stats_dynamic(page, **kwargs):
@@ -48,7 +48,7 @@ def fp_stats_dynamic(page, **kwargs):
     column_names = []
 
     # Process all header rows to build the column names
-    for row in header_rows:
+    for row_index, row in enumerate(header_rows):
         cells = row.find_all(['th', 'td'])
         row_headers = []
         for cell in cells:
@@ -65,7 +65,14 @@ def fp_stats_dynamic(page, **kwargs):
             column_names = row_headers
         else:
             # Combine with previous headers
-            column_names = [f"{prev}_{curr}" if prev else curr for prev, curr in zip(column_names, row_headers)]
+            new_column_names = []
+            for prev, curr in zip(column_names, row_headers):
+                if prev and prev != 'MISC':
+                    full_name = f"{prev}_{curr}"
+                else:
+                    full_name = curr
+                new_column_names.append(full_name)
+            column_names = new_column_names
 
     # Clean up column names
     column_names = [name.strip().replace(' ', '_') for name in column_names]
@@ -77,10 +84,14 @@ def fp_stats_dynamic(page, **kwargs):
     for row in data_rows:
         cells = row.find_all('td')
         row_data = []
+        # Add 'position' at the beginning
+        position = page.upper()  # Convert page to uppercase for consistency
+        year = str(params.get('year', ''))
+        week = str(params.get('week', ''))
         # Process the first cell (Rank)
         rank_cell = cells[0]
         rank_text = rank_cell.get_text(strip=True)
-        row_data.append(rank_text)
+        rank = rank_text
         # Process the second cell (Player)
         player_cell = cells[1]
         # Extract player info
@@ -107,27 +118,24 @@ def fp_stats_dynamic(page, **kwargs):
             player_name = None
             team = None
         # Append player info to row_data
-        row_data.extend([fp_id, player_name, team])
+        row_data.extend([year, week, fp_id, player_name, position, team, rank])
         # Process the remaining cells
         for cell in cells[2:]:
             text = cell.get_text(strip=True)
             row_data.append(text)
         data.append(row_data)
 
-    # Create column names including player info
-    # Remove 'Player' column from headers since we processed it separately
+    # Remove 'Player' from the column names since we processed it separately
     stats_columns = column_names.copy()
     stats_columns.pop(1)  # Remove 'Player' column
 
-    # Our final columns are:
-    # ['Rank', 'fantasypros_id', 'player_name', 'team'] + stats_columns[1:]
-    columns = ['Rank', 'fantasypros_id', 'player_name', 'team'] + stats_columns[1:]
+    columns = ['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team', 'pos_rank'] + stats_columns[1:]
 
     # Create DataFrame
     stats_df = pd.DataFrame(data, columns=columns)
 
     # Identify numeric columns dynamically
-    non_numeric_cols = ['fantasypros_id', 'player_name', 'team']
+    non_numeric_cols = ['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team', 'pos_rank']
     for col in stats_df.columns:
         if col not in non_numeric_cols:
             # Clean and convert to numeric
@@ -140,11 +148,7 @@ def fp_stats_dynamic(page, **kwargs):
         col = rost_col[0]
         stats_df[col] = stats_df[col] / 100.0
 
-    # Reorder columns if needed
-    # stats_df = stats_df[['fantasypros_id', 'player_name', 'team'] + [col for col in projections_df.columns if col not in ['fantasypros_id', 'player_name', 'team']]]
-
     # Return stats DataFrame
-    stats_df['fantasy_points_ppr'] = stats_df['FPTS']
     return stats_df
 
 class StatsDB:

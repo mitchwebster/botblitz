@@ -18,10 +18,12 @@ def fp_projections(page, sport=None, include_metadata=False, **kwargs):
         'content': response.content,
         'query': response.url,
         'sport': sport,
-        'response': response
+        'response': response,
+        'params': params
     }
 
     parsed_projections = fp_projections_parse(response_obj, page)
+
     if not include_metadata:
         return parsed_projections['projections']
 
@@ -43,6 +45,7 @@ def fp_projections_parse(response_obj, page):
 def fp_projections_parse_nfl(response, page):
     content = response['content']
     soup = BeautifulSoup(content, 'html.parser')
+    params = response['params']
 
     # Find the table with id 'data'
     table_html = soup.find(id='data')
@@ -113,7 +116,7 @@ def fp_projections_parse_nfl(response, page):
             fp_id = None
             player_name = None
             team = None
-        row_data.extend([fp_id, player_name, team, page])
+        row_data.extend([str(params.get('year', '')), str(params.get('week', '')), fp_id, player_name, page, team])
 
         # Get the rest of the cells
         for cell in cells[1:]:
@@ -122,12 +125,12 @@ def fp_projections_parse_nfl(response, page):
         data.append(row_data)
 
     # Create column names including player info
-    columns = ['fantasypros_id', 'player_name', 'team', 'position'] + full_column_names[1:]
+    columns = ['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team'] + full_column_names[1:]
 
     projections_df = pd.DataFrame(data, columns=columns)
 
     # Convert numeric columns
-    numeric_cols = projections_df.columns.drop(['fantasypros_id', 'player_name', 'team', 'position'])
+    numeric_cols = projections_df.columns.drop(['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team'])
     for col in numeric_cols:
         projections_df[col] = projections_df[col].replace(',', '', regex=True)
         projections_df[col] = pd.to_numeric(projections_df[col], errors='coerce')

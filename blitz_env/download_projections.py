@@ -31,20 +31,19 @@ def load_and_save_projections(year, weeks, output_folder, aws_profile=None):
         
         week_df = pd.concat([rb_df, qb_df, te_df, wr_df, k_df, dst_df], ignore_index=True)
         week_df['position'] = week_df['position'].str.upper()
-        week_df['week'] = week  # Add week information for clarity
+        week_df['week'] = week
+        week_df["year"] = year
         week_df.sort_values(by="FPTS", ascending=False, inplace=True)
         
         # Construct output file path
+        file_prefix = "draft" if week == "draft" else f"week/{week}"
+        output_file = f"{output_folder}/{year}/{file_prefix}-projections.csv"
         if is_s3:
-            output_file = f"{output_folder}/{year}/{week}-projections.csv"
             with fs.open(output_file, 'w') as f:
                 week_df.to_csv(f, index=False)
         else:
-            # Ensure local output directory exists
-            output_path = os.path.join(output_folder, str(year))
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-            output_file = os.path.join(output_path, f"{week}-projections.csv")
+            # ensure folder exists
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
             week_df.to_csv(output_file, index=False)
         print(f"Saved projections for week {week} to {output_file}")
 
