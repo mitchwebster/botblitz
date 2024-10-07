@@ -4,5 +4,4 @@ use (
 	./pkg/cmd
 	./pkg/common
 	./pkg/engine
-	./pkg/fetchdata
 )

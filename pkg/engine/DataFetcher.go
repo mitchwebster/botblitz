@@ -1,11 +1,11 @@
-package main
+package engine
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -21,11 +21,19 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-// FetchAndSaveData loads data from S3 and saves combined CSV files.
-func FetchAndSaveData(year int, week int, outputFolder string) error {
+// DataBytes holds the CSV data in byte format
+type DataBytes struct {
+	SeasonProjections []byte
+	WeeklyProjections []byte
+	SeasonStats       []byte
+	WeeklyStats       []byte
+}
+
+// FetchDataBytes loads data from S3, combines to byte array, returns data
+func FetchDataBytes(year int, week int) (*DataBytes, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	s3Client := s3.NewFromConfig(cfg)
 	bucketName := "botblitz"
@@ -47,7 +55,7 @@ func FetchAndSaveData(year int, week int, outputFolder string) error {
 			&seasonStatsHeader, &seasonStatsData)
 		weeks, err := getWeeksToProcess(s3Client, bucketName, y, year, week)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, w := range weeks {
 			loadWeeklyData(s3Client, bucketName, y, w,
@@ -56,10 +64,53 @@ func FetchAndSaveData(year int, week int, outputFolder string) error {
 		}
 	}
 
-	saveDataFrame(seasonProjectionsHeader, seasonProjectionsData, outputFolder, "season_projections.csv")
-	saveDataFrame(weeklyProjectionsHeader, weeklyProjectionsData, outputFolder, "weekly_projections.csv")
-	saveDataFrame(seasonStatsHeader, seasonStatsData, outputFolder, "season_stats.csv")
-	saveDataFrame(weeklyStatsHeader, weeklyStatsData, outputFolder, "weekly_stats.csv")
+	// Store data in byte format
+	seasonProjectionsBytes := convertToCSVBytes(seasonProjectionsHeader, seasonProjectionsData)
+	weeklyProjectionsBytes := convertToCSVBytes(weeklyProjectionsHeader, weeklyProjectionsData)
+	seasonStatsBytes := convertToCSVBytes(seasonStatsHeader, seasonStatsData)
+	weeklyStatsBytes := convertToCSVBytes(weeklyStatsHeader, weeklyStatsData)
+
+	// Return the byte data
+	return &DataBytes{
+		SeasonProjections: seasonProjectionsBytes,
+		WeeklyProjections: weeklyProjectionsBytes,
+		SeasonStats:       seasonStatsBytes,
+		WeeklyStats:       weeklyStatsBytes,
+	}, nil
+}
+
+// convertToCSVBytes converts header and data to CSV byte format
+func convertToCSVBytes(header []string, data [][]string) []byte {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+
+	writer.Write(header)
+	writer.WriteAll(data)
+
+	writer.Flush()
+	return buf.Bytes()
+}
+
+// WriteDataToFolder writes the byte data to CSV files in the specified folder
+func WriteDataToFolder(data *DataBytes, outputFolder string) error {
+	err := os.MkdirAll(outputFolder, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create output folder: %v", err)
+	}
+
+	files := map[string][]byte{
+		"season_projections.csv": data.SeasonProjections,
+		"weekly_projections.csv": data.WeeklyProjections,
+		"season_stats.csv":       data.SeasonStats,
+		"weekly_stats.csv":       data.WeeklyStats,
+	}
+
+	for filename, content := range files {
+		err := os.WriteFile(filepath.Join(outputFolder, filename), content, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write %s: %v", filename, err)
+		}
+	}
 
 	return nil
 }
@@ -243,34 +294,4 @@ func readCSV(reader io.Reader) ([]string, [][]string, error) {
 	headers := data[0]
 	records := data[1:]
 	return headers, records, nil
-}
-
-// saveDataFrame saves combined data to a CSV file.
-func saveDataFrame(header []string, data [][]string, outputFolder string, filename string) {
-	if len(data) == 0 {
-		log.Printf("No data loaded for %s.", filename)
-		return
-	}
-	filePath := filepath.Join(outputFolder, filename)
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("Error creating file %s: %v", filePath, err)
-		return
-	}
-	defer file.Close()
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-	// Write header
-	writer.Write(header)
-	// Write data
-	for _, record := range data {
-		writer.Write(record)
-	}
-}
-
-// loadGameState loads the game state and returns the year and current week.
-func loadGameState() (int, int, error) {
-	// Placeholder implementation; actual implementation depends on GameState protobuf structure.
-	// Replace with your own logic to extract year and week from GameState.
-	return 2024, 5, nil
 }
