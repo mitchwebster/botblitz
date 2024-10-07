@@ -259,13 +259,13 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	}
 
 	game_state := common.GameState{
-		CurrentDraftPick: 1,
-		CurrentBotTeamId: "0",
-		LeagueSettings:   &settings,
-		Teams:            fantasyTeams,
-		Players:          players,
+		CurrentDraftPick:   1,
+		CurrentBotTeamId:   "0",
+		LeagueSettings:     &settings,
+		Teams:              fantasyTeams,
+		Players:            players,
+		CurrentFantasyWeek: 2, // Simulate week 2 (this has a bug kind of, in reality you won't see actual performance, so just need to ignore that you're getting that)
 	}
-
 	return &game_state, nil
 }
 

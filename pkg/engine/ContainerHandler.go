@@ -21,6 +21,7 @@ import (
 
 const pyServerHostAndPort = "localhost:8080"
 const botResourceFolderName = "/tmp"
+const botResourceDataFolderName = botResourceFolderName + "/data"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
@@ -133,6 +134,16 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		return "", err
 	}
 
+	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	if err != nil {
+		return "", err
+	}
+
+	err = WriteDataToFolder(e.dataBytes, absDataPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to write data to folder: ", err)
+	}
+
 	env := []string{}
 	if bot.EnvPath != "" {
 		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
@@ -169,6 +180,16 @@ func cleanBotResources() error {
 		if !os.IsNotExist(err) {
 			return err
 		}
+	}
+
+	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	if err != nil {
+		return err
+	}
+
+	err = os.RemoveAll(absDataPath)
+	if err != nil {
+		return fmt.Errorf("failed to remove data folder: %v", err)
 	}
 
 	return nil
@@ -302,7 +323,8 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	defer func() {
 		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
 		if err != nil {
-			fmt.Println("CRITICAL!! Failed to clean after bot run")
+
+			fmt.Println("CRITICAL!! Failed to clean after bot run %v", err)
 			returnError = err
 		}
 	}()

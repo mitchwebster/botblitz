@@ -27,6 +27,7 @@ type BotEngine struct {
 	gameState                   *common.GameState
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
+	dataBytes                   *DataBytes
 }
 
 func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient) *BotEngine {
