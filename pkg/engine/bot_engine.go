@@ -30,7 +30,7 @@ type BotEngine struct {
 	dataBytes                   *DataBytes
 }
 
-func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient) *BotEngine {
+func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
 	return &BotEngine{
@@ -40,6 +40,7 @@ func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotE
 		gameState:                   gameState,
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
+		dataBytes:                   dataBytes,
 	}
 }
 

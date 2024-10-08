@@ -3,9 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/rand"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 )
@@ -33,9 +31,6 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
 	fmt.Println("Playing Weekly Fantasy!!")
-
-	// Update the current fantasy week so bots know what week to use
-	e.gameState.CurrentFantasyWeek = uint32(getCurrentWeek())
 
 	e.makePreviouslyOnHoldPlayersAvailable()
 
@@ -299,12 +294,4 @@ func (e *BotEngine) checkIfPlayerCanBeAddedToTeam(player *common.Player, bot *co
 	// TODO: do we need to check any slot issues - it might be ok if they are just non scoring?
 
 	return true
-}
-
-func getCurrentWeek() int {
-	// Weeks since firt day of football: 9/5/24 at 8am UTC (roughly when this runs)
-	pastDate := time.Date(2024, 9, 5, 8, 0, 0, 0, time.UTC)
-	now := time.Now()
-	duration := now.Sub(pastDate)
-	return int(math.Ceil(duration.Hours()/(24*7))) + 1
 }

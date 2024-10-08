@@ -15,12 +15,6 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		return err
 	}
 
-	dataBytes, err := FetchDataBytes(int(e.gameState.LeagueSettings.Year), int(e.gameState.CurrentFantasyWeek))
-	if err != nil {
-		return err
-	}
-	e.dataBytes = dataBytes
-
 	curRound := 1
 	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)

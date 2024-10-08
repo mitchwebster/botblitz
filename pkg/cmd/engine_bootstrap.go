@@ -6,10 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -84,7 +86,19 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 		GameMode:              engine.WeeklyFantasy,
 	}
 
-	return engine.NewBotEngine(lastGameState, bots, engineSettings, sheetClient)
+	curWeek := getCurrentWeek()
+
+	// Update the current fantasy week so bots know what week to use
+	lastGameState.CurrentFantasyWeek = uint32(curWeek)
+
+	dataBytes, err := engine.FetchDataBytes(int(year), curWeek)
+	if err != nil {
+		fmt.Println("Failed to load data")
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	return engine.NewBotEngine(lastGameState, bots, engineSettings, sheetClient, dataBytes)
 }
 
 func bootstrapDraft() *engine.BotEngine {
@@ -119,7 +133,14 @@ func bootstrapDraft() *engine.BotEngine {
 		GameMode:              engine.Draft,
 	}
 
-	return engine.NewBotEngine(gameState, bots, engineSettings, sheetClient)
+	dataBytes, err := engine.FetchDataBytes(int(year), 1) // default to week 1 for draft
+	if err != nil {
+		fmt.Println("Failed to load data")
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	return engine.NewBotEngine(gameState, bots, engineSettings, sheetClient, dataBytes)
 }
 
 func fetchFantasyTeams() []*common.FantasyTeam {
@@ -344,4 +365,12 @@ func loadPlayers(year int) ([]*common.Player, error) {
 	}
 
 	return players, nil
+}
+
+func getCurrentWeek() int {
+	// Weeks since firt day of football: 9/5/24 at 8am UTC (roughly when this runs)
+	pastDate := time.Date(2024, 9, 5, 8, 0, 0, 0, time.UTC)
+	now := time.Now()
+	duration := now.Sub(pastDate)
+	return int(math.Ceil(duration.Hours()/(24*7))) + 1
 }
