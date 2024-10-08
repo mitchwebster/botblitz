@@ -141,7 +141,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 
 	err = WriteDataToFolder(e.dataBytes, absDataPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to write data to folder: ", err)
+		return "", fmt.Errorf("failed to write data to folder: %s", err)
 	}
 
 	env := []string{}
@@ -217,7 +217,7 @@ func createAndStartContainer(env []string) (string, error) {
 
 	containerPort, err := nat.NewPort("tcp", containerServerPort)
 	if err != nil {
-		return "", fmt.Errorf("Unable to get the port: %v", err)
+		return "", fmt.Errorf("unable to get the port: %s", err)
 	}
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
@@ -324,7 +324,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
 		if err != nil {
 
-			fmt.Println("CRITICAL!! Failed to clean after bot run %v", err)
+			fmt.Printf("CRITICAL!! Failed to clean after bot run %s\n", err)
 			returnError = err
 		}
 	}()
