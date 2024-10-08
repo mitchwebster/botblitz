@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 )
 
 const AllowedAddsPerRun = 3
+const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
 func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 	err := e.performWeeklyFantasyActions(ctx)
@@ -88,7 +90,29 @@ func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
 		fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\t"+bot.FantasyTeamId+":"+bot.Id+"\n")
 	}
 
-	fmt.Println(e.weeklyFantasyTransactionLog.String())
+	transactionLogStr := e.weeklyFantasyTransactionLog.String()
+	fmt.Println(transactionLogStr)
+
+	err = e.saveTransactionLogToFile(transactionLogStr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {
+	file, err := os.Create(TransactionLogFullPath)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return err
+	}
+	defer file.Close() // Ensure the file is closed after writing
+
+	content := []byte(transactionLogStr)
+	if _, err := file.Write(content); err != nil {
+		return err
+	}
 
 	return nil
 }

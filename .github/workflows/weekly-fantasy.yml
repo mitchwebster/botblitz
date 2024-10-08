@@ -2,8 +2,8 @@ name: BotBlitz Weekly Fantasy
 
 on:
   workflow_dispatch:
-  # schedule:
-  #    - cron: "47 15 * * 2-4"
+  schedule:
+     - cron: "47 15 * * 2-4"
 
 jobs:
   buildAndTest:
@@ -64,14 +64,15 @@ jobs:
         sign-commits: true
         add-paths: |
             data/game_states/*.bin
+        body-path: '/tmp/weekly_transaction_log.txt'
 
-    - name: Enable Pull Request Automerge
-      if: steps.cpr.outputs.pull-request-operation == 'created'
-      uses: peter-evans/enable-pull-request-automerge@v3
-      with:
-        token: ${{ github.token }}
-        pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-        merge-method: squash
+    # - name: Enable Pull Request Automerge
+    #   if: steps.cpr.outputs.pull-request-operation == 'created'
+    #   uses: peter-evans/enable-pull-request-automerge@v3
+    #   with:
+    #     token: ${{ github.token }}
+    #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+    #     merge-method: squash
 
     # - name: Run Engine
     #   run: make run-engine
