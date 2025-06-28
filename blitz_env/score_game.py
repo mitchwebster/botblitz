@@ -13,7 +13,11 @@ import numpy as np
 def get_points(stats_db, player, year, week):
     df = stats_db.get_weekly_data(player)
     try:
-        return df[(df["season"] == year) & (df["week"] == week)]["fantasy_points_ppr"].iloc[0]
+        data_row = df[(df["season"] == year) & (df["week"] == week)]
+        if "fantasy_points_ppr" in data_row.columns:
+            return data_row["fantasy_points_ppr"].iloc[0]
+        else:
+            return data_row["FPTS"].iloc[0]
     except IndexError:
         return 0  # Player did not play that week
 

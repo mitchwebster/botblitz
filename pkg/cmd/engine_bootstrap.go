@@ -102,8 +102,8 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 }
 
 func bootstrapDraft() *engine.BotEngine {
-	year := 2024
-	bots := fetchBotList()
+	year := 2023
+	bots := fetchFastBotList()
 	fantasyTeams := fetchFantasyTeams()
 
 	shuffleBotOrder(fantasyTeams, bots) // randomize draft order
@@ -146,15 +146,15 @@ func bootstrapDraft() *engine.BotEngine {
 func fetchFantasyTeams() []*common.FantasyTeam {
 	return []*common.FantasyTeam{
 		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
-		{Id: "1", Name: "Tyler's Team", Owner: "Tyler"},
+		{Id: "1", Name: "Mitch2 Team", Owner: "Mitch 2"},
 		{Id: "2", Name: "Jon's Team", Owner: "Jon"},
 		{Id: "3", Name: "Chris's Team", Owner: "Chris"},
 		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
 		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
 		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
 		{Id: "7", Name: "Justin's Team", Owner: "Justin"},
-		{Id: "8", Name: "Ryan's Team", Owner: "Ryan"},
-		{Id: "9", Name: "Philip's Team", Owner: "Philip"},
+		{Id: "8", Name: "Matt2 Team", Owner: "Matt 2"},
+		{Id: "9", Name: "Justin2 Team", Owner: "Justin 2"},
 	}
 }
 
@@ -219,6 +219,71 @@ func fetchBotList() []*common.Bot {
 			Id:            "Philip's Bot",
 			SourceType:    common.Bot_LOCAL,
 			SourcePath:    "/bots/nfl/philip-bot.py",
+			FantasyTeamId: "9",
+		},
+	}
+}
+
+func fetchFastBotList() []*common.Bot {
+	return []*common.Bot{
+		{
+			Id:            "Mitch's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/mitch-bot.py",
+			FantasyTeamId: "0",
+		},
+		{
+			Id:            "Mitch 2",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/mitch-bot.py",
+			FantasyTeamId: "1",
+		},
+		{
+			Id:            "Jon's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/jon-bot.py",
+			FantasyTeamId: "2",
+		},
+		{
+			Id:            "Chris's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/chris-bot.py",
+			FantasyTeamId: "3",
+		},
+		{
+			Id:            "Harry's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/harry-bot.py",
+			FantasyTeamId: "4",
+		},
+		{
+			Id:            "Parker's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/parker-bot.py",
+			FantasyTeamId: "5",
+		},
+		{
+			Id:            "Matt's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/matt-bot.py",
+			FantasyTeamId: "6",
+		},
+		{
+			Id:            "Justin's Bot",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/justin-bot.py",
+			FantasyTeamId: "7",
+		},
+		{
+			Id:            "Matt 2",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/matt-bot.py",
+			FantasyTeamId: "8",
+		},
+		{
+			Id:            "Justin 2",
+			SourceType:    common.Bot_LOCAL,
+			SourcePath:    "/bots/nfl/justin-bot.py",
 			FantasyTeamId: "9",
 		},
 	}
