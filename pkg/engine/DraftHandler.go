@@ -5,28 +5,16 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 )
 
 func (e *BotEngine) runDraft(ctx context.Context) error {
-	e.latencies = make(map[string]time.Duration)
-	startTime := time.Now()
-
 	err := e.initializeDraftSheet()
 	if err != nil {
 		return err
 	}
 
-	setupEndTime := time.Now()
-	e.latencies["Setup"] = setupEndTime.Sub(startTime)
-
-	dataBytes, err := FetchDataBytes(int(e.gameState.LeagueSettings.Year), int(e.gameState.CurrentFantasyWeek))
-	if err != nil {
-		return err
-	}
-	e.dataBytes = dataBytes
 	curRound := 1
 	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
@@ -63,11 +51,6 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 	}
 
 	SaveGameState(e.gameState)
-
-	endTime := time.Now()
-	e.latencies["TotalDraft"] = endTime.Sub(startTime)
-
-	e.logDraftLatencies()
 
 	return nil
 }
@@ -120,11 +103,9 @@ func (e *BotEngine) initializeDraftSheet() error {
 }
 
 func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, currentBotIndex int) error {
-
 	fmt.Printf("[Pick: %d] Fantasy Team (%s) will choose next...", e.gameState.CurrentDraftPick, bot.FantasyTeamId)
 
 	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
-
 	if err != nil {
 		fmt.Println("Failed to get a response from bot")
 	} else {
@@ -148,6 +129,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, cur
 		fmt.Println("Failed to write content to Google Sheets")
 		return err
 	}
+
 	return nil
 }
 
@@ -233,12 +215,4 @@ func registerPickInSheets(summary string, currentDraftPick int, teamCount int, c
 
 	err := client.WriteContentToCell(IntialRow+zero_based_round, newCol, summary)
 	return err
-}
-
-func (e *BotEngine) logDraftLatencies() {
-	fmt.Println("\n--- Draft Latency Debug ---")
-	for key, latency := range e.latencies {
-		fmt.Printf("%s: %v\n", key, latency)
-	}
-	fmt.Println("--- Draft Latency Debug ---")
 }

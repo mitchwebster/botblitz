@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"golang.org/x/exp/slices"
@@ -29,7 +28,6 @@ type BotEngine struct {
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
 	dataBytes                   *DataBytes
-	latencies                   map[string]time.Duration
 }
 
 func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
@@ -43,7 +41,6 @@ func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotE
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
 		dataBytes:                   dataBytes,
-		latencies:                   make(map[string]time.Duration),
 	}
 }
 

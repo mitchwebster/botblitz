@@ -28,9 +28,7 @@ const botResourceFolderNameInContainer = "/botblitz"
 
 func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error {
 	// Connect to docker api.
-	apiClient, err := client.NewClientWithOpts(
-		client.WithHost("unix:///Users/caltonji/.docker/run/docker.sock"),
-		client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -73,9 +71,7 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 }
 
 func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLoggingEnabled bool) error {
-	apiClient, err := client.NewClientWithOpts(
-		client.WithHost("unix:///Users/caltonji/.docker/run/docker.sock"),
-		client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
 	}
@@ -200,9 +196,7 @@ func cleanBotResources() error {
 }
 
 func createAndStartContainer(env []string) (string, error) {
-	apiClient, err := client.NewClientWithOpts(
-		client.WithHost("unix:///Users/caltonji/.docker/run/docker.sock"),
-		client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
 	}
@@ -256,7 +250,6 @@ func createAndStartContainer(env []string) (string, error) {
 		"",
 	)
 	if err != nil {
-		fmt.Printf("%v", err)
 		return "", fmt.Errorf("unable to create container: %v", err)
 	}
 
@@ -296,65 +289,44 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameSt
 }
 
 func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
-	startTime := time.Now()
-
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
 	// container port may not be listening yet - wait for it
 	opts = append(opts, grpc.WithBlock())
 
-	e.latencies["DraftRPC_Setup"] += time.Since(startTime)
-
-	dialStartTime := time.Now()
 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
-		e.latencies["DraftRPC_DialFail"] += time.Since(dialStartTime)
 		return nil, err
 	}
-	e.latencies["DraftRPC_Dial"] += time.Since(dialStartTime)
 
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
-	clientSetupTime := time.Now()
-	e.latencies["DraftRPC_ClientSetup"] += time.Since(clientSetupTime)
-
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-
-	draftStartTime := time.Now()
 	selections, err := client.DraftPlayer(ctx, gameState)
 	if err != nil {
 		fmt.Println("Failed calling bot")
-		e.latencies["DraftRPC_DraftFail"] += time.Since(draftStartTime)
 		return nil, err
 	}
-	e.latencies["DraftRPC_Draft"] += time.Since(draftStartTime)
 
-	e.latencies["DraftRPC_Total"] += time.Since(startTime)
 	return selections, nil
 }
 
 func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot *common.Bot) (playerId string, returnError error) {
-	startTime := time.Now()
-
 	containerId, err := e.startBotContainer(bot)
-	containerStartTime := time.Now()
-	e.latencies["ContainerStart"] += containerStartTime.Sub(startTime)
-
 	if err != nil {
 		return "", err
 	}
 
 	// schedule cleanup to run right before the function returns
 	defer func() {
-		cleanupStartTime := time.Now()
 		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
 		if err != nil {
+
 			fmt.Printf("CRITICAL!! Failed to clean after bot run %s\n", err)
 			returnError = err
 		}
-		e.latencies["Cleanup"] += time.Since(cleanupStartTime)
 	}()
 
 	if e.settings.VerboseLoggingEnabled {
@@ -363,30 +335,16 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	rpcStartTime := time.Now()
 	draftPick, err := e.callDraftRPC(ctx, e.gameState)
-	e.latencies["RPC"] += time.Since(rpcStartTime)
-
 	if err != nil {
 		return "", err
 	}
 
 	if e.settings.VerboseLoggingEnabled {
-		logSaveStartTime := time.Now()
 		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
 			return "", err
 		}
-		e.latencies["LogSave"] += time.Since(logSaveStartTime)
 	}
-
-	e.latencies["TotalBot"] += time.Since(startTime)
-
-	// Add the bot latency to the map
-	botLatencyKey := fmt.Sprintf("Bot_%s", bot.Id)
-	e.latencies[botLatencyKey] += time.Since(startTime)
-
-	// Add this draft action latency
-	e.latencies["DraftAction"] += time.Since(startTime)
 
 	return draftPick.PlayerId, returnError
 }
