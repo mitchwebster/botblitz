@@ -13,7 +13,11 @@ import numpy as np
 def get_points(stats_db, player, year, week):
     df = stats_db.get_weekly_data(player)
     try:
-        return df[(df["season"] == year) & (df["week"] == week)]["fantasy_points_ppr"].iloc[0]
+        data_row = df[(df["season"] == year) & (df["week"] == week)]
+        if "fantasy_points_ppr" in data_row.columns:
+            return data_row["fantasy_points_ppr"].iloc[0]
+        else:
+            return data_row["FPTS"].iloc[0]
     except IndexError:
         return 0  # Player did not play that week
 
@@ -70,6 +74,96 @@ def get_best_possible_score_season(stats_db, players, player_slots, year):
         for player_id, points in weekly_player_points.items():
             season_player_points[player_id] = season_player_points.get(player_id, 0) + points
     return total_score, season_contributions, season_player_points
+
+def get_weekly_rankings(game_state, stats_db, year):
+    """Calculate weekly rankings for each team throughout the season."""
+    weekly_rankings = {}  # team_id -> list of weekly ranks (1-based)
+    
+    for week in range(1, total_weeks + 1):
+        team_scores = []
+        
+        for team in game_state.teams:
+            # Get the players drafted by the team
+            team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == team.id]
+            
+            # Compute the team's best possible score for this week
+            best_possible_score, _, _ = get_best_possible_score(
+                stats_db, team_players, game_state.league_settings.slots_per_team, year, week
+            )
+            
+            team_scores.append((team.id, best_possible_score))
+        
+        # Sort by score (descending) and assign ranks
+        team_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Handle ties by giving same rank
+        current_rank = 1
+        current_score = team_scores[0][1] if team_scores else 0
+        
+        for i, (team_id, score) in enumerate(team_scores):
+            if score < current_score:
+                current_rank = i + 1
+                current_score = score
+            
+            if team_id not in weekly_rankings:
+                weekly_rankings[team_id] = []
+            weekly_rankings[team_id].append(current_rank)
+    
+    return weekly_rankings
+
+def print_weekly_rankings_summary(game_state, weekly_rankings, team_scores):
+    """Print a summary of weekly rankings for each team."""
+    console = Console(force_terminal=True)
+    
+    # Create a table for weekly rankings summary
+    table = Table(title="Weekly Rankings Summary", box=box.SQUARE)
+    table.add_column("Team", style="bold", justify="left")
+    table.add_column("Owner", style="bold", justify="left")
+    table.add_column("1st Place", justify="center", style="green")
+    table.add_column("2nd Place", justify="center", style="blue")
+    table.add_column("3rd Place", justify="center", style="yellow")
+    table.add_column("Last Place", justify="center", style="red")
+    table.add_column("Total Points", justify="right", style="bold")
+    
+    # Create list of teams with their ranking stats
+    team_stats = []
+    for team in game_state.teams:
+        if team.id in weekly_rankings:
+            ranks = weekly_rankings[team.id]
+            first_place = ranks.count(1)
+            second_place = ranks.count(2)
+            third_place = ranks.count(3)
+            last_place = ranks.count(len(game_state.teams))  # Last place rank
+            
+            # Find total points for this team
+            total_points = next((score for team_id, score in team_scores if team_id == team.id), 0)
+            
+            team_stats.append({
+                'team': team,
+                'first_place': first_place,
+                'second_place': second_place,
+                'third_place': third_place,
+                'last_place': last_place,
+                'total_points': total_points
+            })
+    
+    # Sort by first place count (descending), then by total points (descending)
+    team_stats.sort(key=lambda x: (x['first_place'], x['total_points']), reverse=True)
+    
+    # Add rows to the table
+    for stats in team_stats:
+        team = stats['team']
+        table.add_row(
+            team.name,
+            team.owner,
+            str(stats['first_place']),
+            str(stats['second_place']),
+            str(stats['third_place']),
+            str(stats['last_place']),
+            f"{stats['total_points']:.2f}"
+        )
+    
+    console.print(table)
 
 def print_top_teams_by_best_possible_score(team_scores):
     # Sort the teams by best_possible_score in descending order
@@ -248,6 +342,7 @@ def main():
     player_contributions = {}  # Mapping player_id to total points contributed to best possible score
     player_total_points = {}
     team_scores = []
+    team_scores_with_ids = []
 
     # Compute best possible score and player contributions for each team
     for team in game_state.teams:
@@ -265,8 +360,9 @@ def main():
                 stats_db, team_players, game_state.league_settings.slots_per_team, game_state.league_settings.year
             )
 
-        # Append to the list
+        # Append to the list with team ID for weekly rankings, owner name for display
         team_scores.append((team.owner, best_possible_score))
+        team_scores_with_ids.append((team.id, best_possible_score))
 
         # Accumulate team contributions into global player_contributions
         for player_id, points in team_contributions.items():
@@ -290,6 +386,12 @@ def main():
 
     # Print the top teams
     print_top_teams_by_best_possible_score(team_scores)
+
+    # If scoring the full season, also print weekly rankings summary
+    if week is None:
+        print("\n" + "="*80)
+        weekly_rankings = get_weekly_rankings(game_state, stats_db, game_state.league_settings.year)
+        print_weekly_rankings_summary(game_state, weekly_rankings, team_scores_with_ids)
 
 if __name__ == '__main__':
     main()
