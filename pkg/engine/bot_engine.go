@@ -25,6 +25,7 @@ type BotEngine struct {
 	bots                        []*common.Bot
 	sourceCodeCache             map[string][]byte
 	gameState                   *common.GameState
+	sqliteHandler               *SQLiteGameStateHandler
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
 	dataBytes                   *DataBytes
@@ -33,11 +34,27 @@ type BotEngine struct {
 func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
+	// Create SQLite handler for the game state
+	sqliteHandler, err := NewSQLiteGameStateHandler(gameState.LeagueSettings.Year)
+	if err != nil {
+		fmt.Printf("Failed to create SQLite handler: %v\n", err)
+		return nil
+	}
+
+	// Save initial game state to SQLite
+	err = sqliteHandler.SaveGameState(gameState)
+	if err != nil {
+		fmt.Printf("Failed to save initial game state: %v\n", err)
+		sqliteHandler.Close()
+		return nil
+	}
+
 	return &BotEngine{
 		settings:                    settings,
 		bots:                        bots,
 		sourceCodeCache:             make(map[string][]byte),
 		gameState:                   gameState,
+		sqliteHandler:               sqliteHandler,
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
 		dataBytes:                   dataBytes,

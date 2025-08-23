@@ -263,7 +263,7 @@ func createAndStartContainer(env []string) (string, error) {
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameState) (*common.AddDropSelection, error) {
+func (e *BotEngine) callAddDropRPC(ctx context.Context) (*common.AddDropSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -278,8 +278,18 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameSt
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
+	// Update SQLite with current game state before calling bot
+	err = e.sqliteHandler.SaveGameState(e.gameState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save game state to SQLite: %v", err)
+	}
+
+	dbPathMsg := &common.GameStateDbPath{
+		DbFilePath: e.sqliteHandler.GetDbPath(),
+	}
+
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selection, err := client.ProposeAddDrop(ctx, gameState)
+	selection, err := client.ProposeAddDrop(ctx, dbPathMsg)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -288,7 +298,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameSt
 	return selection, nil
 }
 
-func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
+func (e *BotEngine) callDraftRPC(ctx context.Context) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -303,8 +313,18 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameStat
 	defer conn.Close()
 	client := common.NewAgentServiceClient(conn)
 
+	// Update SQLite with current game state before calling bot
+	err = e.sqliteHandler.SaveGameState(e.gameState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save game state to SQLite: %v", err)
+	}
+
+	dbPathMsg := &common.GameStateDbPath{
+		DbFilePath: e.sqliteHandler.GetDbPath(),
+	}
+
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.DraftPlayer(ctx, gameState)
+	selections, err := client.DraftPlayer(ctx, dbPathMsg)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -335,7 +355,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	draftPick, err := e.callDraftRPC(ctx, e.gameState)
+	draftPick, err := e.callDraftRPC(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -370,7 +390,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	selection, err = e.callAddDropRPC(ctx, e.gameState)
+	selection, err = e.callAddDropRPC(ctx)
 	if err != nil {
 		return nil, err
 	}

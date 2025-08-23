@@ -72,9 +72,9 @@ func main() {
 
 func bootstrapWeeklyFantasy() *engine.BotEngine {
 	var year uint32 = 2024
-	lastGameState, err := engine.LoadLastGameState(year)
+	lastGameState, _, err := engine.LoadLastGameStateFromSQLite(year)
 	if err != nil {
-		fmt.Println("Failed to load last game state")
+		fmt.Println("Failed to load last game state from SQLite")
 		fmt.Println(err)
 		os.Exit(1)
 	}

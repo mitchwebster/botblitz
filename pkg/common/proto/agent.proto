@@ -4,9 +4,9 @@ syntax = "proto3";
 option go_package = ".;common";
 
 service AgentService {
-    rpc DraftPlayer(GameState) returns (DraftSelection) {}
-    rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
-    rpc ProposeAddDrop(GameState) returns (AddDropSelection) {}
+    rpc DraftPlayer(GameStateDbPath) returns (DraftSelection) {}
+    rpc SubmitFantasyActions(GameStateDbPath) returns (AttemptedFantasyActions) {}
+    rpc ProposeAddDrop(GameStateDbPath) returns (AddDropSelection) {}
 }
 
 message FantasyTeam {
@@ -94,4 +94,8 @@ message AttemptedFantasyActions {
 message AddDropSelection {
     string player_to_drop_id = 1;
     string player_to_add_id = 2;
+}
+
+message GameStateDbPath {
+    string db_file_path = 1;
 }

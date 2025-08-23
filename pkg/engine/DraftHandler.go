@@ -50,7 +50,13 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		curRound += 1
 	}
 
-	SaveGameState(e.gameState)
+	err = e.sqliteHandler.SaveGameState(e.gameState)
+	if err != nil {
+		fmt.Printf("Failed to save final game state: %v\n", err)
+	}
+	
+	// Also clean old states
+	CleanOldSQLiteGameStates(e.gameState.LeagueSettings.Year)
 
 	return nil
 }
