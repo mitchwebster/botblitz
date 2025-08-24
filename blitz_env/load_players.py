@@ -3,8 +3,8 @@ import pandas as pd
 from blitz_env.agent_pb2 import Player
 
 def load_players(year: int):
-    if year not in [2021, 2022, 2023, 2024]:
-        raise Exception("only 2023, and 2024 supported")
+    if year not in [2021, 2022, 2023, 2024, 2025]:
+        raise Exception("year not supported")
     current_dir = os.path.dirname(__file__)
     file_path = os.path.join(current_dir, f'player_ranks_{str(year)}.csv')
     players = load_all_players(file_path)

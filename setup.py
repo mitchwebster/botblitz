@@ -24,7 +24,8 @@ setup(
         'requests==2.32.3'
     ],
     package_data={
-        'blitz_env': ['player_ranks_2024.csv',
+        'blitz_env': ['player_ranks_2025.csv',
+                      'player_ranks_2024.csv',
                       'player_ranks_2023.csv',
                       'player_ranks_2022.csv',
                       'player_ranks_2021.csv'],
