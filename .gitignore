@@ -38,3 +38,4 @@ sheets-creds.json
 
 # Ignore any env files that could accidentally be merged in
 *.env
+draft.db
