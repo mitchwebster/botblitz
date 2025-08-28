@@ -1,5 +1,5 @@
 from typing import Callable, List, Mapping
-from blitz_env.agent_pb2 import Player, PlayerStatus, FantasyTeam, GameState, PlayerSlot
+from blitz_env.agent_pb2 import Player, PlayerStatus, Bot, GameState, PlayerSlot
 from blitz_env.load_players import load_players
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -10,14 +10,14 @@ import copy
 def is_drafted(player: Player) -> bool:
     return player.status.availability == PlayerStatus.Availability.DRAFTED or player.status.availability == PlayerStatus.Availability.ON_HOLD
 
-def init_team(id: str, name: str, owner: str) -> FantasyTeam:
-    team = FantasyTeam()
-    team.id = id
-    team.name = name
-    team.owner = owner
-    return team
+def init_bot(id: str, name: str, owner: str) -> Bot:
+    bot = Bot()
+    bot.id = id
+    bot.fantasy_team_name = name
+    bot.owner = owner
+    return bot
 
-def init_player_slot(allowed_positions: List[str]) -> List[PlayerSlot]:
+def init_player_slot(allowed_positions: List[str]) -> PlayerSlot:
     player_slot = PlayerSlot()
     player_slot.allowed_player_positions.extend(allowed_positions)
     return player_slot
@@ -45,20 +45,20 @@ def default_draft_strategy(game_state: GameState) -> str:
 def init_game_state(year) -> GameState:
     players = load_players(year)
     teams = [
-        init_team("1", "A", "Alex"),
-        init_team("2", "B", "Ben"),
-        init_team("3", "C", "Chris"),
-        init_team("4", "D", "Drew"),
-        init_team("5", "E", "Elizabeth"),
-        init_team("6", "F", "Frank"),
-        init_team("7", "G", "Gillian"),
-        init_team("8", "H", "Harry"),
-        init_team("9", "J", "Jon"),
-        init_team("10", "K", "Kevin")
+        init_bot("1", "A", "Alex"),
+        init_bot("2", "B", "Ben"),
+        init_bot("3", "C", "Chris"),
+        init_bot("4", "D", "Drew"),
+        init_bot("5", "E", "Elizabeth"),
+        init_bot("6", "F", "Frank"),
+        init_bot("7", "G", "Gillian"),
+        init_bot("8", "H", "Harry"),
+        init_bot("9", "J", "Jon"),
+        init_bot("10", "K", "Kevin")
     ]
     game_state = GameState()
     game_state.players.extend(players)
-    game_state.teams.extend(teams)
+    game_state.bots.extend(teams)
     game_state.current_draft_pick = 1
     game_state.current_bot_team_id = teams[0].id
     game_state.league_settings.is_snake_draft = True
@@ -88,7 +88,7 @@ def init_game_state(year) -> GameState:
     return game_state
 
 def get_picking_team_index(game_state: GameState, pick: int) -> int:
-    number_of_teams = len(game_state.teams)
+    number_of_teams = len(game_state.bots)
     is_snake_draft = game_state.league_settings.is_snake_draft
     # Adjust pick to be zero-based for easier modulo calculations
     pick_adjusted = pick - 1
@@ -105,11 +105,11 @@ def get_picking_team_index(game_state: GameState, pick: int) -> int:
         position_in_round = number_of_teams - 1 - position_in_round
     return position_in_round
 
-def get_picking_team_id(game_state: GameState, pick: int) -> int:
-    return game_state.teams[get_picking_team_index(game_state, pick)].id
+def get_picking_team_id(game_state: GameState, pick: int) -> str:
+    return game_state.bots[get_picking_team_index(game_state, pick)].id
 
 def run_draft(game_state, draft_strategy_map):
-    total_picks = game_state.league_settings.total_rounds * len(game_state.teams)
+    total_picks = game_state.league_settings.total_rounds * len(game_state.bots)
     while game_state.current_draft_pick <= total_picks:
         draft_strategy = draft_strategy_map[game_state.current_bot_team_id]
         
@@ -118,9 +118,9 @@ def run_draft(game_state, draft_strategy_map):
             if player.id == player_id:
                 if is_drafted(player):
                     raise Exception(f"Player id: {player_id} already drafted")
-                player.status.availability = PlayerStatus.DRAFTED
+                player.status.availability = PlayerStatus.Availability.DRAFTED
                 player.status.pick_chosen = game_state.current_draft_pick
-                player.status.current_fantasy_team_id = game_state.current_bot_team_id 
+                player.status.current_team_bot_id = game_state.current_bot_team_id 
         # update for next pick
         game_state.current_draft_pick += 1
         game_state.current_bot_team_id = get_picking_team_id(game_state, game_state.current_draft_pick)
@@ -129,13 +129,13 @@ def simulate_draft(draft_player: Callable[[List[Player]], str], year: int):
     game_state = init_game_state(year)
     draft_strategy_map = {}
 
-    for team in game_state.teams:
-        draft_strategy_map[team.id] = default_draft_strategy
+    for bot in game_state.bots:
+        draft_strategy_map[bot.id] = default_draft_strategy
     # make random team the user's team
-    user_team = random.choice(game_state.teams)
-    user_team.owner = "User"
-    user_team.name = "Your Bot"
-    draft_strategy_map[user_team.id] = draft_player
+    user_bot = random.choice(game_state.bots)
+    user_bot.owner = "User"
+    user_bot.fantasy_team_name = "Your Bot"
+    draft_strategy_map[user_bot.id] = draft_player
 
     run_draft(game_state, draft_strategy_map)
     return game_state
@@ -155,7 +155,7 @@ def visualize_draft_board(game_state: GameState):
     }
 
     # Get the number of teams and prepare the board layout
-    num_teams = len(game_state.teams)
+    num_teams = len(game_state.bots)
     num_rounds = game_state.league_settings.total_rounds
 
     fig, ax = plt.subplots(figsize=(20, num_rounds )) 
@@ -187,7 +187,7 @@ def visualize_draft_board(game_state: GameState):
     # Set the grid and labels
     ax.set_xticks([i + 0.5 for i in range(num_teams)])
     ax.set_yticks([i + 0.5 for i in range(num_rounds)])
-    ax.set_xticklabels([f"{team.name}\n{team.owner}" for team in game_state.teams], rotation=0)
+    ax.set_xticklabels([f"{team.fantasy_team_name}\n{team.owner}" for team in game_state.bots], rotation=0)
     ax.set_yticklabels([f"Round {i+1}" for i in range(num_rounds)])
     ax.xaxis.set_tick_params(labeltop=True)  # Display team names at the top
 

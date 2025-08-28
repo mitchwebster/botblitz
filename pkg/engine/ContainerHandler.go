@@ -49,12 +49,12 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 
 	// Create temp files.
 	// TODO: include bot name and draft round in file name
-	outf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stdout", pickNum, bot.FantasyTeamId))
+	outf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stdout", pickNum, bot.Id))
 	if err != nil {
 		return err
 	}
 	defer outf.Close()
-	errf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stderr", pickNum, bot.FantasyTeamId))
+	errf, err := os.CreateTemp("", fmt.Sprintf("draft-pick%d-%s-*.stderr", pickNum, bot.Id))
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
+		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
@@ -366,7 +366,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Fantasy Team Id: %s, Username: %s, Repo: %s\n", bot.FantasyTeamId, bot.SourceRepoUsername, bot.SourceRepoName)
+		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 

@@ -5,12 +5,22 @@ RUN apt-get update -y && \
 
 WORKDIR /app
 
-COPY . /app
+# Copy only the built wheel file
+COPY dist/blitz_env-0.1.0-py3-none-any.whl /app/
 
-RUN pip3 install -r requirements.txt
+# Copy only the py_grpc_server directory
+COPY py_grpc_server /app/py_grpc_server
 
-RUN chmod +x /app/bootstrap.sh
+# Install the local wheel
+RUN pip3 install blitz_env-0.1.0-py3-none-any.whl
+
+# Install other requirements
+RUN pip3 install -r py_grpc_server/requirements.txt
+
+RUN chmod +x /app/py_grpc_server/bootstrap.sh
 
 EXPOSE 8080
 
-CMD ["/app/bootstrap.sh"]
+WORKDIR /app/py_grpc_server
+
+CMD ["/app/py_grpc_server/bootstrap.sh"]

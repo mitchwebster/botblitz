@@ -21,13 +21,10 @@ test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go test -C
 
 run-draft:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
+	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft -enable_google_sheets=false
 
 run-fantasy:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy
-
-build-docker:
-	docker build -f py-server-dockerfile -t py_grpc_server ./py_grpc_server
 
 # must be run after make gen 
 build-py-module:
@@ -39,6 +36,9 @@ build-py-module:
 	 cp -f player_ranks_2021.csv blitz_env/player_ranks_2021.csv
 	 rm -rf build/ dist/ *.egg-info
 	 python setup.py sdist bdist_wheel
+	
+build-docker:
+	docker build -f py-server-dockerfile -t py_grpc_server .
 
 debug-docker:
 	docker run -v $(pwd)/tmp:/botblitz:ro -p 8080:8080 py_grpc_server
