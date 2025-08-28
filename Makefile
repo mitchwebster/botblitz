@@ -42,3 +42,9 @@ build-docker:
 
 debug-docker:
 	docker run -v $(pwd)/tmp:/botblitz:ro -p 8080:8080 py_grpc_server
+
+launch-simulator:
+	pip3 install -r requirements.txt
+	$(MAKE) build-py-module
+	pip3 install dist/blitz_env-0.1.0-py3-none-any.whl
+	jupyter notebook SimulateDraft.ipynb

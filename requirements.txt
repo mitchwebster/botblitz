@@ -124,3 +124,4 @@ websocket-client==1.8.0
 widgetsnbextension==4.0.13
 s3fs==2024.6.1
 boto3==1.35.34
+sqlalchemy==2.0.43
