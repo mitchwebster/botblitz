@@ -84,7 +84,7 @@ def get_weekly_rankings(game_state, stats_db, year):
         
         for team in game_state.teams:
             # Get the players drafted by the team
-            team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == team.id]
+            team_players = [player for player in game_state.players if player.status.current_team_bot_id == team.id]
             
             # Compute the team's best possible score for this week
             best_possible_score, _, _ = get_best_possible_score(
@@ -347,7 +347,7 @@ def main():
     # Compute best possible score and player contributions for each team
     for team in game_state.teams:
         # Get the players drafted by the team
-        team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == team.id]
+        team_players = [player for player in game_state.players if player.status.current_team_bot_id == team.id]
 
         if week is not None:
             # Compute the team's best possible score for the specified week

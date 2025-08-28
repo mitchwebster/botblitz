@@ -9,13 +9,6 @@ service AgentService {
     rpc ProposeAddDrop(GameState) returns (AddDropSelection) {}
 }
 
-message FantasyTeam {
-    string id = 1;
-    string name = 2;
-    string owner = 3;
-    uint32 current_waiver_priority = 4;
-}
-
 message LeagueSettings {
     uint32 num_teams = 1;
     repeated PlayerSlot slots_per_team = 2;
@@ -55,28 +48,31 @@ message PlayerStatus {
 
     Availability availability = 1;
     uint32 pick_chosen = 2;
-    string current_fantasy_team_id = 3;
+    string current_team_bot_id = 3;
 }
 
 message Bot {
     string id = 1;
+    string fantasy_team_name = 2;
+    string owner = 3;
 
     enum Source {
         LOCAL = 0;
         REMOTE = 1;
     }
 
-    Source source_type = 2;
-    string source_repo_username = 3;
-    string source_repo_name = 4;
-    string source_path = 5;
-    string fantasy_team_id = 6;
-    string env_path = 7;
+    Source source_type = 4;
+    string source_repo_username = 5;
+    string source_repo_name = 6;
+    string source_path = 7;
+    string env_path = 8;
+
+    uint32 current_waiver_priority = 9;
 }
 
 message GameState {
     repeated Player players = 1;
-    repeated FantasyTeam teams = 2;
+    repeated Bot bots = 2;
     LeagueSettings league_settings = 3;
     string current_bot_team_id = 4;
     uint32 current_draft_pick = 5;

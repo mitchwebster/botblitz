@@ -80,7 +80,6 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 	}
 
 	var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
-	bots := fetchBotList()
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: *enableVerboseLogging,
 		GameMode:              engine.WeeklyFantasy,
@@ -98,17 +97,16 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(lastGameState, bots, engineSettings, sheetClient, dataBytes)
+	return engine.NewBotEngine(lastGameState, engineSettings, sheetClient, dataBytes)
 }
 
 func bootstrapDraft() *engine.BotEngine {
-	year := 2024
+	year := 2025
 	bots := fetchBotList()
-	fantasyTeams := fetchFantasyTeams()
 
-	shuffleBotOrder(fantasyTeams, bots) // randomize draft order
+	shuffleBotOrder(bots) // randomize draft order
 
-	gameState, err := genDraftGameState(year, fantasyTeams)
+	gameState, err := genDraftGameState(year, bots)
 	if err != nil {
 		fmt.Println("Failed to build gameState unexpectedly")
 		fmt.Println(err)
@@ -140,86 +138,81 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(gameState, bots, engineSettings, sheetClient, dataBytes)
-}
-
-func fetchFantasyTeams() []*common.FantasyTeam {
-	return []*common.FantasyTeam{
-		{Id: "0", Name: "Seattle's Best", Owner: "Mitch"},
-		{Id: "1", Name: "Tyler's Team", Owner: "Tyler"},
-		{Id: "2", Name: "Jon's Team", Owner: "Jon"},
-		{Id: "3", Name: "Chris's Team", Owner: "Chris"},
-		{Id: "4", Name: "Harry's Team", Owner: "Harry"},
-		{Id: "5", Name: "Butker School for Women", Owner: "Parker"},
-		{Id: "6", Name: "Matt's Team", Owner: "Matt"},
-		{Id: "7", Name: "Justin's Team", Owner: "Justin"},
-		{Id: "8", Name: "Ryan's Team", Owner: "Ryan"},
-		{Id: "9", Name: "Philip's Team", Owner: "Philip"},
-	}
+	return engine.NewBotEngine(gameState, engineSettings, sheetClient, dataBytes)
 }
 
 func fetchBotList() []*common.Bot {
 	return []*common.Bot{
 		{
-			Id:            "Mitch's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/mitch-bot.py",
-			FantasyTeamId: "0",
+			Id:              "0",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/mitch-bot.py",
+			Owner:           "Mitch",
+			FantasyTeamName: "Seattle's Best",
 		},
 		{
-			Id:            "Tyler's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/tyler-bot.py",
-			FantasyTeamId: "1",
+			Id:              "1",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/tyler-bot.py",
+			Owner:           "Tyler",
+			FantasyTeamName: "Tyler's team",
 		},
 		{
-			Id:            "Jon's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/jon-bot.py",
-			FantasyTeamId: "2",
+			Id:              "2",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/jon-bot.py",
+			Owner:           "Jon",
+			FantasyTeamName: "Jon's team",
 		},
 		{
-			Id:            "Chris's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/chris-bot.py",
-			FantasyTeamId: "3",
+			Id:              "3",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/chris-bot.py",
+			Owner:           "Chris",
+			FantasyTeamName: "Chris's team",
 		},
 		{
-			Id:            "Harry's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/harry-bot.py",
-			FantasyTeamId: "4",
+			Id:              "4",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/harry-bot.py",
+			Owner:           "Harry",
+			FantasyTeamName: "Harry's team",
 		},
 		{
-			Id:            "Parker's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/parker-bot.py",
-			FantasyTeamId: "5",
+			Id:              "5",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/parker-bot.py",
+			Owner:           "Parker",
+			FantasyTeamName: "Butker School for Women",
 		},
 		{
-			Id:            "Matt's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/matt-bot.py",
-			FantasyTeamId: "6",
+			Id:              "6",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/matt-bot.py",
+			Owner:           "Matt",
+			FantasyTeamName: "Matt's team",
 		},
 		{
-			Id:            "Justin's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/justin-bot.py",
-			FantasyTeamId: "7",
+			Id:              "7",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/justin-bot.py",
+			Owner:           "Justin",
+			FantasyTeamName: "Justin's team",
 		},
 		{
-			Id:            "Ryans's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/ryan/ryan-bot.py",
-			FantasyTeamId: "8",
-			EnvPath:       "/bots/nfl/ryan/ryan.env",
+			Id:              "8",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/ryan/ryan-bot.py",
+			Owner:           "Ryan",
+			FantasyTeamName: "Ryans's team",
+			EnvPath:         "/bots/nfl/ryan/ryan.env",
 		},
 		{
-			Id:            "Philip's Bot",
-			SourceType:    common.Bot_LOCAL,
-			SourcePath:    "/bots/nfl/philip-bot.py",
-			FantasyTeamId: "9",
+			Id:              "9",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl/philip-bot.py",
+			Owner:           "Philip",
+			FantasyTeamName: "Philip's team",
 		},
 	}
 }
@@ -227,25 +220,25 @@ func fetchBotList() []*common.Bot {
 func fetchPlayerSlots() []*common.PlayerSlot {
 	return []*common.PlayerSlot{
 		{AllowedPlayerPositions: []string{"QB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
 	}
 }
 
-func shuffleBotOrder(teams []*common.FantasyTeam, bots []*common.Bot) {
-	n := len(teams)
+func shuffleBotOrder(bots []*common.Bot) {
+	n := len(bots)
 	indices := make([]int, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -262,7 +255,7 @@ func shuffleBotOrder(teams []*common.FantasyTeam, bots []*common.Bot) {
 	}
 }
 
-func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.GameState, error) {
+func genDraftGameState(year int, bots []*common.Bot) (*common.GameState, error) {
 	players, err := loadPlayers(year)
 	if err != nil {
 		return nil, err
@@ -271,7 +264,7 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 	player_slots := fetchPlayerSlots()
 
 	settings := common.LeagueSettings{
-		NumTeams:           uint32(len(fantasyTeams)),
+		NumTeams:           uint32(len(bots)),
 		IsSnakeDraft:       true,
 		TotalRounds:        uint32(len(player_slots)),
 		PointsPerReception: 1.0,
@@ -283,7 +276,7 @@ func genDraftGameState(year int, fantasyTeams []*common.FantasyTeam) (*common.Ga
 		CurrentDraftPick:   1,
 		CurrentBotTeamId:   "0",
 		LeagueSettings:     &settings,
-		Teams:              fantasyTeams,
+		Bots:               bots,
 		Players:            players,
 		CurrentFantasyWeek: 2, // Simulate week 2 (this has a bug kind of, in reality you won't see actual performance, so just need to ignore that you're getting that)
 	}
@@ -342,9 +335,9 @@ func loadPlayers(year int) ([]*common.Player, error) {
 		}
 
 		player_status := common.PlayerStatus{
-			Availability:         common.PlayerStatus_AVAILABLE,
-			PickChosen:           0,
-			CurrentFantasyTeamId: "",
+			Availability:     common.PlayerStatus_AVAILABLE,
+			PickChosen:       0,
+			CurrentTeamBotId: "",
 		}
 
 		player := common.Player{

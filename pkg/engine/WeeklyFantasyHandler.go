@@ -48,24 +48,24 @@ func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
 	for run := 0; run < AllowedAddsPerRun; run++ {
 		fmt.Printf("Running %d round of add/drop actions\n", run)
 
-		botsWhoTookActionSlice := make([]*common.Bot, 0, len(e.bots))
+		botsWhoTookActionSlice := make([]*common.Bot, 0, len(e.gameState.Bots))
 		botsWhoTookActionMap := make(map[string]bool)
 
-		for _, bot := range e.bots {
+		for _, bot := range e.gameState.Bots {
 			fmt.Println("Processing add/drops for: " + bot.Id)
-			e.gameState.CurrentBotTeamId = bot.FantasyTeamId
+			e.gameState.CurrentBotTeamId = bot.Id
 			tookAction := e.performAddDrop(ctx, bot, teamIdToPlayerMap)
 			if tookAction {
-				botsWhoTookActionMap[bot.FantasyTeamId] = true
+				botsWhoTookActionMap[bot.Id] = true
 				botsWhoTookActionSlice = append(botsWhoTookActionSlice, bot)
 			}
 		}
 
-		newBotSlice := make([]*common.Bot, 0, len(e.bots))
+		newBotSlice := make([]*common.Bot, 0, len(e.gameState.Bots))
 
 		// Add the bots who did not take action first
-		for _, bot := range e.bots {
-			_, tookAction := botsWhoTookActionMap[bot.FantasyTeamId]
+		for _, bot := range e.gameState.Bots {
+			_, tookAction := botsWhoTookActionMap[bot.Id]
 			if !tookAction {
 				newBotSlice = append(newBotSlice, bot)
 			}
@@ -74,20 +74,15 @@ func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
 		// Add the bots who did take an action
 		newBotSlice = append(newBotSlice, botsWhoTookActionSlice...)
 
-		e.bots = newBotSlice
+		e.gameState.Bots = newBotSlice
 	}
 
 	fmt.Fprintf(&e.weeklyFantasyTransactionLog, "[Final Bot Order]\n")
 
 	// Update the waiver order for next time
-	for i, bot := range e.bots {
-		team, err := FindCurrentTeamById(bot.FantasyTeamId, e.gameState)
-		if err != nil {
-			return err
-		}
-
-		team.CurrentWaiverPriority = uint32(i)
-		fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\t"+bot.FantasyTeamId+":"+bot.Id+"\n")
+	for i, bot := range e.gameState.Bots {
+		bot.CurrentWaiverPriority = uint32(i)
+		fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\t"+bot.Id+":"+bot.FantasyTeamName+"\n")
 	}
 
 	transactionLogStr := e.weeklyFantasyTransactionLog.String()
@@ -128,14 +123,14 @@ func (e *BotEngine) makePreviouslyOnHoldPlayersAvailable() {
 
 func (e *BotEngine) setupInitialWaiverPriorityIfNeeded() error {
 	// check if all of the teams are missing a waiver priority
-	for _, team := range e.gameState.Teams {
-		if team.CurrentWaiverPriority != 0 {
+	for _, bot := range e.gameState.Bots {
+		if bot.CurrentWaiverPriority != 0 {
 			return nil
 		}
 	}
 
 	fmt.Println("Initializing team waiver priorities")
-	n := len(e.gameState.Teams)
+	n := len(e.gameState.Bots)
 	indices := make([]int, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -147,23 +142,23 @@ func (e *BotEngine) setupInitialWaiverPriorityIfNeeded() error {
 	})
 
 	for i := 0; i < n; i++ {
-		curTeam := e.gameState.Teams[i]
-		curTeam.CurrentWaiverPriority = uint32(indices[i])
+		bot := e.gameState.Bots[i]
+		bot.CurrentWaiverPriority = uint32(indices[i])
 	}
 
 	return nil
 }
 
 func (e *BotEngine) sortBotsAccordingToWaiverPriority() {
-	n := len(e.bots)
+	n := len(e.gameState.Bots)
 	newBotList := make([]*common.Bot, n)
 
 	teamIdToBotMap := make(map[string]*common.Bot)
-	for _, bot := range e.bots {
-		teamIdToBotMap[bot.FantasyTeamId] = bot
+	for _, bot := range e.gameState.Bots {
+		teamIdToBotMap[bot.Id] = bot
 	}
 
-	for _, team := range e.gameState.Teams {
+	for _, team := range e.gameState.Bots {
 		bot := teamIdToBotMap[team.Id]
 		newBotList[team.CurrentWaiverPriority] = bot
 	}
@@ -172,13 +167,13 @@ func (e *BotEngine) sortBotsAccordingToWaiverPriority() {
 
 	// Print the new order list for this round
 	for _, bot := range newBotList {
-		fmt.Println(bot.FantasyTeamId + ":" + bot.Id)
-		fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\t"+bot.FantasyTeamId+":"+bot.Id+"\n")
+		fmt.Println(bot.Id + ":" + bot.Id)
+		fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\t"+bot.Id+":"+bot.FantasyTeamName+"\n")
 	}
 
 	fmt.Fprintf(&e.weeklyFantasyTransactionLog, "\n")
 
-	e.bots = newBotList
+	e.gameState.Bots = newBotList
 }
 
 func (e *BotEngine) performAddDrop(ctx context.Context, bot *common.Bot, teamIdToPlayerMap map[string][]*common.Player) bool {
@@ -228,17 +223,17 @@ func (e *BotEngine) handleDropPlayer(playerId string, bot *common.Bot, teamIdToP
 		return nil
 	}
 
-	if player.Status.CurrentFantasyTeamId != bot.FantasyTeamId {
+	if player.Status.CurrentTeamBotId != bot.Id {
 		fmt.Println("Cannot drop a player that is not on this team already")
 		return nil
 	}
 
-	player.Status.CurrentFantasyTeamId = ""                  // No team now
+	player.Status.CurrentTeamBotId = ""                      // No team now
 	player.Status.Availability = common.PlayerStatus_ON_HOLD // On hold until next reconciliation
 	player.Status.PickChosen = 0                             // reset pick chosen as it is no longer true
 
 	// Remove this player from the team map
-	currentTeam := teamIdToPlayerMap[bot.FantasyTeamId]
+	currentTeam := teamIdToPlayerMap[bot.Id]
 	indexToRemove := -1
 	for i, teamPlayer := range currentTeam {
 		if player.Id == teamPlayer.Id {
@@ -248,7 +243,7 @@ func (e *BotEngine) handleDropPlayer(playerId string, bot *common.Bot, teamIdToP
 	}
 
 	resultingSlice := append(currentTeam[:indexToRemove], currentTeam[indexToRemove+1:]...)
-	teamIdToPlayerMap[bot.FantasyTeamId] = resultingSlice
+	teamIdToPlayerMap[bot.Id] = resultingSlice
 
 	return player
 }
@@ -264,14 +259,14 @@ func (e *BotEngine) handleAddPlayer(playerId string, bot *common.Bot, teamIdToPl
 		return nil
 	}
 
-	currentTeam := teamIdToPlayerMap[bot.FantasyTeamId]
+	currentTeam := teamIdToPlayerMap[bot.Id]
 
-	player.Status.CurrentFantasyTeamId = bot.FantasyTeamId   // Assign new team
+	player.Status.CurrentTeamBotId = bot.Id                  // Assign new team
 	player.Status.Availability = common.PlayerStatus_DRAFTED // Mark them as drafted
 	player.Status.PickChosen = 0                             // Not applicable in add/drop
 
 	resultingSllice := append(currentTeam, player)
-	teamIdToPlayerMap[bot.FantasyTeamId] = resultingSllice
+	teamIdToPlayerMap[bot.Id] = resultingSllice
 	return player
 }
 
@@ -279,7 +274,7 @@ func buildTeamMap(gameState *common.GameState) map[string][]*common.Player {
 	playerMap := make(map[string][]*common.Player)
 
 	for _, player := range gameState.Players {
-		teamKey := player.Status.CurrentFantasyTeamId
+		teamKey := player.Status.CurrentTeamBotId
 		if teamKey == "" {
 			continue // do not keep track of players without a team
 		}
@@ -303,13 +298,13 @@ func (e *BotEngine) checkIfPlayerCanBeAddedToTeam(player *common.Player, bot *co
 	}
 
 	// Defense in depth check
-	if player.Status.CurrentFantasyTeamId != "" {
+	if player.Status.CurrentTeamBotId != "" {
 		fmt.Println("Cannot add a player that already belongs to a team")
 		return false
 	}
 
 	totalTeamSize := len(e.gameState.LeagueSettings.SlotsPerTeam)
-	currentTeam := teamIdToPlayerMap[bot.FantasyTeamId]
+	currentTeam := teamIdToPlayerMap[bot.Id]
 	if len(currentTeam)+1 > totalTeamSize {
 		fmt.Println("Cannot add player, team would be too large")
 		return false

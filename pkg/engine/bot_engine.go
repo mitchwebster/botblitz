@@ -22,7 +22,6 @@ type BotEngineSettings struct {
 
 type BotEngine struct {
 	settings                    BotEngineSettings
-	bots                        []*common.Bot
 	sourceCodeCache             map[string][]byte
 	gameState                   *common.GameState
 	sheetsClient                *SheetsClient
@@ -30,12 +29,11 @@ type BotEngine struct {
 	dataBytes                   *DataBytes
 }
 
-func NewBotEngine(gameState *common.GameState, bots []*common.Bot, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
+func NewBotEngine(gameState *common.GameState, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
 	return &BotEngine{
 		settings:                    settings,
-		bots:                        bots,
 		sourceCodeCache:             make(map[string][]byte),
 		gameState:                   gameState,
 		sheetsClient:                sheetsClient,
@@ -61,12 +59,6 @@ func (e *BotEngine) Summarize() string {
 
 	fmt.Fprintf(&builder, "\tGameMode: %s\n", e.settings.GameMode)
 
-	fmt.Fprintf(&builder, "\nBots:\n")
-	fmt.Fprintf(&builder, "\tCount: %d\n", len(e.bots))
-	for _, obj := range e.bots {
-		fmt.Fprintf(&builder, "\t - %s\n", obj.Id)
-	}
-
 	return builder.String()
 }
 
@@ -80,7 +72,7 @@ func (e *BotEngine) Run(ctx context.Context) error {
 }
 
 func (e *BotEngine) performValidations() error {
-	botValidation := common.ValidateBotConfigs(e.bots)
+	botValidation := common.ValidateBotConfigs(e.gameState.Bots)
 	if !botValidation {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
@@ -146,7 +138,7 @@ func (e *BotEngine) initializeBots() error {
 	fmt.Printf("\n-----------------------------------------\n")
 	fmt.Println("Initializing Bots")
 
-	for _, bot := range e.bots {
+	for _, bot := range e.gameState.Bots {
 		byteCode, err := e.fetchSourceCode(bot)
 		if err != nil {
 			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)
@@ -214,13 +206,13 @@ func GenerateRandomString(length int) string {
 	return string(result)
 }
 
-func FindCurrentTeamById(fantasyTeamId string, gameState *common.GameState) (*common.FantasyTeam, error) {
-	teamIdx := slices.IndexFunc(gameState.Teams, func(t *common.FantasyTeam) bool { return t.Id == fantasyTeamId })
+func FindCurrentBotById(botId string, gameState *common.GameState) (*common.Bot, error) {
+	teamIdx := slices.IndexFunc(gameState.Bots, func(t *common.Bot) bool { return t.Id == botId })
 	if teamIdx < 0 {
 		return nil, fmt.Errorf("Could not find team...concerning...")
 	}
 
-	return gameState.Teams[teamIdx], nil
+	return gameState.Bots[teamIdx], nil
 }
 
 func FindPlayerById(playerId string, gameState *common.GameState) (*common.Player, error) {
