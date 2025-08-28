@@ -214,12 +214,12 @@ def visualize_draft_board():
         num_bots = len(bots)
         num_rounds = settings.total_rounds if settings else 0
 
-        fig, ax = plt.subplots(figsize=(30, max(1, num_rounds) * 1.5))
+        fig, ax = plt.subplots(figsize=(30, max(1, num_rounds) * 1.2))
         ax.set_xlim(0, max(1, num_bots))
         ax.set_ylim(0, max(1, num_rounds))
         ax.set_aspect('equal')
 
-        font_size = 12
+        font_size = 10
 
         for player in players:
             if player.availability != 'DRAFTED' or not player.pick_chosen:
