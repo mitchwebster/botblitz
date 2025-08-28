@@ -20,6 +20,11 @@ type BotEngineSettings struct {
 	GameMode              GameMode
 }
 
+type BotContainerInfo struct {
+	ContainerID string
+	Port        string
+}
+
 type BotEngine struct {
 	settings                    BotEngineSettings
 	sourceCodeCache             map[string][]byte
@@ -27,6 +32,7 @@ type BotEngine struct {
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
 	dataBytes                   *DataBytes
+	botContainers               map[string]*BotContainerInfo // map of bot ID to container info
 }
 
 func NewBotEngine(gameState *common.GameState, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
@@ -39,6 +45,7 @@ func NewBotEngine(gameState *common.GameState, settings BotEngineSettings, sheet
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
 		dataBytes:                   dataBytes,
+		botContainers:               make(map[string]*BotContainerInfo),
 	}
 }
 

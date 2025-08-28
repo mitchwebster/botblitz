@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const pyServerHostAndPort = "localhost:8080"
+const localhost = "localhost"
 const botResourceFolderName = "/tmp"
 const botResourceDataFolderName = botResourceFolderName + "/data"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
@@ -70,7 +70,7 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 	return nil
 }
 
-func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId string, isVerboseLoggingEnabled bool) error {
+func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 
 	apiClient.NegotiateAPIVersion(context.Background())
 
-	if isVerboseLoggingEnabled {
+	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Killing container")
 	}
 
@@ -88,7 +88,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 		return err
 	}
 
-	if isVerboseLoggingEnabled {
+	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Force deleting container")
 	}
 
@@ -97,7 +97,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 		return err
 	}
 
-	if isVerboseLoggingEnabled {
+	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Force deleted container")
 	}
 
@@ -106,14 +106,10 @@ func (e *BotEngine) shutDownAndCleanBotServer(bot *common.Bot, containerId strin
 		return err
 	}
 
-	if isVerboseLoggingEnabled {
-		fmt.Printf("Finished cleaning server for bot (%s)\n", bot.Id)
-	}
-
 	return nil
 }
 
-func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
+func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
 	}
@@ -160,7 +156,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot) (string, error) {
 		env = append(strings.Split(string(envContent), "\n"))
 	}
 
-	containerId, err := createAndStartContainer(env)
+	containerId, err := createAndStartContainer(env, port)
 	if err != nil {
 		return "", err
 	}
@@ -195,7 +191,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer(env []string) (string, error) {
+func createAndStartContainer(env []string, port string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -206,7 +202,7 @@ func createAndStartContainer(env []string) (string, error) {
 
 	hostBinding := nat.PortBinding{
 		HostIP:   "0.0.0.0",
-		HostPort: "8080",
+		HostPort: port,
 	}
 
 	// Define resource limits
@@ -263,13 +259,14 @@ func createAndStartContainer(env []string) (string, error) {
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameState) (*common.AddDropSelection, error) {
+func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *common.GameState) (*common.AddDropSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
 	// container port may not be listening yet - wait for it
 	opts = append(opts, grpc.WithBlock())
 
+	pyServerHostAndPort := localhost + ":" + port
 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
 		return nil, err
@@ -288,13 +285,15 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, gameState *common.GameSt
 	return selection, nil
 }
 
-func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameState) (*common.DraftSelection, error) {
+func (e *BotEngine) callDraftRPC(ctx context.Context, port string, gameState *common.GameState) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
 	// container port may not be listening yet - wait for it
 	opts = append(opts, grpc.WithBlock())
 
+	pyServerHostAndPort := localhost + ":" + port
+	print(pyServerHostAndPort)
 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
 		return nil, err
@@ -313,21 +312,107 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, gameState *common.GameStat
 	return selections, nil
 }
 
+func (e *BotEngine) isContainerRunning(containerId string) (bool, error) {
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return false, err
+	}
+	defer apiClient.Close()
+
+	apiClient.NegotiateAPIVersion(context.Background())
+
+	containerInfo, err := apiClient.ContainerInspect(context.Background(), containerId)
+	if err != nil {
+		return false, err
+	}
+
+	return containerInfo.State.Running, nil
+}
+
+func (e *BotEngine) findAvailablePort() (string, error) {
+	basePort := 8080
+	usedPorts := make(map[string]bool)
+	for _, info := range e.botContainers {
+		usedPorts[info.Port] = true
+	}
+	port := basePort
+	for {
+		strPort := fmt.Sprintf("%d", port)
+		if !usedPorts[strPort] {
+			return strPort, nil
+		}
+
+		port++
+		if port > 9000 { // Prevent infinite loop
+			return "", fmt.Errorf("no available ports found")
+		}
+	}
+}
+
+func (e *BotEngine) getOrCreateBotContainer(bot *common.Bot) (*BotContainerInfo, error) {
+	// Check if container already exists for this bot
+	if containerInfo, exists := e.botContainers[bot.Id]; exists {
+		if e.settings.VerboseLoggingEnabled {
+			fmt.Printf("Found existing container for bot (%s): %s\n", bot.Id, containerInfo.ContainerID)
+		}
+
+		// Check if the container is still running
+		if isRunning, err := e.isContainerRunning(containerInfo.ContainerID); err == nil && isRunning {
+			if e.settings.VerboseLoggingEnabled {
+				fmt.Printf("Using existing container for bot (%s): %s\n", bot.Id, containerInfo.ContainerID)
+			}
+			return containerInfo, nil
+		} else {
+			if e.settings.VerboseLoggingEnabled {
+				fmt.Printf("Container for bot (%s) is not running, cleaning up and will recreate\n", bot.Id)
+			}
+
+			// Clean up the non-running container
+			err := e.shutDownAndCleanBotServer(containerInfo.ContainerID)
+			if err != nil {
+				if e.settings.VerboseLoggingEnabled {
+					fmt.Printf("Warning: Failed to clean up non-running container for bot %s: %v\n", bot.Id, err)
+				}
+
+				return nil, err
+			}
+
+			// Remove the invalid container ID from the map
+			delete(e.botContainers, bot.Id)
+		}
+	}
+
+	// Container doesn't exist or is not running, create a new one
+	if e.settings.VerboseLoggingEnabled {
+		fmt.Printf("Creating new container for bot (%s)\n", bot.Id)
+	}
+
+	// Find an available port
+	port, err := e.findAvailablePort()
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the existing startBotContainer function
+	containerId, err := e.startBotContainer(bot, port)
+	if err != nil {
+		return nil, err
+	}
+
+	containerInfo := &BotContainerInfo{
+		ContainerID: containerId,
+		Port:        port,
+	}
+	e.botContainers[bot.Id] = containerInfo
+
+	return containerInfo, nil
+}
+
 func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot *common.Bot) (playerId string, returnError error) {
-	containerId, err := e.startBotContainer(bot)
+	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return "", err
 	}
-
-	// schedule cleanup to run right before the function returns
-	defer func() {
-		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
-		if err != nil {
-
-			fmt.Printf("CRITICAL!! Failed to clean after bot run %s\n", err)
-			returnError = err
-		}
-	}()
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
@@ -335,34 +420,25 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	draftPick, err := e.callDraftRPC(ctx, e.gameState)
+	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port, e.gameState)
 	if err != nil {
 		return "", err
 	}
 
-	if e.settings.VerboseLoggingEnabled {
-		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
-			return "", err
-		}
-	}
+	// if e.settings.VerboseLoggingEnabled {
+	// 	if err := e.saveBotLogsToFile(bot, containerId); err != nil {
+	// 		return "", err
+	// 	}
+	// }
 
 	return draftPick.PlayerId, returnError
 }
 
 func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *common.Bot) (selection *common.AddDropSelection, returnError error) {
-	containerId, err := e.startBotContainer(bot)
+	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return nil, err
 	}
-
-	// schedule cleanup to run right before the function returns
-	defer func() {
-		err = e.shutDownAndCleanBotServer(bot, containerId, e.settings.VerboseLoggingEnabled)
-		if err != nil {
-			fmt.Println("CRITICAL!! Failed to clean after bot run")
-			returnError = err
-		}
-	}()
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
@@ -370,16 +446,53 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	selection, err = e.callAddDropRPC(ctx, e.gameState)
+	selection, err = e.callAddDropRPC(ctx, containerInfo.Port, e.gameState)
 	if err != nil {
 		return nil, err
 	}
 
-	if e.settings.VerboseLoggingEnabled {
-		if err := e.saveBotLogsToFile(bot, containerId); err != nil {
-			return nil, err
+	// if e.settings.VerboseLoggingEnabled {
+	// 	if err := e.saveBotLogsToFile(bot, containerId); err != nil {
+	// 		return nil, err
+	// 	}
+	// }
+
+	return selection, returnError
+}
+
+func (e *BotEngine) CleanupAllPyGrpcServerContainers() error {
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	defer apiClient.Close()
+
+	apiClient.NegotiateAPIVersion(context.Background())
+
+	// List all containers
+	containers, err := apiClient.ContainerList(context.Background(), container.ListOptions{All: true})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %v", err)
+	}
+
+	cleanedCount := 0
+	for _, container := range containers {
+		// Check if this container is using the py_grpc_server image
+		if container.Image == "py_grpc_server" {
+			if e.settings.VerboseLoggingEnabled {
+				fmt.Printf("Cleaning up py_grpc_server container: %s\n", container.ID)
+			}
+
+			err := e.shutDownAndCleanBotServer(container.ID)
+			if err != nil {
+				fmt.Printf("Warning: Failed to kill container %s: %v\n", container.ID, err)
+			}
 		}
 	}
 
-	return selection, returnError
+	if e.settings.VerboseLoggingEnabled {
+		fmt.Printf("Cleaned up %d py_grpc_server containers\n", cleanedCount)
+	}
+
+	return nil
 }

@@ -62,6 +62,14 @@ func main() {
 
 	fmt.Println(botEngine.Summarize())
 
+	// schedule cleanup to run right before the function returns
+	defer func() {
+		botEngine.CleanupAllPyGrpcServerContainers()
+		if err != nil {
+			fmt.Printf("CRITICAL!! Failed to clean after bot run %s\n", err)
+		}
+	}()
+
 	err = botEngine.Run(ctx)
 	if err != nil {
 		fmt.Println("Engine failed unexpectedly")
