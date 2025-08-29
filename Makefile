@@ -8,12 +8,15 @@ clean:
 	rm -f py_grpc_server/agent_pb2.pyi
 	rm -f py_grpc_server/agent_pb2_grpc.py
 
-gen:
-	protoc ./pkg/common/proto/agent.proto --go_out=./pkg/common/ --go-grpc_out=./pkg/common/
+gen-python-only:
 	cd blitz_env && python -m grpc_tools.protoc -I ../pkg/common/proto --python_out=. --pyi_out=. --grpc_python_out=. ../pkg/common/proto/agent.proto
 	cp -f blitz_env/agent_pb2.py py_grpc_server/agent_pb2.py
 	cp -f blitz_env/agent_pb2.pyi py_grpc_server/agent_pb2.pyi
 	cp -f blitz_env/agent_pb2_grpc.py py_grpc_server/agent_pb2_grpc.py
+
+gen:
+	protoc ./pkg/common/proto/agent.proto --go_out=./pkg/common/ --go-grpc_out=./pkg/common/
+	$(MAKE) gen-python-only
 
 test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go mod tidy -C
@@ -45,6 +48,7 @@ debug-docker:
 
 launch-simulator:
 	pip3 install -r requirements.txt
+	$(MAKE) gen-python-only
 	$(MAKE) build-py-module
 	pip3 install dist/blitz_env-0.1.0-py3-none-any.whl
 	jupyter notebook SimulateDraft.ipynb
