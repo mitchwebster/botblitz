@@ -49,6 +49,7 @@ class LeagueSettings(Base):
     is_snake_draft = Column(Boolean)
     total_rounds = Column(Integer)
     points_per_reception = Column(Float)
+    num_teams = Column(Integer)
 
 
 class GameStatus(Base):

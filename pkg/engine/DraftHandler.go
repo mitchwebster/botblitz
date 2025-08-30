@@ -15,13 +15,23 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		return err
 	}
 
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
 	curRound := 1
-	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
+	for curRound <= int(leagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
 
 		index := 0
 		increment := 1
-		arrayEdge := len(e.gameState.Bots) - 1
+		arrayEdge := int(leagueSettings.NumTeams) - 1
 
 		shouldUseReverseOrder := (curRound % 2) == 0
 		if shouldUseReverseOrder {
@@ -35,8 +45,8 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 				return err
 			}
 
-			curBot := e.gameState.Bots[index]
-			e.gameState.CurrentBotTeamId = curBot.Id
+			curBot := bots[index]
+			e.gameStateHandler.SetCurrentBotTeamId(curBot.Id)
 			fmt.Printf("\n-----------------------------------------\n")
 			err := e.performDraftAction(ctx, curBot, index)
 			fmt.Printf("\n-----------------------------------------\n")
@@ -44,13 +54,12 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 				return err
 			}
 			index += increment
-			e.gameState.CurrentDraftPick += 1
+			// TODO: store this
+			// e.gameState.CurrentDraftPick += 1
 		}
 
 		curRound += 1
 	}
-
-	SaveGameState(e.gameState)
 
 	return nil
 }
@@ -76,7 +85,17 @@ func (e *BotEngine) initializeDraftSheet() error {
 		return err
 	}
 
-	for i := 1; i <= int(e.gameState.LeagueSettings.TotalRounds); i++ {
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i <= int(leagueSettings.TotalRounds); i++ {
 		content := strconv.Itoa(i)
 		err = e.sheetsClient.WriteContentToCell(IntialRow+i, InitialCol, content)
 		if err != nil {
@@ -84,8 +103,8 @@ func (e *BotEngine) initializeDraftSheet() error {
 		}
 	}
 
-	for i := 1; i <= len(e.gameState.Bots); i++ {
-		bot := e.gameState.Bots[i-1]
+	for i := 1; i <= len(bots); i++ {
+		bot := bots[i-1]
 		if err != nil {
 			return err
 		}
@@ -102,47 +121,62 @@ func (e *BotEngine) initializeDraftSheet() error {
 }
 
 func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, currentBotIndex int) error {
-	fmt.Printf("[Pick: %d] %s will choose next...", e.gameState.CurrentDraftPick, bot.FantasyTeamName)
+	// pickNum, err := e.gameStateHandler.GetCurrentDraftPick()
+	// if err != nil {
+	// 	return err
+	// }
 
-	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
-	if err != nil {
-		fmt.Println("Failed to get a response from bot")
-		fmt.Println(err)
-	} else {
-		fmt.Println("Received a response from bot")
-	}
+	// leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	// if err != nil {
+	// 	return err
+	// }
 
-	summary, err := validateAndMakeDraftPick(bot, playerIdFromBot, e.gameState)
+	// fmt.Printf("[Pick: %d] %s will choose next...", pickNum, bot.FantasyTeamName)
 
-	if err != nil {
-		fmt.Println("Failed to run draft using bot")
-		fmt.Println(err)
-		summary, err = draftPlayerOnInvalidResponse(bot, e.gameState)
-		if err != nil {
-			return err
-		}
-		summary += string('*')
-	}
+	// playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
+	// if err != nil {
+	// 	fmt.Println("Failed to get a response from bot")
+	// 	fmt.Println(err)
+	// } else {
+	// 	fmt.Println("Received a response from bot")
+	// }
 
-	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.gameState.Bots), currentBotIndex, e.sheetsClient)
-	if err != nil {
-		fmt.Println("Failed to write content to Google Sheets")
-		return err
-	}
+	// summary, err := validateAndMakeDraftPick(bot, playerIdFromBot, e.gameState)
+
+	// if err != nil {
+	// 	fmt.Println("Failed to run draft using bot")
+	// 	fmt.Println(err)
+	// 	summary, err = draftPlayerOnInvalidResponse(bot, e.gameState)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	summary += string('*')
+	// }
+
+	// err = registerPickInSheets(summary, pickNum, int(leagueSettings.NumTeams), currentBotIndex, e.sheetsClient)
+	// if err != nil {
+	// 	fmt.Println("Failed to write content to Google Sheets")
+	// 	return err
+	// }
 
 	return nil
 }
 
 func (e *BotEngine) validateDraftState() error {
-	if !e.gameState.LeagueSettings.IsSnakeDraft {
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	if !leagueSettings.IsSnakeDraft {
 		return fmt.Errorf("I only know how to snake draft")
 	}
 
-	if e.gameState.LeagueSettings.TotalRounds <= 0 {
+	if leagueSettings.TotalRounds <= 0 {
 		return fmt.Errorf("Must have at least one round")
 	}
 
-	if len(e.gameState.Bots) <= 0 {
+	if leagueSettings.NumTeams <= 0 {
 		return fmt.Errorf("Must have have at least one team")
 	}
 

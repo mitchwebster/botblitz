@@ -17,11 +17,15 @@ const filePrefix = "gs-"
 const draftDesc = "draft"
 const weekDesc = "week"
 const fileSuffix = ".db"
-const singleRowTableId = 0
+const singleRowTableId = 1
 
 // GameStateDatabase encapsulates the SQLite database operations
 type GameStateHandler struct {
 	db *gorm.DB
+
+	// Cache the invariants to avoid repeated DB queries for no reason
+	cachedBotList        []*common.Bot
+	cachedLeagueSettings *common.LeagueSettings
 }
 
 func CheckDatabase() {
@@ -54,6 +58,90 @@ func CheckDatabase() {
 
 	// // Delete
 	// db.Delete(&user)
+}
+
+func (handler *GameStateHandler) GetBots() ([]*common.Bot, error) {
+	if handler.cachedBotList != nil {
+		return handler.cachedBotList, nil
+	}
+
+	// list all of the bots from the database and convert to the common bot
+	var dbBots []bot
+	result := handler.db.Order("id ASC").Find(&dbBots)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
+	}
+
+	commonBots := make([]*common.Bot, len(dbBots))
+	for i, dbBot := range dbBots {
+		commonBot := &common.Bot{
+			Id:                    dbBot.ID,
+			FantasyTeamName:       dbBot.Name,
+			Owner:                 dbBot.Owner,
+			CurrentWaiverPriority: uint32(dbBot.CurrentWaiverPriority),
+		}
+		commonBots[i] = commonBot
+	}
+
+	// Cache the result
+	handler.cachedBotList = commonBots
+
+	return handler.cachedBotList, nil
+}
+
+func (handler *GameStateHandler) GetLeagueSettings() (*common.LeagueSettings, error) {
+	if handler.cachedLeagueSettings != nil {
+		return handler.cachedLeagueSettings, nil
+	}
+
+	// list all of the bots from the database and convert to the common bot
+	var settings leagueSettings
+	result := handler.db.First(&settings, singleRowTableId)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	leagueSettings := &common.LeagueSettings{
+		NumTeams:           uint32(settings.NumTeams),
+		SlotsPerTeam:       nil,
+		IsSnakeDraft:       settings.IsSnakeDraft,
+		TotalRounds:        uint32(settings.TotalRounds),
+		PointsPerReception: float32(settings.PointsPerReception),
+		Year:               uint32(settings.Year),
+	}
+	// Cache the result
+	handler.cachedLeagueSettings = leagueSettings
+
+	return handler.cachedLeagueSettings, nil
+}
+
+func (handler *GameStateHandler) SetCurrentBotTeamId(botId string) error {
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	result = handler.db.Model(&gameStatus).Update("CurrentDraftPick", botId)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func (handler *GameStateHandler) GetCurrentDraftPick() (int, error) {
+
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
+
+	if result.Error != nil {
+		return -1, result.Error
+	}
+
+	return *gameStatus.CurrentDraftPick, nil
 }
 
 // UpdatePlayer updates multiple player fields at once
@@ -104,7 +192,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 		return nil, err
 	}
 
-	return &GameStateHandler{db: db}, nil
+	return &GameStateHandler{db: db, cachedBotList: nil, cachedLeagueSettings: nil}, nil
 }
 
 func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSettings) error {
@@ -158,12 +246,12 @@ func populateLeagueSettingsTable(db *gorm.DB, settings *common.LeagueSettings) e
 	}
 
 	dbLeagueSettings := leagueSettings{
-		ID:                 singleRowTableId,
 		Year:               int(settings.Year),
 		PlayerSlots:        string(playerSlotsJSON),
 		IsSnakeDraft:       settings.IsSnakeDraft,
 		TotalRounds:        int(settings.TotalRounds),
 		PointsPerReception: float64(settings.PointsPerReception),
+		NumTeams:           int(settings.NumTeams),
 	}
 
 	result := db.Create(&dbLeagueSettings)
@@ -194,7 +282,6 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	currentBotID := bots[0].Id
 
 	dbGameStatus := gameStatus{
-		ID:                 singleRowTableId,
 		CurrentBotID:       &currentBotID,
 		CurrentDraftPick:   nil, // Will be set when draft starts
 		CurrentFantasyWeek: nil, // Will be set during the season
@@ -362,6 +449,7 @@ type gameStatus struct {
 // --------------------
 type leagueSettings struct {
 	ID                 int     `gorm:"primaryKey;column:id"`
+	NumTeams           int     `gorm:"column:num_teams"`
 	Year               int     `gorm:"column:year"`
 	PlayerSlots        string  `gorm:"type:json;column:player_slots"` // stored as JSON string
 	IsSnakeDraft       bool    `gorm:"column:is_snake_draft"`

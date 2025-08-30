@@ -80,7 +80,12 @@ func (e *BotEngine) Run(ctx context.Context) error {
 }
 
 func (e *BotEngine) performValidations() error {
-	botValidation := common.ValidateBotConfigs(e.gameState.Bots)
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
+	botValidation := common.ValidateBotConfigs(bots)
 	if !botValidation {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
@@ -146,7 +151,12 @@ func (e *BotEngine) initializeBots() error {
 	fmt.Printf("\n-----------------------------------------\n")
 	fmt.Println("Initializing Bots")
 
-	for _, bot := range e.gameState.Bots {
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
+	for _, bot := range bots {
 		byteCode, err := e.fetchSourceCode(bot)
 		if err != nil {
 			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)

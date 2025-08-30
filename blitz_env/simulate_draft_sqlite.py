@@ -54,7 +54,7 @@ def init_database(year: int) -> DatabaseManager:
     
     # Add league settings
     settings = LeagueSettings()
-    settings.num_bots = 10
+    settings.num_teams = 10
     settings.is_snake_draft = True
     settings.total_rounds = 15
     settings.points_per_reception = 1.0

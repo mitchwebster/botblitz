@@ -35,7 +35,10 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 	defer apiClient.Close()
 	apiClient.NegotiateAPIVersion(context.Background())
 
-	pickNum := int(e.gameState.CurrentDraftPick)
+	pickNum, err := e.gameStateHandler.GetCurrentDraftPick()
+	if err != nil {
+		return err
+	}
 
 	// Request logs for this container.
 	ctx := context.Background()
@@ -259,7 +262,7 @@ func createAndStartContainer(env []string, port string) (string, error) {
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *common.GameState) (*common.AddDropSelection, error) {
+func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.AddDropSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -276,7 +279,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selection, err := client.ProposeAddDrop(ctx, gameState)
+	selection, err := client.ProposeAddDrop(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -285,7 +288,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *
 	return selection, nil
 }
 
-func (e *BotEngine) callDraftRPC(ctx context.Context, port string, gameState *common.GameState) (*common.DraftSelection, error) {
+func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -303,7 +306,7 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, port string, gameState *co
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.DraftPlayer(ctx, gameState)
+	selections, err := client.DraftPlayer(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -420,7 +423,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port, e.gameState)
+	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return "", err
 	}
@@ -446,7 +449,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	selection, err = e.callAddDropRPC(ctx, containerInfo.Port, e.gameState)
+	selection, err = e.callAddDropRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return nil, err
 	}

@@ -77,33 +77,35 @@ func main() {
 }
 
 func bootstrapWeeklyFantasy() *engine.BotEngine {
-	var year uint32 = 2024
-	lastGameState, err := engine.LoadLastGameState(year)
-	if err != nil {
-		fmt.Println("Failed to load last game state")
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	// TODO: refactor after sqllite upgrade
+	return nil
+	// var year uint32 = 2024
+	// lastGameState, err := engine.LoadLastGameState(year)
+	// if err != nil {
+	// 	fmt.Println("Failed to load last game state")
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
 
-	var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
-	engineSettings := engine.BotEngineSettings{
-		VerboseLoggingEnabled: *enableVerboseLogging,
-		GameMode:              engine.WeeklyFantasy,
-	}
+	// var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
+	// engineSettings := engine.BotEngineSettings{
+	// 	VerboseLoggingEnabled: *enableVerboseLogging,
+	// 	GameMode:              engine.WeeklyFantasy,
+	// }
 
-	curWeek := getCurrentWeek()
+	// curWeek := getCurrentWeek()
 
-	// Update the current fantasy week so bots know what week to use
-	lastGameState.CurrentFantasyWeek = uint32(curWeek)
+	// // Update the current fantasy week so bots know what week to use
+	// lastGameState.CurrentFantasyWeek = uint32(curWeek)
 
-	dataBytes, err := engine.FetchDataBytes(int(year), curWeek)
-	if err != nil {
-		fmt.Println("Failed to load data")
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	// dataBytes, err := engine.FetchDataBytes(int(year), curWeek)
+	// if err != nil {
+	// 	fmt.Println("Failed to load data")
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
 
-	return engine.NewBotEngine(nil, engineSettings, sheetClient, dataBytes)
+	// return engine.NewBotEngine(nil, engineSettings, sheetClient, dataBytes)
 }
 
 func bootstrapDraft() *engine.BotEngine {
