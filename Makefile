@@ -9,7 +9,7 @@ clean:
 	rm -f py_grpc_server/agent_pb2_grpc.py
 
 gen-python-only:
-	cd blitz_env && python -m grpc_tools.protoc -I ../pkg/common/proto --python_out=. --pyi_out=. --grpc_python_out=. ../pkg/common/proto/agent.proto
+	cd blitz_env && python3 -m grpc_tools.protoc -I ../pkg/common/proto --python_out=. --pyi_out=. --grpc_python_out=. ../pkg/common/proto/agent.proto
 	cp -f blitz_env/agent_pb2.py py_grpc_server/agent_pb2.py
 	cp -f blitz_env/agent_pb2.pyi py_grpc_server/agent_pb2.pyi
 	cp -f blitz_env/agent_pb2_grpc.py py_grpc_server/agent_pb2_grpc.py
@@ -38,7 +38,7 @@ build-py-module:
 	 cp -f player_ranks_2022.csv blitz_env/player_ranks_2022.csv
 	 cp -f player_ranks_2021.csv blitz_env/player_ranks_2021.csv
 	 rm -rf build/ dist/ *.egg-info
-	 python setup.py sdist bdist_wheel
+	 python3 setup.py sdist bdist_wheel
 	
 build-docker:
 	docker build -f py-server-dockerfile -t py_grpc_server .
