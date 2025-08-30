@@ -57,7 +57,7 @@ def draft_player(game_state: GameState) -> str:
     if game_state.league_settings.year == 2024:
       undrafted_players = [p for p in undrafted_players if p.full_name not in DO_NOT_DRAFT_LIST]
     drafted_players = [player for player in game_state.players if is_drafted(player)]
-    team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
+    team_players = [player for player in game_state.players if player.status.current_team_bot_id == game_state.current_bot_team_id]
 
     # Populate team from GameState
     populate_team(team_players)

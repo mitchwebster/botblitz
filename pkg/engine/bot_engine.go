@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
+	gamestate "github.com/mitchwebster/botblitz/pkg/gamestate"
 	"golang.org/x/exp/slices"
 )
 
@@ -28,20 +29,20 @@ type BotContainerInfo struct {
 type BotEngine struct {
 	settings                    BotEngineSettings
 	sourceCodeCache             map[string][]byte
-	gameState                   *common.GameState
+	gameStateHandler            *gamestate.GameStateHandler
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
 	dataBytes                   *DataBytes
 	botContainers               map[string]*BotContainerInfo // map of bot ID to container info
 }
 
-func NewBotEngine(gameState *common.GameState, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
+func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
 	return &BotEngine{
 		settings:                    settings,
 		sourceCodeCache:             make(map[string][]byte),
-		gameState:                   gameState,
+		gameStateHandler:            gameStateHandler,
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
 		dataBytes:                   dataBytes,
@@ -117,7 +118,7 @@ func (e *BotEngine) run(ctx context.Context) error {
 }
 
 func (e *BotEngine) collectBotResources() error {
-	folderPath, err := BuildLocalAbsolutePath(botResourceFolderName)
+	folderPath, err := common.BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return err
 	}
@@ -171,7 +172,7 @@ func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
 
 		botCode = downloadedSourceCode
 	} else {
-		absPath, err := BuildLocalAbsolutePath(bot.SourcePath)
+		absPath, err := common.BuildLocalAbsolutePath(bot.SourcePath)
 		if err != nil {
 			return nil, err
 		}
@@ -186,16 +187,6 @@ func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
 
 	fmt.Printf("Successfully retrieved source code for bot (%s)\n", bot.Id)
 	return botCode, nil
-}
-
-func BuildLocalAbsolutePath(relativePath string) (string, error) {
-	directory, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	var trimmedPath = strings.Trim(relativePath, "/")
-	return fmt.Sprintf("%s/%s", directory, trimmedPath), nil
 }
 
 func GenerateRandomString(length int) string {

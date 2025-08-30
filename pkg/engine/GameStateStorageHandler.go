@@ -5,17 +5,12 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"google.golang.org/protobuf/proto"
 )
 
-const saveFolderRelativePath = "data/game_states"
-const filePrefix = "gameState-"
-const fileSuffix = ".bin"
 const allowedNumSaveFiles = 3
 
 func LoadLastGameState(year uint32) (*common.GameState, error) {
@@ -43,7 +38,7 @@ func LoadLastGameState(year uint32) (*common.GameState, error) {
 }
 
 func SaveGameState(gameState *common.GameState) error {
-	saveFilePath, err := getSaveFileName(gameState.LeagueSettings.Year)
+	saveFilePath, err := getSaveFileName(gameState.LeagueSettings.Year, "")
 	if err != nil {
 		return err
 	}
@@ -88,33 +83,6 @@ func CleanOldGameStates(gameState *common.GameState) error {
 	}
 
 	return nil
-}
-
-func getSaveFileName(year uint32) (string, error) {
-	absFolderPath, err := getSaveFolderPath(year)
-	if err != nil {
-		return "", err
-	}
-
-	err = os.MkdirAll(absFolderPath, os.ModePerm)
-	if err != nil {
-		return "", err
-	}
-
-	timestamp := time.Now().Unix()
-	timestampStr := strconv.FormatInt(timestamp, 10)
-	fileName := filePrefix + timestampStr + fileSuffix
-	return absFolderPath + "/" + fileName, nil
-}
-
-func getSaveFolderPath(year uint32) (string, error) {
-	folderName := saveFolderRelativePath + "/" + strconv.Itoa(int(year))
-	absPath, err := BuildLocalAbsolutePath(folderName)
-	if err != nil {
-		return "", err
-	}
-
-	return absPath, nil
 }
 
 func findLastSaveFilePath(year uint32) (string, error) {
@@ -166,7 +134,7 @@ func findAllSaveFiles(year uint32) ([]string, error) {
 // func FindAvailableYears() ([]string, error) {
 // 	var subdirs []string
 
-// 	absPath, err := BuildLocalAbsolutePath(saveFolderRelativePath)
+// 	absPath, err := common.BuildLocalAbsolutePath(saveFolderRelativePath)
 // 	if err != nil {
 // 		return subdirs, err
 // 	}

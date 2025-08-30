@@ -167,7 +167,7 @@ def get_drafted_team(game_state: GameState, team_id: str):
     players = game_state.players
     roster = []
     for player in players:
-        if is_drafted(player) and player.status.current_fantasy_team_id == team_id:
+        if is_drafted(player) and player.status.current_team_bot_id == team_id:
             roster.append(player)
 
     return roster

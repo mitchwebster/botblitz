@@ -40,7 +40,7 @@ def get_drafted_team(players, team_id):
         D_POS : []
     }
 
-    for player in [player for player in players if is_drafted(player) and player.status.current_fantasy_team_id == team_id]:
+    for player in [player for player in players if is_drafted(player) and player.status.current_team_bot_id == team_id]:
         main_pos = player.allowed_positions[0]
         roster[main_pos].append(player)
 
@@ -76,7 +76,7 @@ def get_target_positions(drafted_team, cur_round, total_rounds):
     return target_positions
 
 def get_current_round(game_state: GameState) -> int:
-    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.teams)
+    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.bots)
     return zero_based_round + 1
 
 def list_to_map(list):

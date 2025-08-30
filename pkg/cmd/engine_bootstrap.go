@@ -2,19 +2,17 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"os"
 	"os/signal"
-	"strconv"
 	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
+	gamestate "github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
 var (
@@ -105,18 +103,19 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(lastGameState, engineSettings, sheetClient, dataBytes)
+	return engine.NewBotEngine(nil, engineSettings, sheetClient, dataBytes)
 }
 
 func bootstrapDraft() *engine.BotEngine {
-	year := 2025
+	year := uint32(2025)
 	bots := fetchBotList()
 
 	shuffleBotOrder(bots) // randomize draft order
 
-	gameState, err := genDraftGameState(year, bots)
+	settings := fetchLeagueSettings(year, bots)
+	gameStateHandler, err := gamestate.NewGameStateHandlerForDraft(bots, settings)
 	if err != nil {
-		fmt.Println("Failed to build gameState unexpectedly")
+		fmt.Println("Failed to build gameState db unexpectedly")
 		fmt.Println(err)
 		os.Exit(1) // Crash hard
 	}
@@ -146,7 +145,7 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(gameState, engineSettings, sheetClient, dataBytes)
+	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, dataBytes)
 }
 
 func fetchBotList() []*common.Bot {
@@ -228,20 +227,20 @@ func fetchBotList() []*common.Bot {
 func fetchPlayerSlots() []*common.PlayerSlot {
 	return []*common.PlayerSlot{
 		{AllowedPlayerPositions: []string{"QB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		{AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
+		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
 	}
 }
 
@@ -263,109 +262,32 @@ func shuffleBotOrder(bots []*common.Bot) {
 	}
 }
 
-func genDraftGameState(year int, bots []*common.Bot) (*common.GameState, error) {
-	players, err := loadPlayers(year)
-	if err != nil {
-		return nil, err
-	}
+func fetchLeagueSettings(year uint32, bots []*common.Bot) *common.LeagueSettings {
+	playerslots := make(map[string]uint32)
+	playerslots["QB"] = 1
+	playerslots["RB"] = 2
+	playerslots["WR"] = 2
+	playerslots["SUPERFLEX"] = 1 // QB/RB/WR/TE
+	playerslots["FLEX"] = 1      // RB/WR/TE
+	playerslots["K"] = 1
+	playerslots["DST"] = 1
+	playerslots["BENCH"] = 3
 
-	player_slots := fetchPlayerSlots()
+	total_rounds := uint32(0)
+	for _, v := range playerslots {
+		total_rounds += v
+	}
 
 	settings := common.LeagueSettings{
 		NumTeams:           uint32(len(bots)),
 		IsSnakeDraft:       true,
-		TotalRounds:        uint32(len(player_slots)),
+		TotalRounds:        uint32(total_rounds),
 		PointsPerReception: 1.0,
 		Year:               uint32(year),
-		SlotsPerTeam:       player_slots,
+		SlotsPerTeam:       playerslots,
 	}
 
-	game_state := common.GameState{
-		CurrentDraftPick:   1,
-		CurrentBotTeamId:   "0",
-		LeagueSettings:     &settings,
-		Bots:               bots,
-		Players:            players,
-		CurrentFantasyWeek: 2, // Simulate week 2 (this has a bug kind of, in reality you won't see actual performance, so just need to ignore that you're getting that)
-	}
-	return &game_state, nil
-}
-
-func loadPlayers(year int) ([]*common.Player, error) {
-	fmt.Println(year)
-	player_rank_file := fmt.Sprintf("player_ranks_%d.csv", year)
-	csv_file_path, err := engine.BuildLocalAbsolutePath("blitz_env/" + player_rank_file)
-	if err != nil {
-		return nil, err
-	}
-
-	// Open the CSV file
-	file, err := os.Open(csv_file_path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	// Create a new CSV reader
-	reader := csv.NewReader(file)
-
-	// Skip the first line (the header)
-	_, err = reader.Read() // Read the first line and ignore it
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	players := []*common.Player{}
-
-	// Read the file line by line
-	for {
-		record, err := reader.Read() // Read one record (a []string)
-		if err != nil {
-			// Check if we've reached the end of the file
-			if err.Error() == "EOF" {
-				break
-			}
-			log.Fatal(err)
-		}
-
-		byeWeek, _ := strconv.Atoi(record[4])
-		rank, _ := strconv.Atoi(record[5])
-		tier, _ := strconv.Atoi(record[6])
-
-		pos_rank, pos_rank_err := strconv.Atoi(record[7])
-		if pos_rank_err != nil {
-			pos_rank = 0
-		}
-
-		pos_tier, pos_tier_err := strconv.Atoi(record[8])
-		if pos_tier_err != nil {
-			pos_tier = 0
-		}
-
-		player_status := common.PlayerStatus{
-			Availability:     common.PlayerStatus_AVAILABLE,
-			PickChosen:       0,
-			CurrentTeamBotId: "",
-		}
-
-		player := common.Player{
-			Id:               record[0],
-			FullName:         record[1],
-			AllowedPositions: []string{record[2]},
-			ProfessionalTeam: record[3],
-			PlayerByeWeek:    uint32(byeWeek),
-			Rank:             uint32(rank),
-			Tier:             uint32(tier),
-			PositionRank:     uint32(pos_rank),
-			PositionTier:     uint32(pos_tier),
-			GsisId:           record[9],
-			Status:           &player_status,
-		}
-
-		players = append(players, &player)
-	}
-
-	return players, nil
+	return &settings
 }
 
 func getCurrentWeek() int {

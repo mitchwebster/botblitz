@@ -45,7 +45,7 @@ def draft_player(game_state: GameState) -> str:
     undrafted_players = [player for player in game_state.players if not is_drafted(player)]
 
     # Find players currently on team
-    team_players = [player for player in game_state.players if player.status.current_fantasy_team_id == game_state.current_bot_team_id]
+    team_players = [player for player in game_state.players if player.status.current_team_bot_id == game_state.current_bot_team_id]
 
     def get_expected_points(player):
         preseason_projections = get_preseason_projections(player, game_state.league_settings.year)
@@ -70,7 +70,7 @@ def draft_player(game_state: GameState) -> str:
     # Sort based on precomputed scores
     undrafted_players.sort(key=lambda player: score_player(player), reverse=True)
 
-    current_round = (game_state.current_draft_pick - 1) // len(game_state.teams)
+    current_round = (game_state.current_draft_pick - 1) // len(game_state.bots)
 
     # if it's the second to last round, pick the top available kicker
     rounds_remaining = game_state.league_settings.total_rounds - current_round

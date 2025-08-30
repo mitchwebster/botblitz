@@ -120,7 +120,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		fmt.Println("Creating source code file")
 	}
 
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := common.BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +130,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		return "", err
 	}
 
-	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
 	if err != nil {
 		return "", err
 	}
@@ -142,7 +142,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 
 	env := []string{}
 	if bot.EnvPath != "" {
-		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
+		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
 		if err != nil {
 			return "", err
 		}
@@ -165,7 +165,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 }
 
 func cleanBotResources() error {
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := common.BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func cleanBotResources() error {
 		}
 	}
 
-	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func createAndStartContainer(env []string, port string) (string, error) {
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
 
-	hostMountPath, err := BuildLocalAbsolutePath(botResourceFolderName)
+	hostMountPath, err := common.BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return "", err
 	}

@@ -8,9 +8,12 @@ replace github.com/mitchwebster/botblitz/pkg/common v0.0.0 => ../common
 
 replace github.com/mitchwebster/botblitz/pkg/engine v0.0.0 => ../engine
 
+replace github.com/mitchwebster/botblitz/pkg/gamestate v0.0.0 => ../gamestate
+
 require (
 	github.com/mitchwebster/botblitz/pkg/common v0.0.0
 	github.com/mitchwebster/botblitz/pkg/engine v0.0.0
+	github.com/mitchwebster/botblitz/pkg/gamestate v0.0.0
 )
 
 require (
@@ -75,4 +78,6 @@ require (
 	google.golang.org/api v0.197.0 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
+	gorm.io/driver/sqlite v1.6.0 // indirect
+	gorm.io/gorm v1.30.2 // indirect
 )

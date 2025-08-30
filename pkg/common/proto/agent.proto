@@ -11,7 +11,7 @@ service AgentService {
 
 message LeagueSettings {
     uint32 num_teams = 1;
-    repeated PlayerSlot slots_per_team = 2;
+    map<string, uint32> slots_per_team = 2;
     bool is_snake_draft = 3;
     uint32 total_rounds = 4;
     float points_per_reception = 5;

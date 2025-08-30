@@ -7,6 +7,21 @@ import json
 import random
 import string
 
+def propose_add_drop(game_state: GameState) -> AddDropSelection:
+    """
+    Selects a player to draft based on the highest rank.
+
+    Args:
+        players (List[Player]): A list of Player objects.
+
+    Returns:
+        str: The id of the drafted player.
+    """
+    return AddDropSelection(
+        player_to_add_id="",
+        player_to_drop_id=""
+    )
+
 def draft_player(game_state: GameState) -> str:
     if os.path.basename(__file__) == 'philip-bot.py':
         print("nope")
@@ -47,7 +62,7 @@ def draft_player(game_state: GameState) -> str:
     ])
 
     for player in game_state.players:
-        if player.status.current_fantasy_team_id == game_state.current_bot_team_id:
+        if player.status.current_team_bot_id == game_state.current_bot_team_id:
             for position in player.allowed_positions:
                 if position in my_team:
                     my_team[position].append(player)
@@ -80,7 +95,7 @@ def draft_player(game_state: GameState) -> str:
         return stats_summary
 
     
-    current_round = ((game_state.current_draft_pick - 1) // len(game_state.teams)) + 1
+    current_round = ((game_state.current_draft_pick - 1) // len(game_state.bots)) + 1
     is_last_three_rounds = (game_state.league_settings.total_rounds - current_round) < 3
     
     # Filter out already drafted players

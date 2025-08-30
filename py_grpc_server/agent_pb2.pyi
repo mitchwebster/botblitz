@@ -8,6 +8,13 @@ DESCRIPTOR: _descriptor.FileDescriptor
 
 class LeagueSettings(_message.Message):
     __slots__ = ("num_teams", "slots_per_team", "is_snake_draft", "total_rounds", "points_per_reception", "year")
+    class SlotsPerTeamEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: int
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[int] = ...) -> None: ...
     NUM_TEAMS_FIELD_NUMBER: _ClassVar[int]
     SLOTS_PER_TEAM_FIELD_NUMBER: _ClassVar[int]
     IS_SNAKE_DRAFT_FIELD_NUMBER: _ClassVar[int]
@@ -15,12 +22,12 @@ class LeagueSettings(_message.Message):
     POINTS_PER_RECEPTION_FIELD_NUMBER: _ClassVar[int]
     YEAR_FIELD_NUMBER: _ClassVar[int]
     num_teams: int
-    slots_per_team: _containers.RepeatedCompositeFieldContainer[PlayerSlot]
+    slots_per_team: _containers.ScalarMap[str, int]
     is_snake_draft: bool
     total_rounds: int
     points_per_reception: float
     year: int
-    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Iterable[_Union[PlayerSlot, _Mapping]]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ..., year: _Optional[int] = ...) -> None: ...
+    def __init__(self, num_teams: _Optional[int] = ..., slots_per_team: _Optional[_Mapping[str, int]] = ..., is_snake_draft: bool = ..., total_rounds: _Optional[int] = ..., points_per_reception: _Optional[float] = ..., year: _Optional[int] = ...) -> None: ...
 
 class PlayerSlot(_message.Message):
     __slots__ = ("name", "allowed_player_positions", "assigned_player_id", "allows_any_position")
