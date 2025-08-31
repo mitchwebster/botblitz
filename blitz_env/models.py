@@ -63,7 +63,7 @@ class GameStatus(Base):
 
 class DatabaseManager:
     # TODO: this should live elsewhere, since it's not a constant
-    DB_URL = "sqlite:///draft.db"
+    DB_URL = "sqlite:///data/draft.db"
     
     def __init__(self):
         self.engine = create_engine(self.DB_URL)
