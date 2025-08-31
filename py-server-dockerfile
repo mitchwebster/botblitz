@@ -11,6 +11,9 @@ COPY dist/blitz_env-0.1.0-py3-none-any.whl /app/
 # Copy only the py_grpc_server directory
 COPY py_grpc_server /app/py_grpc_server
 
+# Copy over the requirements file for the repo
+COPY requirements.txt /app/py_grpc_server/requirements.txt
+
 # Install the local wheel
 RUN pip3 install blitz_env-0.1.0-py3-none-any.whl
 

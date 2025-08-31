@@ -12,6 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const AppDatabaseName = "gamestate" + fileSuffix
+
 const saveFolderRelativePath = "data/game_states"
 const filePrefix = "gs-"
 const draftDesc = "draft"
@@ -21,7 +23,8 @@ const singleRowTableId = 1
 
 // GameStateDatabase encapsulates the SQLite database operations
 type GameStateHandler struct {
-	db *gorm.DB
+	db             *gorm.DB
+	dbSaveFilePath string
 
 	// Cache the invariants to avoid repeated DB queries for no reason
 	cachedBotList        []*common.Bot
@@ -50,36 +53,8 @@ func (s PlayerStatus) String() string {
 	}
 }
 
-func CheckDatabase() {
-	// Open database
-	db, err := gorm.Open(sqlite.Open("draft.db"), &gorm.Config{})
-	if err != nil {
-		panic(err)
-	}
-
-	// Auto migrate: creates "users" table if it doesn't exist
-	// db.AutoMigrate(&User{})
-
-	// Insert
-	// db.Create(&User{Name: "Alice", Email: "alice@example.com"})
-
-	// Query one
-	var user Player
-	db.First(&user, 16393) // find user with integer primary key 1
-	println(user.FullName)
-
-	// // Query all
-	// var users []User
-	// db.Find(&users)
-	// for _, u := range users {
-	//     println(u.Name, u.Email)
-	// }
-
-	// // Update
-	// db.Model(&user).Update("Email", "newalice@example.com")
-
-	// // Delete
-	// db.Delete(&user)
+func (handler *GameStateHandler) GetDBSaveFilePath() string {
+	return handler.dbSaveFilePath
 }
 
 func (handler *GameStateHandler) GetPlayerById(playerId string) (*Player, error) {
@@ -255,7 +230,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 		return nil, err
 	}
 
-	return &GameStateHandler{db: db, cachedBotList: nil, cachedLeagueSettings: nil}, nil
+	return &GameStateHandler{db: db, dbSaveFilePath: saveFileName, cachedBotList: nil, cachedLeagueSettings: nil}, nil
 }
 
 func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSettings) error {

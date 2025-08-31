@@ -15,6 +15,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
+	"github.com/mitchwebster/botblitz/pkg/gamestate"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,6 +27,7 @@ const botResourceDataFolderName = botResourceFolderName + "/data"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
+const appServerFolderPath = "/app/py_grpc_server"
 
 func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error {
 	// Connect to docker api.
@@ -165,7 +167,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		env = append(strings.Split(string(envContent), "\n"))
 	}
 
-	containerId, err := createAndStartContainer(env, port)
+	containerId, err := e.createAndStartContainer(env, port)
 	if err != nil {
 		return "", err
 	}
@@ -200,7 +202,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer(env []string, port string) (string, error) {
+func (e *BotEngine) createAndStartContainer(env []string, port string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -232,6 +234,8 @@ func createAndStartContainer(env []string, port string) (string, error) {
 		return "", err
 	}
 
+	databaseFilePath := appServerFolderPath + "/" + gamestate.AppDatabaseName
+
 	createResponse, err := apiClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
@@ -246,6 +250,12 @@ func createAndStartContainer(env []string, port string) (string, error) {
 					ReadOnly: true,
 					Source:   hostMountPath,
 					Target:   botResourceFolderNameInContainer,
+				},
+				{
+					Type:     mount.TypeBind,
+					ReadOnly: true,
+					Source:   e.gameStateHandler.GetDBSaveFilePath(),
+					Target:   databaseFilePath,
 				},
 			},
 			Resources: resources,

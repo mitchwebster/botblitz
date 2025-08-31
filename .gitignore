@@ -40,3 +40,4 @@ sheets-creds.json
 *.env
 
 draft.dbdist/
+dist/*
