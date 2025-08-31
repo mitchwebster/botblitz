@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"gorm.io/driver/sqlite"
@@ -515,4 +516,14 @@ type Player struct {
 
 	// Relation
 	CurrentBot *bot `gorm:"foreignKey:CurrentBotID;references:ID"`
+}
+
+func (p *Player) GetPositionSummary() (string, error) {
+	var allowedPositions []string
+	err := json.Unmarshal([]byte(p.AllowedPositions), &allowedPositions)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal allowed positions: %v", err)
+	}
+
+	return strings.Join(allowedPositions, ","), nil
 }

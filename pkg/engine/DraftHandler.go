@@ -206,7 +206,12 @@ func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, c
 
 	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", currentDraftPick, bot.FantasyTeamName, bot.Owner, player.FullName)
 
-	summary := player.FullName + "(" + ")"
+	positionSummary, err := player.GetPositionSummary()
+	if err != nil {
+		positionSummary = "?"
+	}
+
+	summary := player.FullName + "(" + positionSummary + ")"
 
 	return summary, nil
 }

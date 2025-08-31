@@ -24,7 +24,7 @@ test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go test -C
 
 run-draft:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft -enable_google_sheets=false
+	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
 
 run-fantasy:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy
