@@ -32,8 +32,9 @@ def create_slot_objects(player_slots_dict):
     slots = []
     for position, count in player_slots_dict.items():
         if position == "FLEX":
-            # FLEX can use RB, WR, TE
             allowed_positions = ["RB", "WR", "TE"]
+        elif position == "SUPERFLEX":
+            allowed_positions = ["QB", "RB", "WR", "TE"]
         else:
             # Regular positions
             allowed_positions = [position]
@@ -458,7 +459,7 @@ def print_visualization_matplotlib(team_scores, bots=None, players=None, player_
     """Create matplotlib visualizations of team scores and draft board."""
     # Team scores bar chart
     sorted_scores = sorted(team_scores, key=lambda x: x[1], reverse=True)
-    
+    print(sorted_scores)
     owners = [score[0] for score in sorted_scores]
     scores = [score[1] for score in sorted_scores]
 
@@ -478,11 +479,6 @@ def print_visualization_matplotlib(team_scores, bots=None, players=None, player_
 
     plt.tight_layout()
     plt.show()
-
-    # Print rankings
-    print("\nTeam Rankings by Best Possible Score:")
-    for i, (owner, score) in enumerate(sorted_scores, 1):
-        print(f"{i:2d}. {owner:<15} | {score:.2f} points")
     
     # Draft board visualization if data provided
     if all([bots, players, player_contributions, player_total_points, settings]):
@@ -633,7 +629,6 @@ def score_draft_for_visualization(database_path='draft.db', week=None):
         for bot in bots:
             # Get the players drafted by the team
             team_players = [player for player in players if player.current_bot_id == bot.id]
-
             if week is not None:
                 # Compute the team's best possible score for the specified week
                 best_possible_score, team_contributions, team_points = get_best_possible_score(
@@ -644,7 +639,6 @@ def score_draft_for_visualization(database_path='draft.db', week=None):
                 best_possible_score, team_contributions, team_points = get_best_possible_score_season(
                     stats_db, team_players, settings.player_slots, settings.year
                 )
-
             # Append to the list with team ID for weekly rankings, owner name for display
             team_scores.append((bot.owner, best_possible_score))
             team_scores_with_ids.append((bot.id, best_possible_score))
