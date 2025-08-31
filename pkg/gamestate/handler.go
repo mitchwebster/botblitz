@@ -28,6 +28,28 @@ type GameStateHandler struct {
 	cachedLeagueSettings *common.LeagueSettings
 }
 
+type PlayerStatus int
+
+const (
+	Available PlayerStatus = iota
+	OnHold
+	Drafted
+)
+
+// String returns a human-readable version of the enum
+func (s PlayerStatus) String() string {
+	switch s {
+	case Drafted:
+		return "DRAFTED"
+	case OnHold:
+		return "ON_HOLD"
+	case Available:
+		return "AVAILABLE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func CheckDatabase() {
 	// Open database
 	db, err := gorm.Open(sqlite.Open("draft.db"), &gorm.Config{})
@@ -42,7 +64,7 @@ func CheckDatabase() {
 	// db.Create(&User{Name: "Alice", Email: "alice@example.com"})
 
 	// Query one
-	var user player
+	var user Player
 	db.First(&user, 16393) // find user with integer primary key 1
 	println(user.FullName)
 
@@ -58,6 +80,29 @@ func CheckDatabase() {
 
 	// // Delete
 	// db.Delete(&user)
+}
+
+func (handler *GameStateHandler) GetPlayerById(playerId string) (*Player, error) {
+	var player Player
+	result := handler.db.First(&player, playerId)
+
+	if result.Error != nil {
+		// real DB error
+		return nil, fmt.Errorf("failed to get player from DB: %w", result.Error)
+	}
+
+	return &player, nil
+}
+
+func (handler *GameStateHandler) GetRandomPlayer() (*Player, error) {
+	var player Player
+	result := handler.db.Order("RANDOM()").First(&player)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get player from DB: %w", result.Error)
+	}
+
+	return &player, nil
 }
 
 func (handler *GameStateHandler) GetBots() ([]*common.Bot, error) {
@@ -124,7 +169,25 @@ func (handler *GameStateHandler) SetCurrentBotTeamId(botId string) error {
 		return result.Error
 	}
 
-	result = handler.db.Model(&gameStatus).Update("CurrentDraftPick", botId)
+	result = handler.db.Model(&gameStatus).Update("CurrentBotID", botId)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func (handler *GameStateHandler) IncrementDraftPick() error {
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	nextPick := gameStatus.CurrentDraftPick + 1
+
+	result = handler.db.Model(&gameStatus).Update("CurrentDraftPick", nextPick)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -141,7 +204,7 @@ func (handler *GameStateHandler) GetCurrentDraftPick() (int, error) {
 		return -1, result.Error
 	}
 
-	return *gameStatus.CurrentDraftPick, nil
+	return gameStatus.CurrentDraftPick, nil
 }
 
 // UpdatePlayer updates multiple player fields at once
@@ -158,7 +221,7 @@ func (handler *GameStateHandler) UpdatePlayer(playerID string, availability *str
 		updates["current_bot_id"] = *botID
 	}
 
-	return handler.db.Model(&player{}).Where("id = ?", playerID).Updates(updates).Error
+	return handler.db.Model(&Player{}).Where("id = ?", playerID).Updates(updates).Error
 }
 
 func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSettings) (*GameStateHandler, error) {
@@ -182,7 +245,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 	}
 
 	// Auto migrate the database tables
-	err = db.AutoMigrate(&bot{}, &gameStatus{}, &leagueSettings{}, &player{})
+	err = db.AutoMigrate(&bot{}, &gameStatus{}, &leagueSettings{}, &Player{})
 	if err != nil {
 		return nil, err
 	}
@@ -283,8 +346,8 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 
 	dbGameStatus := gameStatus{
 		CurrentBotID:       &currentBotID,
-		CurrentDraftPick:   nil, // Will be set when draft starts
-		CurrentFantasyWeek: nil, // Will be set during the season
+		CurrentDraftPick:   1,
+		CurrentFantasyWeek: 0,
 	}
 
 	result := db.Create(&dbGameStatus)
@@ -295,7 +358,7 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	return nil
 }
 
-func loadPlayers(year uint32) ([]player, error) {
+func loadPlayers(year uint32) ([]Player, error) {
 	player_rank_file := fmt.Sprintf("player_ranks_%d.csv", year)
 	csv_file_path, err := common.BuildLocalAbsolutePath("blitz_env/" + player_rank_file)
 	if err != nil {
@@ -318,7 +381,7 @@ func loadPlayers(year uint32) ([]player, error) {
 		return nil, fmt.Errorf("failed to read CSV header: %v", err)
 	}
 
-	players := []player{}
+	players := []Player{}
 
 	// Read the file line by line
 	for {
@@ -351,7 +414,7 @@ func loadPlayers(year uint32) ([]player, error) {
 			return nil, fmt.Errorf("failed to marshal allowed positions: %v", err)
 		}
 
-		dbPlayer := player{
+		dbPlayer := Player{
 			ID:               record[0],
 			FullName:         record[1],
 			AllowedPositions: string(allowedPositionsJSON),
@@ -428,7 +491,7 @@ type bot struct {
 
 	// Relations
 	GameStatuses []gameStatus `gorm:"foreignKey:CurrentBotID"`
-	Players      []player     `gorm:"foreignKey:CurrentBotID"`
+	Players      []Player     `gorm:"foreignKey:CurrentBotID"`
 }
 
 // --------------------
@@ -437,8 +500,8 @@ type bot struct {
 type gameStatus struct {
 	ID                 int     `gorm:"primaryKey;column:id"`
 	CurrentBotID       *string `gorm:"column:current_bot_id"`
-	CurrentDraftPick   *int    `gorm:"column:current_draft_pick"`
-	CurrentFantasyWeek *int    `gorm:"column:current_fantasy_week"`
+	CurrentDraftPick   int     `gorm:"column:current_draft_pick"`
+	CurrentFantasyWeek int     `gorm:"column:current_fantasy_week"`
 
 	// Relation
 	CurrentBot *bot `gorm:"foreignKey:CurrentBotID;references:ID"`
@@ -460,7 +523,7 @@ type leagueSettings struct {
 // --------------------
 // Table: players
 // --------------------
-type player struct {
+type Player struct {
 	ID               string  `gorm:"primaryKey;column:id"`
 	FullName         string  `gorm:"column:full_name"`
 	ProfessionalTeam string  `gorm:"column:professional_team"`

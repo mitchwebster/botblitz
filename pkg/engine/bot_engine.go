@@ -36,12 +36,12 @@ type BotEngine struct {
 	botContainers               map[string]*BotContainerInfo // map of bot ID to container info
 }
 
-func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, dataBytes *DataBytes) *BotEngine {
+func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
 	return &BotEngine{
 		settings:                    settings,
-		sourceCodeCache:             make(map[string][]byte),
+		sourceCodeCache:             sourceCodeCache,
 		gameStateHandler:            gameStateHandler,
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
@@ -110,11 +110,6 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return err
 	}
 
-	err = e.initializeBots()
-	if err != nil {
-		return err
-	}
-
 	if e.settings.GameMode == Draft {
 		return e.runDraft(ctx)
 	}
@@ -145,58 +140,6 @@ func (e *BotEngine) collectBotResources() error {
 	// TODO: put any resources we want to expose to the bot in this directory
 
 	return nil
-}
-
-func (e *BotEngine) initializeBots() error {
-	fmt.Printf("\n-----------------------------------------\n")
-	fmt.Println("Initializing Bots")
-
-	bots, err := e.gameStateHandler.GetBots()
-	if err != nil {
-		return err
-	}
-
-	for _, bot := range bots {
-		byteCode, err := e.fetchSourceCode(bot)
-		if err != nil {
-			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)
-			return err
-		}
-
-		e.sourceCodeCache[bot.Id] = byteCode
-	}
-
-	fmt.Printf("\n-----------------------------------------\n")
-
-	return nil
-}
-
-func (e *BotEngine) fetchSourceCode(bot *common.Bot) ([]byte, error) {
-	var botCode []byte
-
-	if bot.SourceType == common.Bot_REMOTE {
-		downloadedSourceCode, err := DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, e.settings.VerboseLoggingEnabled)
-		if err != nil {
-			return nil, err
-		}
-
-		botCode = downloadedSourceCode
-	} else {
-		absPath, err := common.BuildLocalAbsolutePath(bot.SourcePath)
-		if err != nil {
-			return nil, err
-		}
-
-		bytes, err := os.ReadFile(absPath)
-		if err != nil {
-			return nil, err
-		}
-
-		botCode = bytes
-	}
-
-	fmt.Printf("Successfully retrieved source code for bot (%s)\n", bot.Id)
-	return botCode, nil
 }
 
 func GenerateRandomString(length int) string {

@@ -111,6 +111,12 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 func bootstrapDraft() *engine.BotEngine {
 	year := uint32(2025)
 	bots := fetchBotList()
+	sourceCodeMap, err := getSourceCodeMap(bots)
+	if err != nil {
+		fmt.Println("Failed to find source code for configured bot")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	}
 
 	shuffleBotOrder(bots) // randomize draft order
 
@@ -147,7 +153,7 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, dataBytes)
+	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, sourceCodeMap, dataBytes)
 }
 
 func fetchBotList() []*common.Bot {
@@ -298,4 +304,53 @@ func getCurrentWeek() int {
 	now := time.Now()
 	duration := now.Sub(pastDate)
 	return int(math.Ceil(duration.Hours()/(24*7))) + 1
+}
+
+func getSourceCodeMap(bots []*common.Bot) (map[string][]byte, error) {
+	fmt.Printf("\n-----------------------------------------\n")
+	fmt.Println("Initializing Bots")
+
+	sourceCodeMap := make(map[string][]byte)
+
+	for _, bot := range bots {
+		byteCode, err := fetchSourceCode(bot)
+		if err != nil {
+			fmt.Printf("Failed to retrieve bot source code for (%s)\n", bot.Id)
+			return nil, err
+		}
+
+		sourceCodeMap[bot.Id] = byteCode
+	}
+
+	fmt.Printf("\n-----------------------------------------\n")
+
+	return sourceCodeMap, nil
+}
+
+func fetchSourceCode(bot *common.Bot) ([]byte, error) {
+	var botCode []byte
+
+	if bot.SourceType == common.Bot_REMOTE {
+		downloadedSourceCode, err := engine.DownloadGithubSourceCode(bot.SourceRepoUsername, bot.SourceRepoName, bot.SourcePath, false /*TODO: pass in setting*/)
+		if err != nil {
+			return nil, err
+		}
+
+		botCode = downloadedSourceCode
+	} else {
+		absPath, err := common.BuildLocalAbsolutePath(bot.SourcePath)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes, err := os.ReadFile(absPath)
+		if err != nil {
+			return nil, err
+		}
+
+		botCode = bytes
+	}
+
+	fmt.Printf("Successfully retrieved source code for bot (%s)\n", bot.Id)
+	return botCode, nil
 }

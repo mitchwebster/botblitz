@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
@@ -88,7 +89,11 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 
 	err = apiClient.ContainerKill(context.Background(), containerId, "")
 	if err != nil {
-		return err
+		if errdefs.IsConflict(err) {
+			fmt.Printf("Container %s is not running, continuing\n", containerId)
+		} else {
+			return err
+		}
 	}
 
 	if e.settings.VerboseLoggingEnabled {
@@ -97,6 +102,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 
 	err = apiClient.ContainerRemove(context.Background(), containerId, container.RemoveOptions{Force: true})
 	if err != nil {
+		print(err)
 		return err
 	}
 
@@ -488,6 +494,7 @@ func (e *BotEngine) CleanupAllPyGrpcServerContainers() error {
 
 			err := e.shutDownAndCleanBotServer(container.ID)
 			if err != nil {
+				fmt.Printf("Error type: %T\n", err)
 				fmt.Printf("Warning: Failed to kill container %s: %v\n", container.ID, err)
 			}
 		}
