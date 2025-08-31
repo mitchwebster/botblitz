@@ -15,60 +15,60 @@ def is_drafted(player: Player) -> bool:
 # -----------------------------
 def init_database(year: int) -> DatabaseManager:
     db = DatabaseManager()
-    # Clear existing data
-    db.session.query(Player).delete()
-    db.session.query(Bot).delete()
-    db.session.query(LeagueSettings).delete()
-    db.session.query(GameStatus).delete()
-    db.session.commit()
+    # # Clear existing data
+    # db.session.query(Player).delete()
+    # db.session.query(Bot).delete()
+    # db.session.query(LeagueSettings).delete()
+    # db.session.query(GameStatus).delete()
+    # db.session.commit()
     
-    # Load and add players
-    players_data = load_players(year)
-    for player_proto in players_data:
-        player = Player()
-        player.id = player_proto.id
-        player.full_name = player_proto.full_name
-        player.professional_team = player_proto.professional_team
-        player.player_bye_week = player_proto.player_bye_week
-        player.rank = player_proto.rank
-        player.tier = player_proto.tier
-        player.position_rank = player_proto.position_rank
-        player.position_tier = player_proto.position_tier
-        player.gsis_id = player_proto.gsis_id
-        player.allowed_positions = list(player_proto.allowed_positions)
-        player.availability = 'AVAILABLE'
-        db.session.add(player)
+    # # Load and add players
+    # players_data = load_players(year)
+    # for player_proto in players_data:
+    #     player = Player()
+    #     player.id = player_proto.id
+    #     player.full_name = player_proto.full_name
+    #     player.professional_team = player_proto.professional_team
+    #     player.player_bye_week = player_proto.player_bye_week
+    #     player.rank = player_proto.rank
+    #     player.tier = player_proto.tier
+    #     player.position_rank = player_proto.position_rank
+    #     player.position_tier = player_proto.position_tier
+    #     player.gsis_id = player_proto.gsis_id
+    #     player.allowed_positions = list(player_proto.allowed_positions)
+    #     player.availability = 'AVAILABLE'
+    #     db.session.add(player)
 
-    db.session.add(Bot(id="1", draft_order=0, name="Ryan", owner="Ryan", current_waiver_priority=0))
-    db.session.add(Bot(id="2", draft_order=1, name="Harry", owner="Harry", current_waiver_priority=1))
-    db.session.add(Bot(id="3", draft_order=2, name="Jon", owner="Jon", current_waiver_priority=2))
-    db.session.add(Bot(id="4", draft_order=3, name="Chris", owner="Chris", current_waiver_priority=3))
-    db.session.add(Bot(id="5", draft_order=4, name="Tyler", owner="Tyler", current_waiver_priority=4))
-    db.session.add(Bot(id="6", draft_order=5, name="Mitch", owner="Mitch", current_waiver_priority=5))
-    db.session.add(Bot(id="7", draft_order=6, name="Justin", owner="Justin", current_waiver_priority=6))
-    db.session.add(Bot(id="8", draft_order=7, name="Matt", owner="Matt", current_waiver_priority=7))
-    db.session.add(Bot(id="9", draft_order=8, name="Parker", owner="Parker", current_waiver_priority=8))
-    db.session.add(Bot(id="10", draft_order=9, name="Philip", owner="Philp", current_waiver_priority=9))
+    # db.session.add(Bot(id="1", draft_order=0, name="Ryan", owner="Ryan", current_waiver_priority=0))
+    # db.session.add(Bot(id="2", draft_order=1, name="Harry", owner="Harry", current_waiver_priority=1))
+    # db.session.add(Bot(id="3", draft_order=2, name="Jon", owner="Jon", current_waiver_priority=2))
+    # db.session.add(Bot(id="4", draft_order=3, name="Chris", owner="Chris", current_waiver_priority=3))
+    # db.session.add(Bot(id="5", draft_order=4, name="Tyler", owner="Tyler", current_waiver_priority=4))
+    # db.session.add(Bot(id="6", draft_order=5, name="Mitch", owner="Mitch", current_waiver_priority=5))
+    # db.session.add(Bot(id="7", draft_order=6, name="Justin", owner="Justin", current_waiver_priority=6))
+    # db.session.add(Bot(id="8", draft_order=7, name="Matt", owner="Matt", current_waiver_priority=7))
+    # db.session.add(Bot(id="9", draft_order=8, name="Parker", owner="Parker", current_waiver_priority=8))
+    # db.session.add(Bot(id="10", draft_order=9, name="Philip", owner="Philp", current_waiver_priority=9))
     
-    player_slots = {"QB": 2, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "DST": 1, "Bench": 3}
+    # player_slots = {"QB": 2, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "DST": 1, "Bench": 3}
     
-    # Add league settings
-    settings = LeagueSettings()
-    settings.num_bots = 10
-    settings.is_snake_draft = True
-    settings.total_rounds = 15
-    settings.points_per_reception = 1.0
-    settings.year = year
-    settings.player_slots = player_slots
-    db.session.add(settings)
+    # # Add league settings
+    # settings = LeagueSettings()
+    # settings.num_bots = 10
+    # settings.is_snake_draft = True
+    # settings.total_rounds = 15
+    # settings.points_per_reception = 1.0
+    # settings.year = year
+    # settings.player_slots = player_slots
+    # db.session.add(settings)
     
-    # Initialize draft status
-    game_status = GameStatus()
-    game_status.current_draft_pick = 1
-    game_status.current_bot_team_id = "1"  # Start with first team
-    db.session.add(game_status)
+    # # Initialize draft status
+    # game_status = GameStatus()
+    # game_status.current_draft_pick = 1
+    # game_status.current_bot_team_id = "1"  # Start with first team
+    # db.session.add(game_status)
     
-    db.session.commit()
+    # db.session.commit()
     return db
 
 def default_draft_strategy() -> str:

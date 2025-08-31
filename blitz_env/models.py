@@ -52,7 +52,7 @@ class LeagueSettings(Base):
 
 
 class GameStatus(Base):
-    __tablename__ = 'game_status'
+    __tablename__ = 'game_statuses'
 
     id = Column(Integer, primary_key=True)
     current_bot_id = Column(String, ForeignKey('bots.id'))
