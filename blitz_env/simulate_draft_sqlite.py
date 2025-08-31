@@ -1,4 +1,4 @@
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Tuple
 from blitz_env.models import DatabaseManager, Player, Bot, LeagueSettings, GameStatus
 from blitz_env.load_players import load_players  # used by init_database only
 import matplotlib.pyplot as plt
@@ -6,6 +6,12 @@ import matplotlib.patches as patches
 import textwrap
 import os
 import random
+from blitz_env.projections_db import load_nfl_projections_all_positions
+import pandas as pd
+import nfl_data_py as nfl
+from blitz_env.stats_db import fp_seasonal_years
+from sqlalchemy import text
+
 
 def is_drafted(player: Player) -> bool:
     return player.availability in ('DRAFTED', 'ON_HOLD')
@@ -13,16 +19,16 @@ def is_drafted(player: Player) -> bool:
 # -----------------------------
 # (UNCHANGED) Your init_database
 # -----------------------------
-def init_database(year: int) -> DatabaseManager:
+def init_database(year: int):
     db = DatabaseManager()
-    # Clear existing data
+    # # Clear existing data
     db.session.query(Player).delete()
     db.session.query(Bot).delete()
     db.session.query(LeagueSettings).delete()
     db.session.query(GameStatus).delete()
     db.session.commit()
     
-    # Load and add players
+    # # Load and add players
     players_data = load_players(year)
     for player_proto in players_data:
         player = Player()
@@ -39,37 +45,86 @@ def init_database(year: int) -> DatabaseManager:
         player.availability = 'AVAILABLE'
         db.session.add(player)
 
-    db.session.add(Bot(id="1", draft_order=0, name="Ryan", owner="Ryan", current_waiver_priority=0))
-    db.session.add(Bot(id="2", draft_order=1, name="Harry", owner="Harry", current_waiver_priority=1))
-    db.session.add(Bot(id="3", draft_order=2, name="Jon", owner="Jon", current_waiver_priority=2))
-    db.session.add(Bot(id="4", draft_order=3, name="Chris", owner="Chris", current_waiver_priority=3))
-    db.session.add(Bot(id="5", draft_order=4, name="Tyler", owner="Tyler", current_waiver_priority=4))
-    db.session.add(Bot(id="6", draft_order=5, name="Mitch", owner="Mitch", current_waiver_priority=5))
-    db.session.add(Bot(id="7", draft_order=6, name="Justin", owner="Justin", current_waiver_priority=6))
-    db.session.add(Bot(id="8", draft_order=7, name="Matt", owner="Matt", current_waiver_priority=7))
-    db.session.add(Bot(id="9", draft_order=8, name="Parker", owner="Parker", current_waiver_priority=8))
-    db.session.add(Bot(id="10", draft_order=9, name="Philip", owner="Philp", current_waiver_priority=9))
+    db.session.add(Bot(id="0", draft_order=1, name="Ryan", owner="Ryan", current_waiver_priority=0))
+    db.session.add(Bot(id="1", draft_order=2, name="Harry", owner="Harry", current_waiver_priority=0))
+    db.session.add(Bot(id="2", draft_order=3, name="Jon", owner="Jon", current_waiver_priority=0))
+    db.session.add(Bot(id="3", draft_order=4, name="Chris", owner="Chris", current_waiver_priority=0))
+    db.session.add(Bot(id="4", draft_order=5, name="Tyler", owner="Tyler", current_waiver_priority=0))
+    db.session.add(Bot(id="5", draft_order=6, name="Mitch", owner="Mitch", current_waiver_priority=0))
+    db.session.add(Bot(id="6", draft_order=7, name="Justin", owner="Justin", current_waiver_priority=0))
+    db.session.add(Bot(id="7", draft_order=8, name="Matt", owner="Matt", current_waiver_priority=0))
+    db.session.add(Bot(id="8", draft_order=9, name="Parker", owner="Parker", current_waiver_priority=0))
+    db.session.add(Bot(id="9", draft_order=10, name="Philip", owner="Philp", current_waiver_priority=0))
+    db.session.add(Bot(id="10", draft_order=11, name="Ben", owner="Ben", current_waiver_priority=0))
+    db.session.add(Bot(id="11", draft_order=12, name="Chris H", owner="Chris H", current_waiver_priority=0))
+    db.session.add(Bot(id="12", draft_order=13, name="Jack", owner="Jack", current_waiver_priority=0))
     
-    player_slots = {"QB": 2, "RB": 2, "WR": 2, "TE": 1, "FLEX": 1, "K": 1, "DST": 1, "Bench": 3}
+    player_slots = {"QB": 1, "RB": 2, "WR": 2, "SUPERFLEX": 1, "FLEX": 1, "K": 1, "DST": 1, "BENCH": 3}
+    total_rounds = sum(player_slots.values())
     
-    # Add league settings
+    # # Add league settings
     settings = LeagueSettings()
-    settings.num_teams = 10
     settings.is_snake_draft = True
-    settings.total_rounds = 15
+    settings.total_rounds = total_rounds
     settings.points_per_reception = 1.0
     settings.year = year
     settings.player_slots = player_slots
     db.session.add(settings)
     
-    # Initialize draft status
+    # # Initialize draft status
     game_status = GameStatus()
     game_status.current_draft_pick = 1
-    game_status.current_bot_team_id = "1"  # Start with first team
+    game_status.current_bot_id = "0"  # Start with first team
+    game_status.current_fantasy_week = 1
     db.session.add(game_status)
     
     db.session.commit()
-    return db
+    init_preseason_stats(db, year)
+    db.close()
+
+_STATS_CACHE: Dict[Tuple[str, int], pd.DataFrame] = {}
+
+def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True):
+    global _STATS_CACHE
+
+    # --- Preseason projections ---
+    key = ("preseason_projections", year)
+    if use_cache and key in _STATS_CACHE:
+        df = _STATS_CACHE[key]
+    else:
+        df = load_nfl_projections_all_positions(year)
+        _STATS_CACHE[key] = df
+
+    df.to_sql(
+        name="preseason_projections",
+        con=db.engine,
+        if_exists="replace",
+        index=False,
+    )
+
+    # --- Seasonal stats (previous 2 years) ---
+    key = ("season_stats", year)
+    if use_cache and key in _STATS_CACHE:
+        df = _STATS_CACHE[key]
+    else:
+        years = [year - 1, year - 2]
+        rb_df = fp_seasonal_years("rb", years)
+        qb_df = fp_seasonal_years("qb", years)
+        wr_df = fp_seasonal_years("wr", years)
+        te_df = fp_seasonal_years("te", years)
+        dst_df = fp_seasonal_years("dst", years)
+        k_df = fp_seasonal_years("k", years)
+        df = pd.concat([rb_df, qb_df, wr_df, te_df, dst_df, k_df])
+        _STATS_CACHE[key] = df
+
+    df.to_sql(
+        name="season_stats",
+        con=db.engine,
+        if_exists="replace",
+        index=False,
+    )
+    db.session.commit()
+
 
 def default_draft_strategy() -> str:
     """
@@ -93,25 +148,23 @@ def default_draft_strategy() -> str:
 
 
 def get_picking_team_index(pick: int) -> int:
-    """
-    Given an absolute pick number (1-based), return the index (0-based) of the bot that should pick.
-    Uses LeagueSettings.is_snake_draft and the current number of bots in the DB.
-    """
     db = DatabaseManager()
     try:
         settings: LeagueSettings = db.get_league_settings()
         num_bots = len(db.get_all_bots())
         is_snake = settings.is_snake_draft if settings else True
 
-        pick_adj = pick - 1
-        round_number = pick_adj // num_bots
-        pos_in_round = pick_adj % num_bots
+        i = pick - 1  # zero-based index
+        round_number = i // num_bots
+        pos_in_round = i % num_bots
 
         if is_snake and (round_number % 2 == 1):
             pos_in_round = num_bots - 1 - pos_in_round
+
         return pos_in_round
     finally:
         db.close()
+
 
 
 def get_picking_team_id(pick: int) -> str:
@@ -122,7 +175,7 @@ def get_picking_team_id(pick: int) -> str:
     try:
         bot_index = get_picking_team_index(pick)
         bot = db.get_bot_by_index(bot_index)
-        return bot.id if bot else "1"
+        return bot.id if bot else "0"
     finally:
         db.close()
 
@@ -163,7 +216,8 @@ def simulate_draft(draft_player: Callable[[], str], year: int):
     Initialize the DB (via your already-correct init_database), attach strategies,
     mark one random bot as the user's bot, and run the draft.
     """
-    db = init_database(year)
+    init_database(year)
+    db = DatabaseManager()
     try:
         draft_strategy_map: Dict[str, Callable[[], str]] = {}
         bots: List[Bot] = db.get_all_bots()

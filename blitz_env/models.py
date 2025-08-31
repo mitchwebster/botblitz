@@ -43,7 +43,7 @@ class Bot(Base):
 class LeagueSettings(Base):
     __tablename__ = 'league_settings'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     year = Column(Integer)
     player_slots = Column(JSON) # {"RB": 2, "QB": 2}
     is_snake_draft = Column(Boolean)
@@ -53,9 +53,9 @@ class LeagueSettings(Base):
 
 
 class GameStatus(Base):
-    __tablename__ = 'game_status'
+    __tablename__ = 'game_statuses'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     current_bot_id = Column(String, ForeignKey('bots.id'))
     current_draft_pick = Column(Integer)
     current_fantasy_week = Column(Integer)
@@ -109,7 +109,8 @@ class DatabaseManager:
         self.session.commit()
 
     def get_bot_by_index(self, index: int) -> Bot:        
-        return self.session.query(Bot).filter(Bot.draft_order == index).first()
+        bots = sorted(self.get_all_bots(), key=lambda b: b.draft_order)
+        return bots[index]
 
     def is_draft_complete(self) -> bool:
         settings = self.get_league_settings()

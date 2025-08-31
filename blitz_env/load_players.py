@@ -26,7 +26,7 @@ def load_all_players(csv_path):
             full_name=row['player_name'],
             allowed_positions=[row['pos']],  # assuming 'pos' is a string; adjust if it's actually a list
             professional_team=row['team'],
-            player_bye_week=int(row['position_rank']) if pd.notna(row['position_rank']) else 0,
+            player_bye_week=int(row['player_bye_week']) if pd.notna(row['player_bye_week']) else 0,
             rank=int(row['rank']),
             tier=int(row['tier']),
             position_rank=int(row['position_rank']) if pd.notna(row['position_rank']) else 0,
