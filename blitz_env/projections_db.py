@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import re
+from typing import Union
 
 def fp_projections(page, sport=None, include_metadata=False, **kwargs):
     if sport is None:
@@ -149,6 +150,95 @@ def fp_projections_parse_nhl(response):
     print("No projections for NHL yet")
     return {'projections': None, 'response': response['response']}
 
+
+# Default set of FantasyPros NFL position pages
+DEFAULT_NFL_PAGES = ("qb", "rb", "wr", "te", "k", "dst")
+
+def load_nfl_projections_all_positions(
+    year: Union[int, str],
+    week: Union[int, str] = "draft",
+    scoring: str = "PPR",
+    *,
+    include_errors: bool = False,
+    verbose: bool = False,
+    **extra_params,
+) -> pd.DataFrame:
+    """
+    Load FantasyPros NFL projections for a given year/week across multiple positions
+    and return a single concatenated DataFrame.
+
+    Parameters
+    ----------
+    year : int | str
+        Season year (e.g., 2024).
+    week : int | str, default "draft"
+        "draft" for preseason projections, or a specific week number (e.g., 1..18).
+    scoring : str, default "PPR"
+        Scoring format accepted by FantasyPros (e.g., "PPR", "HALF", "STD").
+    pages : Iterable[str], optional
+        Iterable of position pages to fetch. Defaults to QB/RB/WR/TE/K/DST.
+        (FantasyPros page names are lowercase like "qb", "rb", "wr", "te", "k", "dst".)
+    include_errors : bool, default False
+        If True, rows from failed pages will be skipped silently.
+        If False, the first error encountered will be raised.
+    verbose : bool, default False
+        If True, prints progress messages for each page.
+    **extra_params
+        Any additional query params to pass through to `fp_projections`, such as:
+        - "experts": "consensus" or an expert id filter
+        - "filters": site-specific filters, if supported
+
+    Returns
+    -------
+    pd.DataFrame
+        One DataFrame containing all rows across the requested position pages
+        with unified columns (non-shared columns will be present with NaNs as needed).
+    """
+    pages = DEFAULT_NFL_PAGES
+
+    all_frames = []
+    year_str = str(year)
+    week_str = str(week)
+
+    for page in pages:
+        if verbose:
+            print(f"Fetching {page.upper()} projections for year={year_str}, week={week_str}, scoring={scoring}...")
+        try:
+            df = fp_projections(
+                page=page,
+                sport="nfl",
+                year=year_str,
+                week=week_str,
+                scoring=scoring,
+                **extra_params
+            )
+            # Ensure required identifier columns exist (parser already sets these)
+            # but we guard just in case.
+            required_cols = ['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = pd.NA
+            all_frames.append(df)
+        except Exception as e:
+            if include_errors:
+                if verbose:
+                    print(f"  Skipping {page} due to error: {e}")
+                continue
+            raise
+
+    if not all_frames:
+        # If nothing fetched (e.g., all failed and include_errors=True), return empty with a sane schema
+        return pd.DataFrame(columns=['year', 'week', 'fantasypros_id', 'player_name', 'position', 'team'])
+
+    # Concatenate and reset index; union of columns is preserved automatically.
+    merged = pd.concat(all_frames, ignore_index=True, sort=False)
+
+    # Normalize dtypes for key identifiers
+    for c in ('year', 'week', 'fantasypros_id', 'position', 'team', 'player_name'):
+        if c in merged.columns:
+            merged[c] = merged[c].astype('string')
+
+    return merged
 
 from .agent_pb2 import Player  
 
