@@ -459,7 +459,6 @@ def print_visualization_matplotlib(team_scores, bots=None, players=None, player_
     """Create matplotlib visualizations of team scores and draft board."""
     # Team scores bar chart
     sorted_scores = sorted(team_scores, key=lambda x: x[1], reverse=True)
-    print(sorted_scores)
     owners = [score[0] for score in sorted_scores]
     scores = [score[1] for score in sorted_scores]
 
@@ -639,6 +638,7 @@ def score_draft_for_visualization(database_path='draft.db', week=None):
                 best_possible_score, team_contributions, team_points = get_best_possible_score_season(
                     stats_db, team_players, settings.player_slots, settings.year
                 )
+
             # Append to the list with team ID for weekly rankings, owner name for display
             team_scores.append((bot.owner, best_possible_score))
             team_scores_with_ids.append((bot.id, best_possible_score))

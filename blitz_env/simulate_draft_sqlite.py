@@ -1,4 +1,4 @@
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Tuple
 from blitz_env.models import DatabaseManager, Player, Bot, LeagueSettings, GameStatus
 from blitz_env.load_players import load_players  # used by init_database only
 import matplotlib.pyplot as plt
@@ -6,6 +6,12 @@ import matplotlib.patches as patches
 import textwrap
 import os
 import random
+from blitz_env.projections_db import load_nfl_projections_all_positions
+import pandas as pd
+import nfl_data_py as nfl
+from blitz_env.stats_db import fp_seasonal_years
+from sqlalchemy import text
+
 
 def is_drafted(player: Player) -> bool:
     return player.availability in ('DRAFTED', 'ON_HOLD')
@@ -13,7 +19,7 @@ def is_drafted(player: Player) -> bool:
 # -----------------------------
 # (UNCHANGED) Your init_database
 # -----------------------------
-def init_database(year: int) -> DatabaseManager:
+def init_database(year: int):
     db = DatabaseManager()
     # # Clear existing data
     db.session.query(Player).delete()
@@ -73,7 +79,52 @@ def init_database(year: int) -> DatabaseManager:
     db.session.add(game_status)
     
     db.session.commit()
-    return db
+    init_preseason_stats(db, year)
+    db.close()
+
+_STATS_CACHE: Dict[Tuple[str, int], pd.DataFrame] = {}
+
+def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True):
+    global _STATS_CACHE
+
+    # --- Preseason projections ---
+    key = ("preseason_projections", year)
+    if use_cache and key in _STATS_CACHE:
+        df = _STATS_CACHE[key]
+    else:
+        df = load_nfl_projections_all_positions(year)
+        _STATS_CACHE[key] = df
+
+    df.to_sql(
+        name="preseason_projections",
+        con=db.engine,
+        if_exists="replace",
+        index=False,
+    )
+
+    # --- Seasonal stats (previous 2 years) ---
+    key = ("season_stats", year)
+    if use_cache and key in _STATS_CACHE:
+        df = _STATS_CACHE[key]
+    else:
+        years = [year - 1, year - 2]
+        rb_df = fp_seasonal_years("rb", years)
+        qb_df = fp_seasonal_years("qb", years)
+        wr_df = fp_seasonal_years("wr", years)
+        te_df = fp_seasonal_years("te", years)
+        dst_df = fp_seasonal_years("dst", years)
+        k_df = fp_seasonal_years("k", years)
+        df = pd.concat([rb_df, qb_df, wr_df, te_df, dst_df, k_df])
+        _STATS_CACHE[key] = df
+
+    df.to_sql(
+        name="season_stats",
+        con=db.engine,
+        if_exists="replace",
+        index=False,
+    )
+    db.session.commit()
+
 
 def default_draft_strategy() -> str:
     """
@@ -165,7 +216,8 @@ def simulate_draft(draft_player: Callable[[], str], year: int):
     Initialize the DB (via your already-correct init_database), attach strategies,
     mark one random bot as the user's bot, and run the draft.
     """
-    db = init_database(year)
+    init_database(year)
+    db = DatabaseManager()
     try:
         draft_strategy_map: Dict[str, Callable[[], str]] = {}
         bots: List[Bot] = db.get_all_bots()
