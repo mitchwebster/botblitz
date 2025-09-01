@@ -3,10 +3,11 @@ package engine
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strconv"
+	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
+	"github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
 func (e *BotEngine) runDraft(ctx context.Context) error {
@@ -15,13 +16,23 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		return err
 	}
 
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
 	curRound := 1
-	for curRound <= int(e.gameState.LeagueSettings.TotalRounds) {
+	for curRound <= int(leagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
 
 		index := 0
 		increment := 1
-		arrayEdge := len(e.gameState.Bots) - 1
+		arrayEdge := int(leagueSettings.NumTeams) - 1
 
 		shouldUseReverseOrder := (curRound % 2) == 0
 		if shouldUseReverseOrder {
@@ -35,8 +46,8 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 				return err
 			}
 
-			curBot := e.gameState.Bots[index]
-			e.gameState.CurrentBotTeamId = curBot.Id
+			curBot := bots[index]
+			e.gameStateHandler.SetCurrentBotTeamId(curBot.Id)
 			fmt.Printf("\n-----------------------------------------\n")
 			err := e.performDraftAction(ctx, curBot, index)
 			fmt.Printf("\n-----------------------------------------\n")
@@ -44,13 +55,15 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 				return err
 			}
 			index += increment
-			e.gameState.CurrentDraftPick += 1
+
+			err = e.gameStateHandler.IncrementDraftPick()
+			if err != nil {
+				println("Failed to increment draft pick number")
+			}
 		}
 
 		curRound += 1
 	}
-
-	SaveGameState(e.gameState)
 
 	return nil
 }
@@ -76,7 +89,17 @@ func (e *BotEngine) initializeDraftSheet() error {
 		return err
 	}
 
-	for i := 1; i <= int(e.gameState.LeagueSettings.TotalRounds); i++ {
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i <= int(leagueSettings.TotalRounds); i++ {
 		content := strconv.Itoa(i)
 		err = e.sheetsClient.WriteContentToCell(IntialRow+i, InitialCol, content)
 		if err != nil {
@@ -84,8 +107,8 @@ func (e *BotEngine) initializeDraftSheet() error {
 		}
 	}
 
-	for i := 1; i <= len(e.gameState.Bots); i++ {
-		bot := e.gameState.Bots[i-1]
+	for i := 1; i <= len(bots); i++ {
+		bot := bots[i-1]
 		if err != nil {
 			return err
 		}
@@ -102,29 +125,38 @@ func (e *BotEngine) initializeDraftSheet() error {
 }
 
 func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, currentBotIndex int) error {
-	fmt.Printf("[Pick: %d] %s will choose next...", e.gameState.CurrentDraftPick, bot.FantasyTeamName)
+	pickNum, err := e.gameStateHandler.GetCurrentDraftPick()
+	if err != nil {
+		return err
+	}
 
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("[Pick: %d] %s will choose next...", pickNum, bot.FantasyTeamName)
+
+	summary := ""
 	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
 	if err != nil {
 		fmt.Println("Failed to get a response from bot")
 		fmt.Println(err)
-	} else {
-		fmt.Println("Received a response from bot")
 	}
 
-	summary, err := validateAndMakeDraftPick(bot, playerIdFromBot, e.gameState)
+	summary, err = e.validateAndMakeDraftPick(bot, playerIdFromBot, pickNum)
 
 	if err != nil {
 		fmt.Println("Failed to run draft using bot")
 		fmt.Println(err)
-		summary, err = draftPlayerOnInvalidResponse(bot, e.gameState)
+		summary, err = e.draftPlayerOnInvalidResponse(bot, pickNum)
 		if err != nil {
 			return err
 		}
 		summary += string('*')
 	}
 
-	err = registerPickInSheets(summary, int(e.gameState.CurrentDraftPick), len(e.gameState.Bots), currentBotIndex, e.sheetsClient)
+	err = registerPickInSheets(summary, pickNum, int(leagueSettings.NumTeams), currentBotIndex, e.sheetsClient)
 	if err != nil {
 		fmt.Println("Failed to write content to Google Sheets")
 		return err
@@ -134,59 +166,73 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, cur
 }
 
 func (e *BotEngine) validateDraftState() error {
-	if !e.gameState.LeagueSettings.IsSnakeDraft {
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
+
+	if !leagueSettings.IsSnakeDraft {
 		return fmt.Errorf("I only know how to snake draft")
 	}
 
-	if e.gameState.LeagueSettings.TotalRounds <= 0 {
+	if leagueSettings.TotalRounds <= 0 {
 		return fmt.Errorf("Must have at least one round")
 	}
 
-	if len(e.gameState.Bots) <= 0 {
+	if leagueSettings.NumTeams <= 0 {
 		return fmt.Errorf("Must have have at least one team")
 	}
 
 	return nil
 }
 
-func validateAndMakeDraftPick(bot *common.Bot, playerId string, gameState *common.GameState) (string, error) {
-	player, err := FindPlayerById(playerId, gameState)
+func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, currentDraftPick int) (string, error) {
+	if strings.TrimSpace(playerId) == "" {
+		return "", fmt.Errorf("Cannot draft an empty player")
+	}
+
+	player, err := e.gameStateHandler.GetPlayerById(playerId)
 	if err != nil {
 		return "", err
 	}
 
-	if player.Status.Availability == common.PlayerStatus_DRAFTED {
+	if player.Availability == gamestate.Drafted.String() {
 		return "", fmt.Errorf("Cannot draft player again")
 	}
 
-	player.Status.CurrentTeamBotId = bot.Id
-	player.Status.Availability = common.PlayerStatus_DRAFTED
-	player.Status.PickChosen = gameState.CurrentDraftPick
+	draftString := gamestate.Drafted.String()
 
-	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", gameState.CurrentDraftPick, bot.FantasyTeamName, bot.Owner, player.FullName)
+	e.gameStateHandler.UpdatePlayer(playerId, &draftString, &currentDraftPick, &bot.Id)
 
-	summary := player.FullName + "(" + player.AllowedPositions[0] + ")"
+	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", currentDraftPick, bot.FantasyTeamName, bot.Owner, player.FullName)
+
+	positionSummary, err := player.GetPositionSummary()
+	if err != nil {
+		positionSummary = "?"
+	}
+
+	summary := player.FullName + "(" + positionSummary + ")"
 
 	return summary, nil
 }
 
-func draftPlayerOnInvalidResponse(bot *common.Bot, gameState *common.GameState) (string, error) {
+func (e *BotEngine) draftPlayerOnInvalidResponse(bot *common.Bot, currentDraftPick int) (string, error) {
 	fmt.Println("Auto-drafting due to failure")
-	playerCount := len(gameState.Players)
-	index := rand.Intn(playerCount)
-	hasLooped := false
-	for index < playerCount && !hasLooped {
-		player := gameState.Players[index]
-		if player.Status.Availability == common.PlayerStatus_AVAILABLE {
-			summary, err := validateAndMakeDraftPick(bot, player.Id, gameState)
+
+	tries := 0
+	for tries < 1000 {
+
+		player, err := e.gameStateHandler.GetRandomPlayer()
+		if err != nil {
+			return "", err
+		}
+
+		if player.Availability == gamestate.Available.String() {
+			summary, err := e.validateAndMakeDraftPick(bot, player.ID, currentDraftPick)
 			return summary, err
 		}
 
-		index += 1
-		if index == playerCount && !hasLooped {
-			hasLooped = true
-			index = 0
-		}
+		tries += 1
 	}
 
 	return "", fmt.Errorf("Could not find a valid player to auto-draft")

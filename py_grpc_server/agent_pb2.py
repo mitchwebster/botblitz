@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x61gent.proto\"\xa2\x01\n\x0eLeagueSettings\x12\x11\n\tnum_teams\x18\x01 \x01(\r\x12#\n\x0eslots_per_team\x18\x02 \x03(\x0b\x32\x0b.PlayerSlot\x12\x16\n\x0eis_snake_draft\x18\x03 \x01(\x08\x12\x14\n\x0ctotal_rounds\x18\x04 \x01(\r\x12\x1c\n\x14points_per_reception\x18\x05 \x01(\x02\x12\x0c\n\x04year\x18\x06 \x01(\r\"u\n\nPlayerSlot\x12\x0c\n\x04name\x18\x01 \x01(\t\x12 \n\x18\x61llowed_player_positions\x18\x02 \x03(\t\x12\x1a\n\x12\x61ssigned_player_id\x18\x03 \x01(\t\x12\x1b\n\x13\x61llows_any_position\x18\x04 \x01(\x08\"\xf0\x01\n\x06Player\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tfull_name\x18\x02 \x01(\t\x12\x19\n\x11\x61llowed_positions\x18\x03 \x03(\t\x12\x19\n\x11professional_team\x18\x04 \x01(\t\x12\x17\n\x0fplayer_bye_week\x18\x05 \x01(\r\x12\x0c\n\x04rank\x18\x06 \x01(\r\x12\x0c\n\x04tier\x18\x07 \x01(\r\x12\x15\n\rposition_rank\x18\x08 \x01(\r\x12\x15\n\rposition_tier\x18\t \x01(\r\x12\x1d\n\x06status\x18\n \x01(\x0b\x32\r.PlayerStatus\x12\x0f\n\x07gsis_id\x18\x0b \x01(\t\"\xab\x01\n\x0cPlayerStatus\x12\x30\n\x0c\x61vailability\x18\x01 \x01(\x0e\x32\x1a.PlayerStatus.Availability\x12\x13\n\x0bpick_chosen\x18\x02 \x01(\r\x12\x1b\n\x13\x63urrent_team_bot_id\x18\x03 \x01(\t\"7\n\x0c\x41vailability\x12\r\n\tAVAILABLE\x10\x00\x12\x0b\n\x07\x44RAFTED\x10\x01\x12\x0b\n\x07ON_HOLD\x10\x02\"\xfe\x01\n\x03\x42ot\x12\n\n\x02id\x18\x01 \x01(\t\x12\x19\n\x11\x66\x61ntasy_team_name\x18\x02 \x01(\t\x12\r\n\x05owner\x18\x03 \x01(\t\x12 \n\x0bsource_type\x18\x04 \x01(\x0e\x32\x0b.Bot.Source\x12\x1c\n\x14source_repo_username\x18\x05 \x01(\t\x12\x18\n\x10source_repo_name\x18\x06 \x01(\t\x12\x13\n\x0bsource_path\x18\x07 \x01(\t\x12\x10\n\x08\x65nv_path\x18\x08 \x01(\t\x12\x1f\n\x17\x63urrent_waiver_priority\x18\t \x01(\r\"\x1f\n\x06Source\x12\t\n\x05LOCAL\x10\x00\x12\n\n\x06REMOTE\x10\x01\"\xba\x01\n\tGameState\x12\x18\n\x07players\x18\x01 \x03(\x0b\x32\x07.Player\x12\x12\n\x04\x62ots\x18\x02 \x03(\x0b\x32\x04.Bot\x12(\n\x0fleague_settings\x18\x03 \x01(\x0b\x32\x0f.LeagueSettings\x12\x1b\n\x13\x63urrent_bot_team_id\x18\x04 \x01(\t\x12\x1a\n\x12\x63urrent_draft_pick\x18\x05 \x01(\r\x12\x1c\n\x14\x63urrent_fantasy_week\x18\x06 \x01(\r\"#\n\x0e\x44raftSelection\x12\x11\n\tplayer_id\x18\x01 \x01(\t\"I\n\x17\x41ttemptedFantasyActions\x12.\n\x13\x61\x64\x64_drop_selections\x18\x01 \x03(\x0b\x32\x11.AddDropSelection\"G\n\x10\x41\x64\x64\x44ropSelection\x12\x19\n\x11player_to_drop_id\x18\x01 \x01(\t\x12\x18\n\x10player_to_add_id\x18\x02 \x01(\t2\xaf\x01\n\x0c\x41gentService\x12,\n\x0b\x44raftPlayer\x12\n.GameState\x1a\x0f.DraftSelection\"\x00\x12>\n\x14SubmitFantasyActions\x12\n.GameState\x1a\x18.AttemptedFantasyActions\"\x00\x12\x31\n\x0eProposeAddDrop\x12\n.GameState\x1a\x11.AddDropSelection\"\x00\x42\nZ\x08.;commonb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x61gent.proto\"\xed\x01\n\x0eLeagueSettings\x12\x11\n\tnum_teams\x18\x01 \x01(\r\x12\x39\n\x0eslots_per_team\x18\x02 \x03(\x0b\x32!.LeagueSettings.SlotsPerTeamEntry\x12\x16\n\x0eis_snake_draft\x18\x03 \x01(\x08\x12\x14\n\x0ctotal_rounds\x18\x04 \x01(\r\x12\x1c\n\x14points_per_reception\x18\x05 \x01(\x02\x12\x0c\n\x04year\x18\x06 \x01(\r\x1a\x33\n\x11SlotsPerTeamEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\r:\x02\x38\x01\"u\n\nPlayerSlot\x12\x0c\n\x04name\x18\x01 \x01(\t\x12 \n\x18\x61llowed_player_positions\x18\x02 \x03(\t\x12\x1a\n\x12\x61ssigned_player_id\x18\x03 \x01(\t\x12\x1b\n\x13\x61llows_any_position\x18\x04 \x01(\x08\"\xf0\x01\n\x06Player\x12\n\n\x02id\x18\x01 \x01(\t\x12\x11\n\tfull_name\x18\x02 \x01(\t\x12\x19\n\x11\x61llowed_positions\x18\x03 \x03(\t\x12\x19\n\x11professional_team\x18\x04 \x01(\t\x12\x17\n\x0fplayer_bye_week\x18\x05 \x01(\r\x12\x0c\n\x04rank\x18\x06 \x01(\r\x12\x0c\n\x04tier\x18\x07 \x01(\r\x12\x15\n\rposition_rank\x18\x08 \x01(\r\x12\x15\n\rposition_tier\x18\t \x01(\r\x12\x1d\n\x06status\x18\n \x01(\x0b\x32\r.PlayerStatus\x12\x0f\n\x07gsis_id\x18\x0b \x01(\t\"\xab\x01\n\x0cPlayerStatus\x12\x30\n\x0c\x61vailability\x18\x01 \x01(\x0e\x32\x1a.PlayerStatus.Availability\x12\x13\n\x0bpick_chosen\x18\x02 \x01(\r\x12\x1b\n\x13\x63urrent_team_bot_id\x18\x03 \x01(\t\"7\n\x0c\x41vailability\x12\r\n\tAVAILABLE\x10\x00\x12\x0b\n\x07\x44RAFTED\x10\x01\x12\x0b\n\x07ON_HOLD\x10\x02\"\xfe\x01\n\x03\x42ot\x12\n\n\x02id\x18\x01 \x01(\t\x12\x19\n\x11\x66\x61ntasy_team_name\x18\x02 \x01(\t\x12\r\n\x05owner\x18\x03 \x01(\t\x12 \n\x0bsource_type\x18\x04 \x01(\x0e\x32\x0b.Bot.Source\x12\x1c\n\x14source_repo_username\x18\x05 \x01(\t\x12\x18\n\x10source_repo_name\x18\x06 \x01(\t\x12\x13\n\x0bsource_path\x18\x07 \x01(\t\x12\x10\n\x08\x65nv_path\x18\x08 \x01(\t\x12\x1f\n\x17\x63urrent_waiver_priority\x18\t \x01(\r\"\x1f\n\x06Source\x12\t\n\x05LOCAL\x10\x00\x12\n\n\x06REMOTE\x10\x01\"\xba\x01\n\tGameState\x12\x18\n\x07players\x18\x01 \x03(\x0b\x32\x07.Player\x12\x12\n\x04\x62ots\x18\x02 \x03(\x0b\x32\x04.Bot\x12(\n\x0fleague_settings\x18\x03 \x01(\x0b\x32\x0f.LeagueSettings\x12\x1b\n\x13\x63urrent_bot_team_id\x18\x04 \x01(\t\x12\x1a\n\x12\x63urrent_draft_pick\x18\x05 \x01(\r\x12\x1c\n\x14\x63urrent_fantasy_week\x18\x06 \x01(\r\"#\n\x0e\x44raftSelection\x12\x11\n\tplayer_id\x18\x01 \x01(\t\"I\n\x17\x41ttemptedFantasyActions\x12.\n\x13\x61\x64\x64_drop_selections\x18\x01 \x03(\x0b\x32\x11.AddDropSelection\"G\n\x10\x41\x64\x64\x44ropSelection\x12\x19\n\x11player_to_drop_id\x18\x01 \x01(\t\x12\x18\n\x10player_to_add_id\x18\x02 \x01(\t2\xaf\x01\n\x0c\x41gentService\x12,\n\x0b\x44raftPlayer\x12\n.GameState\x1a\x0f.DraftSelection\"\x00\x12>\n\x14SubmitFantasyActions\x12\n.GameState\x1a\x18.AttemptedFantasyActions\"\x00\x12\x31\n\x0eProposeAddDrop\x12\n.GameState\x1a\x11.AddDropSelection\"\x00\x42\nZ\x08.;commonb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,28 +32,32 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'agent_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z\010.;common'
+  _globals['_LEAGUESETTINGS_SLOTSPERTEAMENTRY']._loaded_options = None
+  _globals['_LEAGUESETTINGS_SLOTSPERTEAMENTRY']._serialized_options = b'8\001'
   _globals['_LEAGUESETTINGS']._serialized_start=16
-  _globals['_LEAGUESETTINGS']._serialized_end=178
-  _globals['_PLAYERSLOT']._serialized_start=180
-  _globals['_PLAYERSLOT']._serialized_end=297
-  _globals['_PLAYER']._serialized_start=300
-  _globals['_PLAYER']._serialized_end=540
-  _globals['_PLAYERSTATUS']._serialized_start=543
-  _globals['_PLAYERSTATUS']._serialized_end=714
-  _globals['_PLAYERSTATUS_AVAILABILITY']._serialized_start=659
-  _globals['_PLAYERSTATUS_AVAILABILITY']._serialized_end=714
-  _globals['_BOT']._serialized_start=717
-  _globals['_BOT']._serialized_end=971
-  _globals['_BOT_SOURCE']._serialized_start=940
-  _globals['_BOT_SOURCE']._serialized_end=971
-  _globals['_GAMESTATE']._serialized_start=974
-  _globals['_GAMESTATE']._serialized_end=1160
-  _globals['_DRAFTSELECTION']._serialized_start=1162
-  _globals['_DRAFTSELECTION']._serialized_end=1197
-  _globals['_ATTEMPTEDFANTASYACTIONS']._serialized_start=1199
-  _globals['_ATTEMPTEDFANTASYACTIONS']._serialized_end=1272
-  _globals['_ADDDROPSELECTION']._serialized_start=1274
-  _globals['_ADDDROPSELECTION']._serialized_end=1345
-  _globals['_AGENTSERVICE']._serialized_start=1348
-  _globals['_AGENTSERVICE']._serialized_end=1523
+  _globals['_LEAGUESETTINGS']._serialized_end=253
+  _globals['_LEAGUESETTINGS_SLOTSPERTEAMENTRY']._serialized_start=202
+  _globals['_LEAGUESETTINGS_SLOTSPERTEAMENTRY']._serialized_end=253
+  _globals['_PLAYERSLOT']._serialized_start=255
+  _globals['_PLAYERSLOT']._serialized_end=372
+  _globals['_PLAYER']._serialized_start=375
+  _globals['_PLAYER']._serialized_end=615
+  _globals['_PLAYERSTATUS']._serialized_start=618
+  _globals['_PLAYERSTATUS']._serialized_end=789
+  _globals['_PLAYERSTATUS_AVAILABILITY']._serialized_start=734
+  _globals['_PLAYERSTATUS_AVAILABILITY']._serialized_end=789
+  _globals['_BOT']._serialized_start=792
+  _globals['_BOT']._serialized_end=1046
+  _globals['_BOT_SOURCE']._serialized_start=1015
+  _globals['_BOT_SOURCE']._serialized_end=1046
+  _globals['_GAMESTATE']._serialized_start=1049
+  _globals['_GAMESTATE']._serialized_end=1235
+  _globals['_DRAFTSELECTION']._serialized_start=1237
+  _globals['_DRAFTSELECTION']._serialized_end=1272
+  _globals['_ATTEMPTEDFANTASYACTIONS']._serialized_start=1274
+  _globals['_ATTEMPTEDFANTASYACTIONS']._serialized_end=1347
+  _globals['_ADDDROPSELECTION']._serialized_start=1349
+  _globals['_ADDDROPSELECTION']._serialized_end=1420
+  _globals['_AGENTSERVICE']._serialized_start=1423
+  _globals['_AGENTSERVICE']._serialized_end=1598
 # @@protoc_insertion_point(module_scope)

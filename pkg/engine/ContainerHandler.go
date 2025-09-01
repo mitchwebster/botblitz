@@ -11,9 +11,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	common "github.com/mitchwebster/botblitz/pkg/common"
+	"github.com/mitchwebster/botblitz/pkg/gamestate"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -25,6 +27,7 @@ const botResourceDataFolderName = botResourceFolderName + "/data"
 const botFileRelativePath = botResourceFolderName + "/bot.py" // source code name passed in resource folder
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
+const appServerFolderPath = "/app/py_grpc_server"
 
 func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error {
 	// Connect to docker api.
@@ -35,7 +38,10 @@ func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error
 	defer apiClient.Close()
 	apiClient.NegotiateAPIVersion(context.Background())
 
-	pickNum := int(e.gameState.CurrentDraftPick)
+	pickNum, err := e.gameStateHandler.GetCurrentDraftPick()
+	if err != nil {
+		return err
+	}
 
 	// Request logs for this container.
 	ctx := context.Background()
@@ -85,7 +91,11 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 
 	err = apiClient.ContainerKill(context.Background(), containerId, "")
 	if err != nil {
-		return err
+		if errdefs.IsConflict(err) {
+			fmt.Printf("Container %s is not running, continuing\n", containerId)
+		} else {
+			return err
+		}
 	}
 
 	if e.settings.VerboseLoggingEnabled {
@@ -94,6 +104,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 
 	err = apiClient.ContainerRemove(context.Background(), containerId, container.RemoveOptions{Force: true})
 	if err != nil {
+		print(err)
 		return err
 	}
 
@@ -120,7 +131,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		fmt.Println("Creating source code file")
 	}
 
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := common.BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +141,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		return "", err
 	}
 
-	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
 	if err != nil {
 		return "", err
 	}
@@ -142,7 +153,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 
 	env := []string{}
 	if bot.EnvPath != "" {
-		envAbsPath, err := BuildLocalAbsolutePath(bot.EnvPath)
+		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
 		if err != nil {
 			return "", err
 		}
@@ -156,7 +167,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		env = append(strings.Split(string(envContent), "\n"))
 	}
 
-	containerId, err := createAndStartContainer(env, port)
+	containerId, err := e.createAndStartContainer(env, port)
 	if err != nil {
 		return "", err
 	}
@@ -165,7 +176,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 }
 
 func cleanBotResources() error {
-	absPath, err := BuildLocalAbsolutePath(botFileRelativePath)
+	absPath, err := common.BuildLocalAbsolutePath(botFileRelativePath)
 	if err != nil {
 		return err
 	}
@@ -178,7 +189,7 @@ func cleanBotResources() error {
 		}
 	}
 
-	absDataPath, err := BuildLocalAbsolutePath(botResourceDataFolderName)
+	absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
 	if err != nil {
 		return err
 	}
@@ -191,7 +202,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func createAndStartContainer(env []string, port string) (string, error) {
+func (e *BotEngine) createAndStartContainer(env []string, port string) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -218,10 +229,12 @@ func createAndStartContainer(env []string, port string) (string, error) {
 
 	portBinding := nat.PortMap{containerPort: []nat.PortBinding{hostBinding}}
 
-	hostMountPath, err := BuildLocalAbsolutePath(botResourceFolderName)
+	hostMountPath, err := common.BuildLocalAbsolutePath(botResourceFolderName)
 	if err != nil {
 		return "", err
 	}
+
+	databaseFilePath := appServerFolderPath + "/" + gamestate.AppDatabaseName
 
 	createResponse, err := apiClient.ContainerCreate(
 		context.Background(),
@@ -237,6 +250,12 @@ func createAndStartContainer(env []string, port string) (string, error) {
 					ReadOnly: true,
 					Source:   hostMountPath,
 					Target:   botResourceFolderNameInContainer,
+				},
+				{
+					Type:     mount.TypeBind,
+					ReadOnly: true,
+					Source:   e.gameStateHandler.GetDBSaveFilePath(),
+					Target:   databaseFilePath,
 				},
 			},
 			Resources: resources,
@@ -259,7 +278,7 @@ func createAndStartContainer(env []string, port string) (string, error) {
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *common.GameState) (*common.AddDropSelection, error) {
+func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.AddDropSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -276,7 +295,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selection, err := client.ProposeAddDrop(ctx, gameState)
+	selection, err := client.ProposeAddDrop(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -285,7 +304,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string, gameState *
 	return selection, nil
 }
 
-func (e *BotEngine) callDraftRPC(ctx context.Context, port string, gameState *common.GameState) (*common.DraftSelection, error) {
+func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -303,7 +322,7 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, port string, gameState *co
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.DraftPlayer(ctx, gameState)
+	selections, err := client.DraftPlayer(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -420,7 +439,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port, e.gameState)
+	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return "", err
 	}
@@ -446,7 +465,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
 	}
 
-	selection, err = e.callAddDropRPC(ctx, containerInfo.Port, e.gameState)
+	selection, err = e.callAddDropRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -485,6 +504,7 @@ func (e *BotEngine) CleanupAllPyGrpcServerContainers() error {
 
 			err := e.shutDownAndCleanBotServer(container.ID)
 			if err != nil {
+				fmt.Printf("Error type: %T\n", err)
 				fmt.Printf("Warning: Failed to kill container %s: %v\n", container.ID, err)
 			}
 		}

@@ -2,7 +2,7 @@ from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player,
 from typing import List
 
 def get_current_round(game_state: GameState) -> int:
-    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.teams)
+    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.bots)
     return zero_based_round + 1
 
 def draft_player(game_state: GameState) -> str:

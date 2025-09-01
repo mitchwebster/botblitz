@@ -11,4 +11,11 @@ from .agent_pb2 import (
     LeagueSettings,
     PlayerSlot
 )
+from.models import (
+    Player,
+    Bot,
+    LeagueSettings,
+    GameStatus,
+    DatabaseManager
+)
 from .projections_db import ProjectionsDB

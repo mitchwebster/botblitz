@@ -119,7 +119,7 @@ func (Bot_Source) EnumDescriptor() ([]byte, []int) {
 type LeagueSettings struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	NumTeams           uint32                 `protobuf:"varint,1,opt,name=num_teams,json=numTeams,proto3" json:"num_teams,omitempty"`
-	SlotsPerTeam       []*PlayerSlot          `protobuf:"bytes,2,rep,name=slots_per_team,json=slotsPerTeam,proto3" json:"slots_per_team,omitempty"`
+	SlotsPerTeam       map[string]uint32      `protobuf:"bytes,2,rep,name=slots_per_team,json=slotsPerTeam,proto3" json:"slots_per_team,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	IsSnakeDraft       bool                   `protobuf:"varint,3,opt,name=is_snake_draft,json=isSnakeDraft,proto3" json:"is_snake_draft,omitempty"`
 	TotalRounds        uint32                 `protobuf:"varint,4,opt,name=total_rounds,json=totalRounds,proto3" json:"total_rounds,omitempty"`
 	PointsPerReception float32                `protobuf:"fixed32,5,opt,name=points_per_reception,json=pointsPerReception,proto3" json:"points_per_reception,omitempty"`
@@ -165,7 +165,7 @@ func (x *LeagueSettings) GetNumTeams() uint32 {
 	return 0
 }
 
-func (x *LeagueSettings) GetSlotsPerTeam() []*PlayerSlot {
+func (x *LeagueSettings) GetSlotsPerTeam() map[string]uint32 {
 	if x != nil {
 		return x.SlotsPerTeam
 	}
@@ -788,14 +788,17 @@ var File_pkg_common_proto_agent_proto protoreflect.FileDescriptor
 
 const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1cpkg/common/proto/agent.proto\"\xef\x01\n" +
+	"\x1cpkg/common/proto/agent.proto\"\xc6\x02\n" +
 	"\x0eLeagueSettings\x12\x1b\n" +
-	"\tnum_teams\x18\x01 \x01(\rR\bnumTeams\x121\n" +
-	"\x0eslots_per_team\x18\x02 \x03(\v2\v.PlayerSlotR\fslotsPerTeam\x12$\n" +
+	"\tnum_teams\x18\x01 \x01(\rR\bnumTeams\x12G\n" +
+	"\x0eslots_per_team\x18\x02 \x03(\v2!.LeagueSettings.SlotsPerTeamEntryR\fslotsPerTeam\x12$\n" +
 	"\x0eis_snake_draft\x18\x03 \x01(\bR\fisSnakeDraft\x12!\n" +
 	"\ftotal_rounds\x18\x04 \x01(\rR\vtotalRounds\x120\n" +
 	"\x14points_per_reception\x18\x05 \x01(\x02R\x12pointsPerReception\x12\x12\n" +
-	"\x04year\x18\x06 \x01(\rR\x04year\"\xb8\x01\n" +
+	"\x04year\x18\x06 \x01(\rR\x04year\x1a?\n" +
+	"\x11SlotsPerTeamEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\rR\x05value:\x028\x01\"\xb8\x01\n" +
 	"\n" +
 	"PlayerSlot\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x128\n" +
@@ -876,7 +879,7 @@ func file_pkg_common_proto_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_pkg_common_proto_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_pkg_common_proto_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_pkg_common_proto_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_pkg_common_proto_agent_proto_goTypes = []any{
 	(PlayerStatus_Availability)(0),  // 0: PlayerStatus.Availability
 	(Bot_Source)(0),                 // 1: Bot.Source
@@ -889,9 +892,10 @@ var file_pkg_common_proto_agent_proto_goTypes = []any{
 	(*DraftSelection)(nil),          // 8: DraftSelection
 	(*AttemptedFantasyActions)(nil), // 9: AttemptedFantasyActions
 	(*AddDropSelection)(nil),        // 10: AddDropSelection
+	nil,                             // 11: LeagueSettings.SlotsPerTeamEntry
 }
 var file_pkg_common_proto_agent_proto_depIdxs = []int32{
-	3,  // 0: LeagueSettings.slots_per_team:type_name -> PlayerSlot
+	11, // 0: LeagueSettings.slots_per_team:type_name -> LeagueSettings.SlotsPerTeamEntry
 	5,  // 1: Player.status:type_name -> PlayerStatus
 	0,  // 2: PlayerStatus.availability:type_name -> PlayerStatus.Availability
 	1,  // 3: Bot.source_type:type_name -> Bot.Source
@@ -923,7 +927,7 @@ func file_pkg_common_proto_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_common_proto_agent_proto_rawDesc), len(file_pkg_common_proto_agent_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

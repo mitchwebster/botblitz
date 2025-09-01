@@ -14,7 +14,7 @@ def draft_player(game_state: GameState) -> str:
 
     # my team
     draft_id = game_state.current_bot_team_id
-    my_team = [player for player in game_state.players if player.status.current_fantasy_team_id == draft_id]
+    my_team = [player for player in game_state.players if player.status.current_team_bot_id == draft_id]
 
     # declare variables
     drafted_qb_count = 0

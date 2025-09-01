@@ -49,6 +49,7 @@ class LeagueSettings(Base):
     is_snake_draft = Column(Boolean)
     total_rounds = Column(Integer)
     points_per_reception = Column(Float)
+    num_teams = Column(Integer)
 
 
 class GameStatus(Base):
@@ -62,7 +63,7 @@ class GameStatus(Base):
 
 class DatabaseManager:
     # TODO: this should live elsewhere, since it's not a constant
-    DB_URL = "sqlite:///draft.db"
+    DB_URL = "sqlite:///gamestate.db"
     
     def __init__(self):
         self.engine = create_engine(self.DB_URL)

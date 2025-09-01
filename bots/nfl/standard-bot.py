@@ -1,5 +1,5 @@
-from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, GameState, AddDropSelection
-from typing import List
+from blitz_env import Player, GameState, AddDropSelection
+from blitz_env.models import DatabaseManager, Player
 
 def draft_player(game_state: GameState) -> str:
     """
@@ -11,15 +11,25 @@ def draft_player(game_state: GameState) -> str:
     Returns:
         str: The id of the drafted player.
     """
-    # Filter out already drafted players
-    undrafted_players = [player for player in game_state.players if not is_drafted(player)]
-
-    # Select the player with the highest rank (lowest rank number)
-    if undrafted_players:
-        drafted_player = min(undrafted_players, key=lambda p: p.rank)
-        return drafted_player.id
-    else:
-        return "None"  # Return empty string if no undrafted players are available
+    db = DatabaseManager()
+    try:
+        # First, try to get the best available QB
+        best_qb = db.session.query(Player).filter(
+            Player.availability == 'AVAILABLE',
+            Player.allowed_positions.contains("RB"),
+        ).order_by(Player.rank).first()
+        
+        if best_qb:
+            return best_qb.id
+        
+        # If no QBs available, get best overall player
+        best_player = db.session.query(Player).filter(
+            Player.availability == 'AVAILABLE'
+        ).order_by(Player.rank).first()
+        
+        return best_player.id if best_player else ""
+    finally:
+        db.close()
 
 def propose_add_drop(game_state: GameState) -> AddDropSelection:
     """
