@@ -85,46 +85,79 @@ def init_database(year: int):
 
 _STATS_CACHE: Dict[Tuple[str, int], pd.DataFrame] = {}
 
-def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True):
-    global _STATS_CACHE
+def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True, stats_path: str = "stats.db"):
+    with db.engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS season_stats"))
+        conn.execute(text("DROP TABLE IF EXISTS preseason_projections"))
 
-    # --- Preseason projections ---
-    key = ("preseason_projections", year)
-    if use_cache and key in _STATS_CACHE:
-        df = _STATS_CACHE[key]
-    else:
-        df = load_nfl_projections_all_positions(year)
-        _STATS_CACHE[key] = df
+        # Attach on this short-lived connection
+        conn.execute(text(f"ATTACH DATABASE '{stats_path}' AS stats"))
+        
 
-    df.to_sql(
-        name="preseason_projections",
-        con=db.engine,
-        if_exists="replace",
-        index=False,
-    )
+        # copy fresh season_stats (last 2 years)
+        conn.execute(
+            text("""
+                CREATE TABLE season_stats AS
+                SELECT * FROM stats.season_stats
+                WHERE year < :y AND year >= :y2
+            """),
+            {"y": year, "y2": year - 2}
+        )
 
-    # --- Seasonal stats (previous 2 years) ---
-    key = ("season_stats", year)
-    if use_cache and key in _STATS_CACHE:
-        df = _STATS_CACHE[key]
-    else:
-        years = [year - 1, year - 2]
-        rb_df = fp_seasonal_years("rb", years)
-        qb_df = fp_seasonal_years("qb", years)
-        wr_df = fp_seasonal_years("wr", years)
-        te_df = fp_seasonal_years("te", years)
-        dst_df = fp_seasonal_years("dst", years)
-        k_df = fp_seasonal_years("k", years)
-        df = pd.concat([rb_df, qb_df, wr_df, te_df, dst_df, k_df])
-        _STATS_CACHE[key] = df
+        # copy fresh preseason_projections (this year, last 2 years)
+        conn.execute(
+            text("""
+                CREATE TABLE preseason_projections AS
+                SELECT * FROM stats.preseason_projections
+                 WHERE year <= :y AND year >= :y2
+            """),
+            {"y": year, "y2": year - 2}
+        )
 
-    df.to_sql(
-        name="season_stats",
-        con=db.engine,
-        if_exists="replace",
-        index=False,
-    )
-    db.session.commit()
+        # Now that no tx/statement is active, DETACH
+        # conn.execute(text("DETACH DATABASE stats"))
+        # Exiting the `with` will close/return the connection cleanly
+
+
+
+
+    # # --- Preseason projections ---
+    # key = ("preseason_projections", year)
+    # if use_cache and key in _STATS_CACHE:
+    #     df = _STATS_CACHE[key]
+    # else:
+    #     df = load_nfl_projections_all_positions(year)
+    #     _STATS_CACHE[key] = df
+
+    # df.to_sql(
+    #     name="preseason_projections",
+    #     con=db.engine,
+    #     if_exists="replace",
+    #     index=False,
+    # )
+
+    # # --- Seasonal stats (previous 2 years) ---
+    # key = ("season_stats", year)
+    # if use_cache and key in _STATS_CACHE:
+    #     df = _STATS_CACHE[key]
+    # else:
+    #     years = [year - 1, year - 2]
+    #     rb_df = fp_seasonal_years("rb", years)
+    #     qb_df = fp_seasonal_years("qb", years)
+    #     wr_df = fp_seasonal_years("wr", years)
+    #     te_df = fp_seasonal_years("te", years)
+    #     dst_df = fp_seasonal_years("dst", years)
+    #     k_df = fp_seasonal_years("k", years)
+    #     df = pd.concat([rb_df, qb_df, wr_df, te_df, dst_df, k_df])
+    #     _STATS_CACHE[key] = df
+
+    # df.to_sql(
+    #     name="season_stats",
+    #     con=db.engine,
+    #     if_exists="replace",
+    #     index=False,
+    # )
+    # db.session.commit()
 
 
 def default_draft_strategy() -> str:
