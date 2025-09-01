@@ -1,5 +1,5 @@
-from blitz_env import Player, GameState, AddDropSelection
-from blitz_env.models import DatabaseManager, Player
+from blitz_env import GameState, AddDropSelection
+from blitz_env.models import DatabaseManager
 import pandas as pd
 import json
 
@@ -37,7 +37,7 @@ def adjust_available_positions(remaining_positions_to_fill):
     remaining_positions_to_fill -= special_positions
     return remaining_positions_to_fill
 
-def draft_player(game_state: GameState) -> str:
+def draft_player() -> str:
     """
     Selects a player to draft based on the highest rank.
 
