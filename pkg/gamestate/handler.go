@@ -255,6 +255,11 @@ func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSe
 		return err
 	}
 
+	err = populateStatsTables(db)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -329,6 +334,27 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	result := db.Create(&dbGameStatus)
 	if result.Error != nil {
 		return fmt.Errorf("failed to insert game status: %v", result.Error)
+	}
+
+	return nil
+}
+
+func populateStatsTables(db *gorm.DB) error {
+	// Attach the other DB
+	if err := db.Exec(`ATTACH DATABASE 'stats.db' AS other;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`CREATE TABLE season_stats AS SELECT * FROM other.season_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`CREATE TABLE preseason_projections AS SELECT * FROM other.preseason_projections;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`DETACH DATABASE other;`).Error; err != nil {
+		return err
 	}
 
 	return nil

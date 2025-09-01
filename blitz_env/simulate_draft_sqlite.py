@@ -69,6 +69,7 @@ def init_database(year: int):
     settings.points_per_reception = 1.0
     settings.year = year
     settings.player_slots = player_slots
+    settings.num_teams = 13
     db.session.add(settings)
     
     # # Initialize draft status
