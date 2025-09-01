@@ -485,7 +485,7 @@ def print_visualization_matplotlib(team_scores, bots=None, players=None, player_
 
 def main():
     parser = argparse.ArgumentParser(description='Compute and display top teams by best possible score from a SQLite database.')
-    parser.add_argument('database_path', type=str, help='Path to the SQLite database file', default='draft.db')
+    parser.add_argument('database_path', type=str, help='Path to the SQLite database file', default='gamestate.db')
     parser.add_argument('--week', type=int, default=None, help='Week number to compute the best possible score (1-17). If not provided, computes for the entire season.')
 
     args = parser.parse_args()
@@ -580,7 +580,7 @@ def main():
     finally:
         db.close()
 
-def score_draft_for_visualization(database_path='draft.db', week=None):
+def score_draft_for_visualization(database_path='gamestate.db', week=None):
     """
     Score a draft and return data for visualization.
     
