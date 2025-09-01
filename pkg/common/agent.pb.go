@@ -9,6 +9,7 @@ package common
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -788,7 +789,7 @@ var File_pkg_common_proto_agent_proto protoreflect.FileDescriptor
 
 const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x1cpkg/common/proto/agent.proto\"\xc6\x02\n" +
+	"\x1cpkg/common/proto/agent.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xc6\x02\n" +
 	"\x0eLeagueSettings\x12\x1b\n" +
 	"\tnum_teams\x18\x01 \x01(\rR\bnumTeams\x12G\n" +
 	"\x0eslots_per_team\x18\x02 \x03(\v2!.LeagueSettings.SlotsPerTeamEntryR\fslotsPerTeam\x12$\n" +
@@ -856,10 +857,9 @@ const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\x13add_drop_selections\x18\x01 \x03(\v2\x11.AddDropSelectionR\x11addDropSelections\"f\n" +
 	"\x10AddDropSelection\x12)\n" +
 	"\x11player_to_drop_id\x18\x01 \x01(\tR\x0eplayerToDropId\x12'\n" +
-	"\x10player_to_add_id\x18\x02 \x01(\tR\rplayerToAddId2\xaf\x01\n" +
-	"\fAgentService\x12,\n" +
-	"\vDraftPlayer\x12\n" +
-	".GameState\x1a\x0f.DraftSelection\"\x00\x12>\n" +
+	"\x10player_to_add_id\x18\x02 \x01(\tR\rplayerToAddId2\xbb\x01\n" +
+	"\fAgentService\x128\n" +
+	"\vDraftPlayer\x12\x16.google.protobuf.Empty\x1a\x0f.DraftSelection\"\x00\x12>\n" +
 	"\x14SubmitFantasyActions\x12\n" +
 	".GameState\x1a\x18.AttemptedFantasyActions\"\x00\x121\n" +
 	"\x0eProposeAddDrop\x12\n" +
@@ -893,6 +893,7 @@ var file_pkg_common_proto_agent_proto_goTypes = []any{
 	(*AttemptedFantasyActions)(nil), // 9: AttemptedFantasyActions
 	(*AddDropSelection)(nil),        // 10: AddDropSelection
 	nil,                             // 11: LeagueSettings.SlotsPerTeamEntry
+	(*emptypb.Empty)(nil),           // 12: google.protobuf.Empty
 }
 var file_pkg_common_proto_agent_proto_depIdxs = []int32{
 	11, // 0: LeagueSettings.slots_per_team:type_name -> LeagueSettings.SlotsPerTeamEntry
@@ -903,7 +904,7 @@ var file_pkg_common_proto_agent_proto_depIdxs = []int32{
 	6,  // 5: GameState.bots:type_name -> Bot
 	2,  // 6: GameState.league_settings:type_name -> LeagueSettings
 	10, // 7: AttemptedFantasyActions.add_drop_selections:type_name -> AddDropSelection
-	7,  // 8: AgentService.DraftPlayer:input_type -> GameState
+	12, // 8: AgentService.DraftPlayer:input_type -> google.protobuf.Empty
 	7,  // 9: AgentService.SubmitFantasyActions:input_type -> GameState
 	7,  // 10: AgentService.ProposeAddDrop:input_type -> GameState
 	8,  // 11: AgentService.DraftPlayer:output_type -> DraftSelection

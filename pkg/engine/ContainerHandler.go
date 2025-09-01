@@ -19,6 +19,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const localhost = "localhost"
@@ -322,7 +323,7 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.Draf
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selections, err := client.DraftPlayer(ctx, nil)
+	selections, err := client.DraftPlayer(ctx, &emptypb.Empty{})
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err

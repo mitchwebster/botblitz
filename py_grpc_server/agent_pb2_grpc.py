@@ -4,6 +4,7 @@ import grpc
 import warnings
 
 import agent_pb2 as agent__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 GRPC_GENERATED_VERSION = '1.66.0'
 GRPC_VERSION = grpc.__version__
@@ -36,7 +37,7 @@ class AgentServiceStub(object):
         """
         self.DraftPlayer = channel.unary_unary(
                 '/AgentService/DraftPlayer',
-                request_serializer=agent__pb2.GameState.SerializeToString,
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=agent__pb2.DraftSelection.FromString,
                 _registered_method=True)
         self.SubmitFantasyActions = channel.unary_unary(
@@ -77,7 +78,7 @@ def add_AgentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'DraftPlayer': grpc.unary_unary_rpc_method_handler(
                     servicer.DraftPlayer,
-                    request_deserializer=agent__pb2.GameState.FromString,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=agent__pb2.DraftSelection.SerializeToString,
             ),
             'SubmitFantasyActions': grpc.unary_unary_rpc_method_handler(
@@ -116,7 +117,7 @@ class AgentService(object):
             request,
             target,
             '/AgentService/DraftPlayer',
-            agent__pb2.GameState.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             agent__pb2.DraftSelection.FromString,
             options,
             channel_credentials,

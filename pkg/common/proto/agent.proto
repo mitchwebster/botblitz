@@ -1,10 +1,12 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 // option go_package = ".;pb";
 option go_package = ".;common";
 
 service AgentService {
-    rpc DraftPlayer(GameState) returns (DraftSelection) {}
+    rpc DraftPlayer(google.protobuf.Empty) returns (DraftSelection) {}
     rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
     rpc ProposeAddDrop(GameState) returns (AddDropSelection) {}
 }

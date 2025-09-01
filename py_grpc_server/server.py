@@ -1,14 +1,12 @@
 from concurrent import futures
 import logging
-import math
-import time
 import subprocess, os, json
-from google.protobuf.json_format import MessageToJson, ParseDict
-from blitz_env import DraftSelection, AddDropSelection, GameState
+from google.protobuf.json_format import ParseDict
+from blitz_env import DraftSelection
 
 import grpc
 from agent_pb2_grpc import AgentServiceServicer, add_AgentServiceServicer_to_server
-from bot import draft_player, propose_add_drop
+from bot import propose_add_drop
 
 class AgentServiceServicer(AgentServiceServicer):
 
@@ -35,8 +33,7 @@ class AgentServiceServicer(AgentServiceServicer):
         os.close(w)
 
         # Send input and wait for completion in one call
-        serialized_request = MessageToJson(request)
-        stdout, stderr = proc.communicate(input=serialized_request)
+        stdout, stderr = proc.communicate()
 
         # Now read the result from the pipe
         with os.fdopen(r) as fr:
