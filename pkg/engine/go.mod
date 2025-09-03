@@ -1,8 +1,8 @@
 module github.com/mitchwebster/botblitz/pkg/engine
 
-go 1.22.0
+go 1.24.2
 
-toolchain go1.22.7
+toolchain go1.24.5
 
 replace github.com/mitchwebster/botblitz/pkg/common v0.0.0 => ../common
 
@@ -16,6 +16,7 @@ require (
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/mitchwebster/botblitz/pkg/common v0.0.0
+	github.com/mitchwebster/botblitz/pkg/gamestate v0.0.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 	google.golang.org/api v0.197.0
 	google.golang.org/grpc v1.66.2
@@ -53,6 +54,9 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -69,7 +73,9 @@ require (
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	gorm.io/driver/sqlite v1.6.0 // indirect
+	gorm.io/gorm v1.30.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
