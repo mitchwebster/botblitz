@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-from blitz_env import is_drafted, simulate_draft, visualize_draft_board, Player, StatsDB
+from blitz_env import visualize_draft_board, Player, StatsDB
+from blitz_env.simulate_draft_sqlite import simulate_draft, is_drafted
 from openai import OpenAI
 import json
 
@@ -19,9 +20,8 @@ def draft_player() -> str:
     game_status = db.get_game_status()
     stats_db = StatsDB([league_settings.year - 1])
 
-    players_df = pd.read_sql("SELECT * FROM players", db.engine)
-    players = players_df.to_dict(orient="records")
-    my_players = players_df[players_df["current_bot_id"] == game_status.current_bot_id]
+    players = db.get_all_players()
+    my_players = [player for player in players if player.current_bot_id == game_status.current_bot_id]
 
     my_team = {
         "QB": [],
@@ -37,6 +37,7 @@ def draft_player() -> str:
     ])
 
     for player in my_players:
+        print(player)
         for position in player.allowed_positions:
             if position in my_team:
                 my_team[position].append(player)
@@ -69,7 +70,7 @@ def draft_player() -> str:
         return stats_summary
 
     
-    current_round = ((game_status.current_draft_pick - 1) // len(league_settings.num_teams)) + 1
+    current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1
     is_last_three_rounds = (league_settings.total_rounds - current_round) < 3
     
     # Filter out already drafted players
@@ -189,4 +190,4 @@ def draft_player() -> str:
             print("All positions are filled")
     return ""
 
-# game_state = simulate_draft(draft_player, 2025)
+game_state = simulate_draft(draft_player, 2025)
