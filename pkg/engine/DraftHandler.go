@@ -135,7 +135,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, cur
 		return err
 	}
 
-	fmt.Printf("[Pick: %d] %s will choose next...", pickNum, bot.FantasyTeamName)
+	fmt.Printf("[Pick: %d] %s will choose next...\n", pickNum, bot.FantasyTeamName)
 
 	summary := ""
 	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
