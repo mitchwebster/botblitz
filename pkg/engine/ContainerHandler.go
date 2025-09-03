@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -153,19 +152,10 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 	}
 
 	env := []string{}
-	if bot.EnvPath != "" {
-		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
-		if err != nil {
-			return "", err
-		}
 
-		envContent, err := os.ReadFile(envAbsPath)
-		if err != nil {
-			return "", err
-		}
-
-		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
-		env = append(strings.Split(string(envContent), "\n"))
+	envVarsFromCache, ok := e.envVarsCache[bot.Id]
+	if ok {
+		env = envVarsFromCache
 	}
 
 	containerId, err := e.createAndStartContainer(env, port)

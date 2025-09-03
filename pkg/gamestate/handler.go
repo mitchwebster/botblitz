@@ -88,7 +88,7 @@ func (handler *GameStateHandler) GetBots() ([]*common.Bot, error) {
 
 	// list all of the bots from the database and convert to the common bot
 	var dbBots []bot
-	result := handler.db.Order("id ASC").Find(&dbBots)
+	result := handler.db.Order("RANDOM()").Find(&dbBots)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
 	}
