@@ -41,6 +41,9 @@ jobs:
     - name: Check protoc version
       run: protoc --version
 
+    - name: Build py module
+      run: make build-py-module
+
     - name: Docker version
       run: docker -v
 
