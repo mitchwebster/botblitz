@@ -1,95 +1,133 @@
-from blitz_env import load_players, StatsDB, is_drafted, simulate_draft, visualize_draft_board, Player, GameState, AddDropSelection
-from typing import List
-import math
-import sys
+from blitz_env import GameState, AddDropSelection
+from blitz_env.models import DatabaseManager
+import pandas as pd
+import json
 
-QB_POS = "QB"
-RB_POS = "RB"
-WR_POS = "WR"
-TE_POS = "TE"
-K_POS = "K"
-D_POS = "DST"
+def get_player_history(db, player_id):
+    history_df = pd.read_sql(f"SELECT * FROM season_stats where fantasypros_id = '{player_id}'", db.engine)
+    print(len(history_df))
 
-# Thanks Tyler!
-INJURED_LIST_2024 = set([
-    "Christian McCaffrey",
-    "Tua Tagovailoa",
-    "Cooper Kupp",
-    "A.J. Brown",
-    "AJ Brown",
-    "Deebo Samuel",
-    "Puka Nacua",
-    "Marquise Brown",
-    "J.J. McCarthy",
-    "Odell Beckham Jr.",
-    "Odell Beckham",
-    "T.J. Hockenson",
-    "Tyler Higbee",
-    "Kendrick Bourne",
-    "Keaton Mitchell",
-    "Nick Chubb",
-])
-
-def get_drafted_team(players, team_id):
-    roster = {
-        QB_POS : [],
-        RB_POS : [],
-        WR_POS : [],
-        TE_POS : [],
-        K_POS : [],
-        D_POS : []
-    }
-
-    for player in [player for player in players if is_drafted(player) and player.status.current_team_bot_id == team_id]:
-        main_pos = player.allowed_positions[0]
-        roster[main_pos].append(player)
-
-    return roster
-
-def get_target_positions(drafted_team, cur_round, total_rounds):
-    target_positions = []
-
-    if total_rounds - cur_round < 2:
-        # Last 2 rounds we go for kickers and defense
-        if len(drafted_team[K_POS]) < 1:
-            target_positions.append(K_POS)
-
-        if len(drafted_team[D_POS]) < 1:
-            target_positions.append(D_POS)
-    else:
-        rb_count = len(drafted_team[RB_POS])
-        wr_count = len(drafted_team[WR_POS])
-
-        if rb_count < 5 and (rb_count + wr_count) < 10:
-            target_positions.append(RB_POS)
-
-        if wr_count < 5 and (rb_count + wr_count) < 10:
-            target_positions.append(WR_POS)
-
-        allowed_qbs = 2 if cur_round > 7 else 1 if cur_round > 2 else 0
-        if cur_round > 2 and len(drafted_team[QB_POS]) < allowed_qbs:
-            target_positions.append(QB_POS)
-
-        if cur_round > 3 and len(drafted_team[TE_POS]) < 1:
-            target_positions.append(TE_POS)
+def get_current_round(db):
+    settings_df = pd.read_sql("SELECT * FROM league_settings", db.engine) # get leagueSettings
+    leagueSettings = settings_df.iloc[0]
     
-    return target_positions
+    status_df = pd.read_sql("SELECT * FROM game_statuses", db.engine) # get game status
+    gameSettings = status_df.iloc[0]
 
-def get_current_round(game_state: GameState) -> int:
-    zero_based_round = (game_state.current_draft_pick - 1) // len(game_state.bots)
+    zero_based_round = (gameSettings["current_draft_pick"] - 1) // leagueSettings["num_teams"]
     return zero_based_round + 1
 
-def list_to_map(list):
-    map = {}
-    for item in list: 
-        map[item] = ""
-    
-    return map
+def get_total_rounds(db) -> int:
+    settings_df = pd.read_sql("SELECT * FROM league_settings", db.engine) # get game status
+    return settings_df.iloc[0]["total_rounds"]
 
-def player_need(player, existing_players_in_position):
-    other_players_penalty = 0 if existing_players_in_position < 2 else existing_players_in_position
-    position_rank_penalty = 2 * (player.position_rank // 5)
-    return player.rank + other_players_penalty + position_rank_penalty
+def get_my_team(db):
+    df = pd.read_sql("SELECT * FROM game_statuses", db.engine) # get game status
+    draft_pick = df.iloc[0]["current_draft_pick"]
+    print(f"Current pick is {draft_pick}")
+    
+    bot_id = df.iloc[0]["current_bot_id"]
+    queryStr = f"SELECT * FROM players where current_bot_id = '{bot_id}'"
+    my_team = pd.read_sql(queryStr, db.engine) 
+
+    player_positions_map = {
+        row["full_name"]: (json.loads(row["allowed_positions"])[0] if row["allowed_positions"] else None)
+        for _, row in my_team.iterrows()
+    }
+
+    return player_positions_map
+
+def convert_team_to_position_map(curTeam):
+    positionCounts = {}
+    for playerName, position in curTeam.items():
+        if position in positionCounts:
+            positionCounts[position] += 1
+        else:
+            positionCounts[position] = 1
+    return positionCounts
+
+def get_allowed_positions_to_draft(curRound, totalRounds, curTeam):
+    position_set = set()
+
+    if curRound == totalRounds:
+        position_set = set(["K"])
+    elif curRound + 1 == totalRounds:
+        position_set = set(["DST"])
+    elif curRound < 8:
+        position_set = set(["QB", "WR", "RB"])
+    else:
+        position_set = set(["QB", "WR", "RB", "TE"])
+
+    positionCounts = convert_team_to_position_map(curTeam)
+
+    # only allow 2 QB
+    if "QB" in positionCounts and positionCounts["QB"] >= 2:
+        position_set -= {"QB"}
+    
+    # only allow 1 TE
+    if "TE" in positionCounts and positionCounts["TE"] >= 1:
+        position_set -= {"TE"}
+
+    return position_set 
+
+def get_top_50_ranked_available_players(db, positions_to_draft):
+    df = pd.read_sql("SELECT * FROM players where availability = 'AVAILABLE'", db.engine)
+
+    # expand the allowed_position json strings into a set
+    df["allowed_positions_set"] = df["allowed_positions"].apply(
+        lambda x: set(json.loads(x)) if x else set()
+    )
+
+    filtered_df = df[df["allowed_positions_set"].apply(lambda s: bool(s & positions_to_draft))]
+    df = filtered_df.sort_values(by="rank", ascending=True)
+    return df.head(50)
+
+def score_potential_player(player_row, db, current_round, my_team):
+    current_rank = player_row["rank"]
+
+    # TODO: need to consider position in the snake draft in early rounds
+    
+    # Draft QBs earlier given superflex
+    if any(player_row["allowed_positions_set"] & {"QB"}):
+        positionCounts = convert_team_to_position_map(my_team)
+
+        currentQBCount = positionCounts["QB"] if "QB" in positionCounts else 0
+        baseReduction = 7 if currentQBCount >= 1 else 30
+
+        rank_reduction = max(baseReduction - 5*player_row["position_tier"], 0)
+        current_rank -= rank_reduction
+
+    if any(player_row["allowed_positions_set"] & {"RB"}):
+        positionCounts = convert_team_to_position_map(my_team)
+        rankIncrease = 10 if "RB" in positionCounts and positionCounts["RB"] >= 2 else 0
+        current_rank += rankIncrease
+
+    if any(player_row["allowed_positions_set"] & {"WR"}):
+        positionCounts = convert_team_to_position_map(my_team)
+        rankIncrease = 10 if "WR" in positionCounts and positionCounts["WR"] >= 2 else 0
+        current_rank += rankIncrease
+
+    return current_rank
+    
+def draft_player() -> str:
+    db = DatabaseManager()
+    try:
+        current_round = get_current_round(db)
+        total_rounds = get_total_rounds(db)
+        my_team = get_my_team(db)
+        positions_to_draft = get_allowed_positions_to_draft(current_round, total_rounds, my_team)
+        df = get_top_50_ranked_available_players(db, positions_to_draft)
+        df["score"] = df.apply(lambda row: score_potential_player(row, db, current_round, my_team), axis=1)
+        df = df.sort_values(by="score", ascending=True)
+
+        if not df.empty:
+            best_player = df.iloc[0]
+            print(best_player["full_name"])
+            return best_player["id"]  # No need for conditional on the Series itself
+        else:
+            return ""  # No eligible player
+    finally:
+        db.close()
 
 def propose_add_drop(game_state: GameState) -> AddDropSelection:
     """
@@ -106,72 +144,3 @@ def propose_add_drop(game_state: GameState) -> AddDropSelection:
         player_to_add_id="", # do not add
         player_to_drop_id="" # do not drop
     )
-
-def draft_player(game_state: GameState) -> str:
-    """
-    Selects a player to draft based on the highest rank.
-
-    Args:
-        players (List[Player]): A list of Player objects.
-
-    Returns:
-        str: The id of the drafted player.
-    """
-
-    player_deny_map = {
-        "Marvin Harrison Jr.": "",
-        "Drake London": "",
-        "Zamir White" : "",
-    }
-
-    # Do not draft Tua this year
-    if game_state.league_settings.year == 2024:
-        for player in INJURED_LIST_2024:
-            player_deny_map[player] = ""
-
-    team_deny_map = {
-        "CAR": "",
-    }
-
-    # relevant current game state
-    my_team_id = game_state.current_bot_team_id
-    drafted_team = get_drafted_team(game_state.players, my_team_id)
-    cur_round = get_current_round(game_state)
-
-    # positions we are looking for
-    target_positions = get_target_positions(drafted_team, cur_round, game_state.league_settings.total_rounds)
-    position_map = list_to_map(target_positions)
-
-    # players we are looking for
-    undrafted_players = [player for player in game_state.players 
-                        if not is_drafted(player)
-                        and player.allowed_positions[0] in position_map
-                        and player.full_name not in player_deny_map
-                        and player.professional_team not in team_deny_map]
-
-
-
-    # print(position_map)
-
-    # for k,v in drafted_team.items():
-    #     print(k + ": " + str(len(v)))
-
-    # if cur_round == game_state.league_settings.total_rounds:
-    #     print(drafted_team)
-
-    # Select the player with the highest rank (lowest rank number)
-    selected_player = ""
-    cur_min = sys.maxsize
-    for player in undrafted_players:
-        score = player_need(player, len(drafted_team[player.allowed_positions[0]]))
-        if score < cur_min:
-            cur_min = score
-            selected_player = player.id
-
-    print("Selecting: " + selected_player)
-    print("Score: " + str(cur_min))
-
-    if cur_round == game_state.league_settings.total_rounds:
-        print(drafted_team)
-    
-    return selected_player  # Return empty string if no undrafted players are available
