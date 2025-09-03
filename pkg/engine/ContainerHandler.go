@@ -303,7 +303,7 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.Draf
 	opts = append(opts, grpc.WithBlock())
 
 	pyServerHostAndPort := localhost + ":" + port
-	print(pyServerHostAndPort)
+	// print(pyServerHostAndPort)
 	conn, err := grpc.Dial(pyServerHostAndPort, opts...)
 	if err != nil {
 		return nil, err
@@ -427,7 +427,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
 		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+		fmt.Printf("Using a %s source to find %q\n", bot.SourceType, bot.SourcePath)
 	}
 
 	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port)
@@ -453,7 +453,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.Id)
 		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %s\n", bot.SourceType, bot.SourcePath)
+		fmt.Printf("Using a %s source to find %q\n", bot.SourceType, bot.SourcePath)
 	}
 
 	selection, err = e.callAddDropRPC(ctx, containerInfo.Port)

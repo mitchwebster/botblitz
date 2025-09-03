@@ -450,7 +450,7 @@ func verifyFileDoesNotExistAndCreate(filePath string) error {
 		return nil
 	}
 
-	return fmt.Errorf("Draft file already exists, please delete before drafting again")
+	return fmt.Errorf("Draft file already exists, please delete before drafting again: %q", filePath)
 }
 
 func getSaveFileName(year uint32, description string) (string, error) {
