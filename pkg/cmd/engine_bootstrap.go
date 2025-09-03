@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
@@ -118,6 +119,13 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1) // Crash hard
 	}
 
+	envVarsMap, err := getEnvVarsMap(bots)
+	if err != nil {
+		fmt.Println("Failed to find env vars for configured bot")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	}
+
 	shuffleBotOrder(bots) // randomize draft order
 
 	settings := fetchLeagueSettings(year, bots)
@@ -153,7 +161,7 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1)
 	}
 
-	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, sourceCodeMap, dataBytes)
+	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, sourceCodeMap, envVarsMap, dataBytes)
 }
 
 func fetchBotList() []*common.Bot {
@@ -381,4 +389,48 @@ func fetchSourceCode(bot *common.Bot) ([]byte, error) {
 
 	fmt.Printf("Successfully retrieved source code for bot (%s)\n", bot.Id)
 	return botCode, nil
+}
+
+func getEnvVarsMap(bots []*common.Bot) (map[string][]string, error) {
+	fmt.Printf("\n-----------------------------------------\n")
+	fmt.Println("Initializing Bots")
+
+	envVarsMap := make(map[string][]string)
+
+	for _, bot := range bots {
+		if bot.EnvPath == "" {
+			continue
+		}
+
+		vars, err := fetchEnvVars(bot)
+		if err != nil {
+			return nil, err
+		}
+
+		envVarsMap[bot.Id] = vars
+	}
+
+	fmt.Printf("\n-----------------------------------------\n")
+
+	return envVarsMap, nil
+}
+
+func fetchEnvVars(bot *common.Bot) ([]string, error) {
+	env := []string{}
+
+	fmt.Printf("Grabbing env vars from: %s\n", bot.EnvPath)
+	envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
+	if err != nil {
+		return env, err
+	}
+
+	envContent, err := os.ReadFile(envAbsPath)
+	if err != nil {
+		return env, err
+	}
+
+	// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
+	env = append(strings.Split(string(envContent), "\n"))
+
+	return env, nil
 }

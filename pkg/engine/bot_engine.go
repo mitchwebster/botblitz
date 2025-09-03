@@ -29,6 +29,7 @@ type BotContainerInfo struct {
 type BotEngine struct {
 	settings                    BotEngineSettings
 	sourceCodeCache             map[string][]byte
+	envVarsCache                map[string][]string
 	gameStateHandler            *gamestate.GameStateHandler
 	sheetsClient                *SheetsClient
 	weeklyFantasyTransactionLog strings.Builder
@@ -36,12 +37,13 @@ type BotEngine struct {
 	botContainers               map[string]*BotContainerInfo // map of bot ID to container info
 }
 
-func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, dataBytes *DataBytes) *BotEngine {
+func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, envVarsCache map[string][]string, dataBytes *DataBytes) *BotEngine {
 	var builder strings.Builder
 
 	return &BotEngine{
 		settings:                    settings,
 		sourceCodeCache:             sourceCodeCache,
+		envVarsCache:                envVarsCache,
 		gameStateHandler:            gameStateHandler,
 		sheetsClient:                sheetsClient,
 		weeklyFantasyTransactionLog: builder,
