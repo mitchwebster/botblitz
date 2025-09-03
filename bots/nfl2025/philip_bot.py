@@ -30,9 +30,12 @@ class PhilipFantasyBot:
         if token:
             try:
                 self.openai_client = OpenAI(api_key=token)
+                print("OpenAI client initialized")
             except Exception as e:
                 print(f"Failed to initialize OpenAI client: {e}")
                 self.openai_client = None
+        else:
+            print("No OpenAI token found")
     
     def get_league_settings(self):
         """Get current league settings"""
@@ -73,9 +76,19 @@ class PhilipFantasyBot:
         
         scarcity_scores = {}
         for pos in expected_draft_counts:
-            pos_players = available_players[available_players["allowed_positions"].apply(
-                lambda x: pos in json.loads(x) if x else False
-            )]
+            def position_filter(x):
+                if not x:
+                    return False
+                try:
+                    if isinstance(x, str):
+                        positions = json.loads(x)
+                    else:
+                        positions = x
+                    return pos in positions
+                except (json.JSONDecodeError, TypeError):
+                    return False
+            
+            pos_players = available_players[available_players["allowed_positions"].apply(position_filter)]
             
             if len(pos_players) > 0:
                 # Calculate scarcity: fewer available players = higher scarcity
@@ -93,7 +106,16 @@ class PhilipFantasyBot:
         """Calculate comprehensive player value score"""
         try:
             # Get player's primary position
-            positions = json.loads(player["allowed_positions"]) if player["allowed_positions"] else []
+            positions = []
+            if player["allowed_positions"]:
+                if isinstance(player["allowed_positions"], str):
+                    try:
+                        positions = json.loads(player["allowed_positions"])
+                    except json.JSONDecodeError:
+                        positions = []
+                else:
+                    positions = player["allowed_positions"]
+            
             if not positions:
                 return -1000  # Invalid player
             
@@ -137,13 +159,30 @@ class PhilipFantasyBot:
         my_team = self.get_my_team()
         league_settings = self.get_league_settings()
         
-        # Parse required roster slots
-        required_slots = json.loads(league_settings.player_slots) if league_settings.player_slots else {}
+        # Get required roster slots - handle both string and dict formats
+        required_slots = {}
+        if league_settings.player_slots:
+            if isinstance(league_settings.player_slots, str):
+                try:
+                    required_slots = json.loads(league_settings.player_slots)
+                except json.JSONDecodeError:
+                    required_slots = {}
+            else:
+                required_slots = league_settings.player_slots
         
         # Count current players by position
         position_counts = {}
         for _, player in my_team.iterrows():
-            positions = json.loads(player["allowed_positions"]) if player["allowed_positions"] else []
+            positions = []
+            if player["allowed_positions"]:
+                if isinstance(player["allowed_positions"], str):
+                    try:
+                        positions = json.loads(player["allowed_positions"])
+                    except json.JSONDecodeError:
+                        positions = []
+                else:
+                    positions = player["allowed_positions"]
+            
             for pos in positions:
                 position_counts[pos] = position_counts.get(pos, 0) + 1
         
@@ -169,12 +208,21 @@ class PhilipFantasyBot:
             team_summary = []
             
             for _, player in my_team.iterrows():
-                positions = json.loads(player["allowed_positions"]) if player["allowed_positions"] else []
+                positions = []
+                if player["allowed_positions"]:
+                    if isinstance(player["allowed_positions"], str):
+                        try:
+                            positions = json.loads(player["allowed_positions"])
+                        except json.JSONDecodeError:
+                            positions = []
+                    else:
+                        positions = player["allowed_positions"]
+                
                 pos_str = ", ".join(positions) if positions else "Unknown"
                 team_summary.append(f"{player['full_name']} ({pos_str}) - Rank {player['rank']}")
             
             # Top available players
-            top_players = available_players.nlargest(20, "rank")["full_name"].tolist()
+            top_players = available_players.nlargest(200, "rank")["full_name"].tolist()
             
             prompt = f"""
             You are a fantasy football expert helping with draft strategy for the 2025 NFL season.
@@ -184,7 +232,7 @@ class PhilipFantasyBot:
             - Team needs: {json.dumps(team_needs)}
             - Current roster: {', '.join(team_summary) if team_summary else 'Empty team'}
             
-            Available players (top 20 by rank): {', '.join(top_players)}
+            Available players (top 200 by rank): {', '.join(top_players)}
             
             Strategy priorities:
             1. Fill required starting positions first
@@ -196,12 +244,14 @@ class PhilipFantasyBot:
             Return ONLY the player name (exactly as shown) that should be drafted next.
             """
             
+            print(f"AI prompt sent with {len(top_players)} available players")
+            
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=50,
-                temperature=0.1
             )
+
+            print(f"AI response: {response}")
             
             recommended_player = response.choices[0].message.content.strip()
             
@@ -228,9 +278,15 @@ class PhilipFantasyBot:
             league_settings = self.get_league_settings()
             current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1
             
+            print(f"=== Draft Round {current_round} of {league_settings.total_rounds} ===")
+            print(f"Current draft pick: {game_status.current_draft_pick}")
+            
             # Get available players and projections
             available_players = self.get_available_players()
             projections_df = self.get_projections_data()
+            
+            print(f"Available players: {len(available_players)}")
+            print(f"Projections data loaded: {len(projections_df)} records")
             
             if available_players.empty:
                 print("No available players to draft")
@@ -238,9 +294,30 @@ class PhilipFantasyBot:
             
             # Calculate position scarcity
             scarcity_scores = self.calculate_position_scarcity(available_players)
+            print(f"Position scarcity scores: {scarcity_scores}")
             
             # Get team needs
             team_needs = self.get_team_needs()
+            print(f"Current team needs: {team_needs}")
+            
+            # Show current roster
+            my_team = self.get_my_team()
+            if not my_team.empty:
+                print("Current roster:")
+                for _, player in my_team.iterrows():
+                    positions = []
+                    if player["allowed_positions"]:
+                        if isinstance(player["allowed_positions"], str):
+                            try:
+                                positions = json.loads(player["allowed_positions"])
+                            except json.JSONDecodeError:
+                                positions = []
+                        else:
+                            positions = player["allowed_positions"]
+                    pos_str = ", ".join(positions) if positions else "Unknown"
+                    print(f"  {player['full_name']} ({pos_str}) - Rank {player['rank']}")
+            else:
+                print("Current roster: Empty")
             
             # Try AI recommendation first
             ai_recommendation = self.get_ai_draft_recommendation(
@@ -248,19 +325,36 @@ class PhilipFantasyBot:
             )
             
             if ai_recommendation:
-                print(f"AI recommended player ID: {ai_recommendation}")
+                # Get player name for logging
+                player_name = available_players[available_players["id"] == ai_recommendation]["full_name"].iloc[0] if not available_players[available_players["id"] == ai_recommendation].empty else "Unknown"
+                print(f"AI recommended player: {player_name} (ID: {ai_recommendation})")
                 return ai_recommendation
             
             # Fallback to algorithmic approach
             # Calculate value for each available player
             player_values = []
             
+            print(f"Calculating values for {len(available_players)} available players...")
+            
             for _, player in available_players.iterrows():
                 value = self.calculate_player_value(player, projections_df, scarcity_scores)
+                # Get player position safely
+                positions = []
+                if player['allowed_positions']:
+                    if isinstance(player['allowed_positions'], str):
+                        try:
+                            positions = json.loads(player['allowed_positions'])
+                        except json.JSONDecodeError:
+                            positions = []
+                    else:
+                        positions = player['allowed_positions']
+                
+                position = positions[0] if positions else 'Unknown'
+                
                 player_values.append({
                     'id': player['id'],
                     'name': player['full_name'],
-                    'position': json.loads(player['allowed_positions'])[0] if player['allowed_positions'] else 'Unknown',
+                    'position': position,
                     'rank': player['rank'],
                     'value': value
                 })
@@ -268,14 +362,19 @@ class PhilipFantasyBot:
             # Sort by value and select best
             player_values.sort(key=lambda x: x['value'], reverse=True)
             
+            # Log top 5 players by value for debugging
+            print("Top 5 players by calculated value:")
+            for i, player in enumerate(player_values[:5]):
+                print(f"  {i+1}. {player['name']} ({player['position']}) - Value: {player['value']:.2f}, Rank: {player['rank']}")
+            
             if player_values:
                 best_player = player_values[0]
-                print(f"Drafting {best_player['name']} ({best_player['position']}) with value {best_player['value']:.2f}")
+                print(f"Drafting {best_player['name']} ({best_player['position']}) with value {best_player['value']:.2f} (ID: {best_player['id']})")
                 return best_player['id']
             
             # Ultimate fallback - highest ranked available player
             best_available = available_players.loc[available_players['rank'].idxmin()]
-            print(f"Fallback: Drafting highest ranked player {best_available['full_name']}")
+            print(f"Fallback: Drafting highest ranked player {best_available['full_name']} (ID: {best_available['id']})")
             return best_available['id']
             
         except Exception as e:
