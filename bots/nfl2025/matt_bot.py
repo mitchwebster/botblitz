@@ -2,6 +2,8 @@
 from typing import List
 from blitz_env import projections_db, GameState, AddDropSelection
 from blitz_env.models import DatabaseManager, Player
+from sqlalchemy import or_
+import pandas as pd
 
 
 
@@ -37,6 +39,30 @@ def draft_player() -> str:
     db = DatabaseManager()
 
     try:
+        league_settings = db.get_league_settings()
+        game_status = db.get_game_status()
+
+        # Draft K and DST in last two rounds
+        current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1
+        remaining_rounds = league_settings.total_rounds - current_round
+        if remaining_rounds == 0:
+            # Draft DST in last round
+            best_dst = db.session.query(Player).filter(
+                Player.availability == 'AVAILABLE',
+                Player.allowed_positions.contains("DST")
+            ).order_by(Player.rank).first()
+            return best_dst.id
+
+
+        if remaining_rounds == 1:
+            # Draft K in second to last round
+            best_k = db.session.query(Player).filter(
+                Player.availability == 'AVAILABLE',
+                Player.allowed_positions.contains("K")
+            ).order_by(Player.rank).first()
+            return best_k.id
+
+
         # Construct my current team
         current_team_id = db.get_game_status().current_bot_id
         team_players = db.session.query(Player).filter(
@@ -45,18 +71,20 @@ def draft_player() -> str:
         ).order_by(Player.rank).all()
         team_state = TeamState(team_players)
 
-        # Draft player
+        # Draft best player available
         available_players = db.session.query(Player).filter(
             Player.availability == 'AVAILABLE',
-            Player.allowed_positions.contains("WR")
-        ).order_by(Player.rank).all()
-
+            or_(
+                Player.allowed_positions.contains("WR"),
+                Player.allowed_positions.contains("QB"),
+                Player.allowed_positions.contains("RB")
+            )
+        ).order_by(Player.rank).all()        
         
         return available_players[0].id if available_players and available_players[0] else ""
     
     finally:
         db.close()
-    
     
 
 # def propose_add_drop(game_state: GameState) -> AddDropSelection:
