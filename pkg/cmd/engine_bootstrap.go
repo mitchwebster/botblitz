@@ -229,14 +229,14 @@ func fetchBotList() []*common.Bot {
 			SourceType:      common.Bot_LOCAL,
 			SourcePath:      "/bots/nfl2025/jack_bot.py",
 			Owner:           "Jack",
-			FantasyTeamName: "Jack's team",
+			FantasyTeamName: "AVOCADOTOAST4U",
 		},
 		{
 			Id:              "9",
 			SourceType:      common.Bot_LOCAL,
 			SourcePath:      "/bots/nfl2025/ben_bot.py",
 			Owner:           "Ben",
-			FantasyTeamName: "Ben's team",
+			FantasyTeamName: "Ben's bread",
 		},
 		{
 			Id:              "10",
@@ -259,6 +259,13 @@ func fetchBotList() []*common.Bot {
 			SourcePath:      "/bots/nfl2025/jon_bot.py",
 			Owner:           "Jon",
 			FantasyTeamName: "Jon's team",
+		},
+		{
+			Id:              "13",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl2025/harry_bot.py",
+			Owner:           "Harry",
+			FantasyTeamName: "Harry's team",
 		},
 		// {
 		// 	Id:              "1",
