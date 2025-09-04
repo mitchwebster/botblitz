@@ -1,4 +1,4 @@
-from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
+# from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
 from blitz_env.models import DatabaseManager, Player, Bot, GameStatus
 from blitz_env import GameState, AddDropSelection
 import pandas as pd

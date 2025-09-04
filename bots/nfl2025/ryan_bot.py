@@ -1,11 +1,13 @@
 import os
 import pandas as pd
-from blitz_env import visualize_draft_board, Player, StatsDB
-from blitz_env.simulate_draft_sqlite import simulate_draft, is_drafted
+from blitz_env import Player, PlayerStatus, StatsDB, GameState, AddDropSelection
 from openai import OpenAI
 import json
 
 from blitz_env.models import DatabaseManager
+
+def is_drafted(player: Player) -> bool:
+    return player.status.availability == PlayerStatus.Availability.DRAFTED or player.status.availability == PlayerStatus.Availability.ON_HOLD
 
 def draft_player() -> str:
     openai_api_key = os.environ.get('OPEN_AI_TOKEN')
@@ -190,4 +192,18 @@ def draft_player() -> str:
             print("All positions are filled")
     return ""
 
-game_state = simulate_draft(draft_player, 2025)
+
+def propose_add_drop(game_state: GameState) -> AddDropSelection:
+    """
+    Selects a player to draft based on the highest rank.
+
+    Args:
+        players (List[Player]): A list of Player objects.
+
+    Returns:
+        str: The id of the drafted player.
+    """
+    return AddDropSelection(
+        player_to_add_id="",
+        player_to_drop_id=""
+    )
