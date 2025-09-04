@@ -5,9 +5,7 @@ from openai import OpenAI
 import json
 
 from blitz_env.models import DatabaseManager
-
-def is_drafted(player: Player) -> bool:
-    return player.status.availability == PlayerStatus.Availability.DRAFTED or player.status.availability == PlayerStatus.Availability.ON_HOLD
+from blitz_env.simulate_draft_sqlite import is_drafted, simulate_draft
 
 def draft_player() -> str:
     openai_api_key = os.environ.get('OPEN_AI_TOKEN')
