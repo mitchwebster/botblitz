@@ -269,23 +269,39 @@ def draft_player() -> str:
         team_positions = [f"{pos}: {count}" for pos, count in position_counts.items()]
         team_summary = f"Round {current_round}, Roster: {', '.join(team_positions)}"
 
+        vetoed_ids = set()
+
         for _, candidate in top_candidates.iterrows():
-            player_name = candidate.get("full_name", "Unknown")
-            position = candidate.get("position", "Unknown")
+            player_name = (
+                candidate["full_name"] if "full_name" in candidate else "Unknown"
+            )
+            position = candidate["position"] if "position" in candidate else "Unknown"
 
             # Check if AI wants to veto this pick
             if ai_draft_veto(player_name, position, current_round, team_summary):
                 print(f"🚫 AI vetoed {player_name}, trying next best option...")
+                vetoed_ids.add(candidate["id"])
                 continue
             else:
                 print(f"✅ AI approved: {player_name}")
                 return candidate["id"]
 
-        # If all top 3 were vetoed, just pick the best remaining
-        best_player = available_df.nlargest(1, "RosterValue").iloc[0]
-        print(
-            f"⚠️ AI vetoed top picks, selecting: {best_player.get('full_name', 'Unknown')}"
+        # If all top 3 were vetoed, pick the best non-vetoed player
+        remaining_df = available_df[~available_df["id"].isin(vetoed_ids)]
+        if not remaining_df.empty:
+            best_player = remaining_df.nlargest(1, "RosterValue").iloc[0]
+            player_name = (
+                best_player["full_name"] if "full_name" in best_player else "Unknown"
+            )
+            print(f"⚠️ AI vetoed top picks, selecting: {player_name}")
+            return best_player["id"]
+
+        # Last resort - pick anyone available
+        best_player = available_df.iloc[0]
+        player_name = (
+            best_player["full_name"] if "full_name" in best_player else "Unknown"
         )
+        print(f"🚨 No options left, selecting: {player_name}")
         return best_player["id"]
 
     except Exception as e:
@@ -326,7 +342,8 @@ def find_best_add_drop(db: DatabaseManager) -> Tuple[Optional[str], Optional[str
         if not worst_same_pos.empty:
             worst_player = worst_same_pos.iloc[0]
             # Only drop if the add is significantly better
-            if best_add["RosterValue"] > worst_player.get("Value", 0) + 5:
+            worst_value = worst_player["Value"] if "Value" in worst_player else 0
+            if best_add["RosterValue"] > worst_value + 5:
                 return best_add["id"], worst_player["id"]
 
     return None, None
