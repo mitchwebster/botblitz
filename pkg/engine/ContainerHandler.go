@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -120,7 +122,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 	return nil
 }
 
-func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port string) (string, error) {
+func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port int) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.ID)
 	}
@@ -193,7 +195,7 @@ func cleanBotResources() error {
 	return nil
 }
 
-func (e *BotEngine) createAndStartContainer(env []string, port string) (string, error) {
+func (e *BotEngine) createAndStartContainer(env []string, port int) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return "", err
@@ -204,7 +206,7 @@ func (e *BotEngine) createAndStartContainer(env []string, port string) (string, 
 
 	hostBinding := nat.PortBinding{
 		HostIP:   "0.0.0.0",
-		HostPort: port,
+		HostPort: strconv.Itoa(port),
 	}
 
 	// Define resource limits
@@ -339,24 +341,17 @@ func (e *BotEngine) isContainerRunning(containerId string) (bool, error) {
 	return containerInfo.State.Running, nil
 }
 
-func (e *BotEngine) findAvailablePort() (string, error) {
-	basePort := 8080
-	usedPorts := make(map[string]bool)
-	for _, info := range e.botContainers {
-		usedPorts[info.Port] = true
+func findAvailablePort() (int, error) {
+	// Listen on port 0 - OS will assign an available port
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
 	}
-	port := basePort
-	for {
-		strPort := fmt.Sprintf("%d", port)
-		if !usedPorts[strPort] {
-			return strPort, nil
-		}
+	defer listener.Close()
 
-		port++
-		if port > 9000 { // Prevent infinite loop
-			return "", fmt.Errorf("no available ports found")
-		}
-	}
+	// Get the assigned port
+	port := listener.Addr().(*net.TCPAddr).Port
+	return port, nil
 }
 
 func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerInfo, error) {
@@ -398,7 +393,7 @@ func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerIn
 	}
 
 	// Find an available port
-	port, err := e.findAvailablePort()
+	port, err := findAvailablePort()
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +406,7 @@ func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerIn
 
 	containerInfo := &BotContainerInfo{
 		ContainerID: containerId,
-		Port:        port,
+		Port:        strconv.Itoa(port),
 	}
 	e.botContainers[bot.ID] = containerInfo
 
