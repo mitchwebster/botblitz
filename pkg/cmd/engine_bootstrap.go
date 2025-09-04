@@ -228,7 +228,7 @@ func fetchBotList() []*common.Bot {
 			SourcePath:      "/bots/nfl2025/ryan_bot.py",
 			Owner:           "Ryan",
 			FantasyTeamName: "Ryan's team",
-			EnvPath:         "/bots/nfl/ryan/ryan.env",
+			EnvPath:         "/bots/nfl/envs/ryan.env",
 		},
 		{
 			Id:              "9",
@@ -236,6 +236,7 @@ func fetchBotList() []*common.Bot {
 			SourcePath:      "/bots/nfl2025/philip_bot.py",
 			Owner:           "Philip",
 			FantasyTeamName: "Philip's team",
+			EnvPath:         "/bots/nfl/envs/philip.env",
 		},
 		// {
 		// 	Id:              "10",
