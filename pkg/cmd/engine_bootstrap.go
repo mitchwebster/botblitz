@@ -231,6 +231,13 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Jack",
 			FantasyTeamName: "Jack's team",
 		},
+		{
+			Id:              "9",
+			SourceType:      common.Bot_LOCAL,
+			SourcePath:      "/bots/nfl2025/ben_bot.py",
+			Owner:           "Ben",
+			FantasyTeamName: "Ben's team",
+		},
 		// {
 		// 	Id:              "1",
 		// 	SourceType:      common.Bot_LOCAL,

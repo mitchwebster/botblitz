@@ -1,11 +1,9 @@
-from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
+# from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
 from blitz_env.models import DatabaseManager, Player
 from blitz_env import GameState, AddDropSelection
 import pandas as pd
 
 pd.set_option('mode.chained_assignment',None)
-
-
 
 def get_roster(db):
     roster = {
@@ -17,7 +15,7 @@ def get_roster(db):
             'K': []
         }
 
-    df = pd.read_sql("SELECT * FROM game_status", db.engine) # get game status
+    df = pd.read_sql("SELECT * FROM game_statuses", db.engine) # get game status
     draft_pick = df.iloc[0]["current_draft_pick"]
     print(f"Current pick is {draft_pick}")
     
@@ -163,7 +161,7 @@ def draft_player() -> str:
 
     # get game state 
     # draft_position = db.get_game_status().current_bot_id
-    game_statuses_df = pd.read_sql("SELECT * FROM game_status", db.engine) # get game status
+    game_statuses_df = pd.read_sql("SELECT * FROM game_statuses", db.engine) # get game status
     draft_pick = game_statuses_df.iloc[0]["current_draft_pick"]
     
     # draft_position = df.iloc[0]["current_bot_id"]
@@ -191,7 +189,7 @@ def draft_player() -> str:
 
 
     try:     
-        display(adj_rank_top_pick)       
+        # display(adj_rank_top_pick)       
         return adj_rank_top_pick['id'].values[0]
 
     finally:
