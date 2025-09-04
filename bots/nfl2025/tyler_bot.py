@@ -207,7 +207,7 @@ Should I VETO this pick? Consider:
 Respond with only "VETO" or "APPROVE" and a brief reason (max 30 words)."""
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-5-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=50,
             temperature=0.3,
