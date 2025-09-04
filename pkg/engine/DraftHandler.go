@@ -43,6 +43,15 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		for index >= 0 && index <= arrayEdge {
 			// check if ctx is canceled
 			if err := ctx.Err(); err != nil {
+				// cleanup all running bot containers
+				fmt.Printf("Engine canceled. Cleaning up all running containers...")
+				for _, containerInfo := range e.botContainers {
+					err := e.shutDownAndCleanBotServer(containerInfo.ContainerID)
+					if err != nil {
+						fmt.Printf("Error shutting down bot container %q: %v", containerInfo.ContainerID, err)
+					}
+				}
+
 				return err
 			}
 
