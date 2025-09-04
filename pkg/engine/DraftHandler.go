@@ -10,6 +10,16 @@ import (
 	"github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
+func (e *BotEngine) stopAllRunningBots() {
+	fmt.Println("Cleaning up all running containers...")
+	for _, containerInfo := range e.botContainers {
+		err := e.shutDownAndCleanBotServer(containerInfo.ContainerID)
+		if err != nil {
+			fmt.Printf("Error shutting down bot container %q: %v", containerInfo.ContainerID, err)
+		}
+	}
+}
+
 func (e *BotEngine) runDraft(ctx context.Context) error {
 	err := e.initializeDraftSheet()
 	if err != nil {
@@ -44,14 +54,7 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 			// check if ctx is canceled
 			if err := ctx.Err(); err != nil {
 				// cleanup all running bot containers
-				fmt.Printf("Engine canceled. Cleaning up all running containers...")
-				for _, containerInfo := range e.botContainers {
-					err := e.shutDownAndCleanBotServer(containerInfo.ContainerID)
-					if err != nil {
-						fmt.Printf("Error shutting down bot container %q: %v", containerInfo.ContainerID, err)
-					}
-				}
-
+				e.stopAllRunningBots()
 				return err
 			}
 
@@ -73,6 +76,8 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 
 		curRound += 1
 	}
+
+	e.stopAllRunningBots()
 
 	return nil
 }
