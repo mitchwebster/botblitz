@@ -79,15 +79,29 @@ def draft_player() -> str:
 
     # Count how many players we're allowed to field for each position
     allowed_position_counts = get_positions_to_fill(db)
+    allowed_position_counts['TE'] = 0
     print(f"allowed_position_counts: {allowed_position_counts}")
 
     # handle bench position. for each bench, add one to each other position
     # note that allowed_position_counts tracks how many of each we can *field* at a time, while position_open_counts tracks how many we can still *draft*
-    position_open_counts = copy.deepcopy(allowed_position_counts)
+    # position_open_counts = copy.deepcopy(allowed_position_counts)
+    position_open_counts = collections.defaultdict(int)
+    for pos in allowed_position_counts.keys():
+        position_open_counts[pos] = allowed_position_counts[pos]
+    # adjust counts
     bench_count = position_open_counts["BENCH"]
+    flex_count = position_open_counts["FLEX"]
+    superflex_count = position_open_counts["SUPERFLEX"]
     del position_open_counts["BENCH"]
-    for pos in position_open_counts.keys():
+    del position_open_counts["FLEX"]
+    del position_open_counts["SUPERFLEX"]
+    for pos in ["QB", "RB", "WR", "TE", "K", "DST"]:
         position_open_counts[pos] += bench_count
+    for pos in ["RB", "WR", "TE"]:
+        position_open_counts[pos] += flex_count
+    for pos in ["QB", "RB", "WR", "TE"]:
+        position_open_counts[pos] += superflex_count
+    
 
     # count how many players we've already drafted in each position
     filled_position_counts = collections.defaultdict(int)
@@ -173,3 +187,4 @@ def draft_player() -> str:
 
 # TODO
 def propose_add_drop(game_state: GameState) -> AddDropSelection: pass
+
