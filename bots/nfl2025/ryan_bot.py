@@ -5,7 +5,6 @@ from openai import OpenAI
 import json
 
 from blitz_env.models import DatabaseManager
-from blitz_env.simulate_draft_sqlite import is_drafted, simulate_draft
 
 def draft_player() -> str:
     openai_api_key = os.environ.get('OPEN_AI_TOKEN')
@@ -72,6 +71,8 @@ def draft_player() -> str:
     
     current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1
     is_last_three_rounds = (league_settings.total_rounds - current_round) < 3
+    
+    is_drafted = lambda player: player.availability in ('DRAFTED', 'ON_HOLD')
     
     # Filter out already drafted players
     undrafted_players = [
