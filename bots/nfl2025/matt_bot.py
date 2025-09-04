@@ -1,8 +1,7 @@
-
 from typing import List
 from blitz_env import projections_db, GameState, AddDropSelection
 from blitz_env.models import DatabaseManager, Player
-from sqlalchemy import or_
+from sqlalchemy import or_, desc
 import pandas as pd
 
 
@@ -62,7 +61,6 @@ def draft_player() -> str:
             ).order_by(Player.rank).first()
             return best_k.id
 
-
         # Construct my current team
         current_team_id = db.get_game_status().current_bot_id
         team_players = db.session.query(Player).filter(
@@ -79,10 +77,80 @@ def draft_player() -> str:
                 Player.allowed_positions.contains("QB"),
                 Player.allowed_positions.contains("RB")
             )
-        ).order_by(Player.rank).all()        
+        ).order_by(Player.rank).all()
+
+        if team_state.num_drafted_qbs() == 2:
+            available_players = db.session.query(Player).filter(
+            Player.availability == 'AVAILABLE',
+                or_(
+                    Player.allowed_positions.contains("WR"),
+                    Player.allowed_positions.contains("RB")
+                )
+            ).order_by(Player.rank).all()
+
+        if remaining_rounds < 5 and team_state.num_drafted_rbs() < 3:
+            available_players = db.session.query(Player).filter(
+            Player.availability == 'AVAILABLE',
+                or_(
+                    Player.allowed_positions.contains("RB")
+                )
+            ).order_by(Player.rank).all()
+
+        if remaining_rounds < 5 and team_state.num_drafted_wrs() < 3:
+            available_players = db.session.query(Player).filter(
+            Player.availability == 'AVAILABLE',
+                or_(
+                    Player.allowed_positions.contains("WR")
+                )
+            ).order_by(Player.rank).all()
+
+        available_player_ids = [player.id for player in available_players]
+
+        # Get preseason projections and filter for available players
+        preseason_projections = pd.read_sql(f"""
+            SELECT * FROM preseason_projections 
+            WHERE year = 2025 
+            AND position IN ('wr', 'qb', 'rb')
+            ORDER BY FPTS DESC
+        """, db.engine)
+
+
+        # # Debug: Check if the DataFrame has any data
+        # print(f"Shape of preseason_projections: {preseason_projections.shape}")
+        # print(f"Is DataFrame empty: {preseason_projections.empty}")
+
+        # # Check the raw SQL query first
+        # print("Testing raw SQL query...")
+        # test_df = pd.read_sql(f"SELECT COUNT(*) as count FROM preseason_projections WHERE year = 2025", db.engine)
+        # print(f"Total records for 2025: {test_df['count'].iloc[0]}")
+
+        # # Check what years are actually in the table
+        # years_df = pd.read_sql("SELECT DISTINCT year FROM preseason_projections ORDER BY year", db.engine)
+        # print(f"Available years: {years_df['year'].tolist()}")
+
+        # # Check what positions are in the table
+        # positions_df = pd.read_sql("SELECT DISTINCT position FROM preseason_projections ORDER BY position", db.engine)
+        # print(f"Available positions: {positions_df['position'].tolist()}")
+
+        # # Try without filters first
+        # all_projections = pd.read_sql("SELECT * FROM preseason_projections LIMIT 5", db.engine)
+        # print(f"Sample data:")
+        # print(all_projections.head())
+
+
+        # Iterate through projections and manually check if player is available
+        for index, player in preseason_projections.iterrows():
+            fantasypros_id = player['fantasypros_id']
+            
+            # Check if this player is in available_players list
+            available_player = next((ap for ap in available_players if ap.id == fantasypros_id), None)
+            
+            if available_player:
+                print(f"Available: {player['player_name']} ({player['position']}) - {player['FPTS']} points")
+                # Do whatever you need with this available player
+                return available_player.id
         
-        return available_players[0].id if available_players and available_players[0] else ""
-    
+        return ""
     finally:
         db.close()
     
