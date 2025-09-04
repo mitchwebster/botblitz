@@ -87,14 +87,20 @@ def draft_player() -> str:
         db.close()
     
 
-# def propose_add_drop(game_state: GameState) -> AddDropSelection:
-#     """
-#     Do not add or drop players yet
-#     """
-#     return AddDropSelection(
-#         player_to_add_id="",
-#         player_to_drop_id=""
-#     )
+def propose_add_drop(game_state: GameState) -> AddDropSelection:
+    """
+    Selects a player to draft based on the highest rank.
+
+    Args:
+        players (List[Player]): A list of Player objects.
+
+    Returns:
+        str: The id of the drafted player.
+    """
+    return AddDropSelection(
+        player_to_add_id="",
+        player_to_drop_id=""
+    )
 
 
 

@@ -81,6 +81,17 @@ def draft_player() -> str:
         filtered_df = df[df["allowed_positions_set"].apply(lambda s: bool(s & position_filter))]
         filtered_df_sorted = filtered_df.sort_values(by="rank", ascending=True)
 
+        preferred_players = ["Ja'Marr Chase", "Bijan Robinson", "Justin Jefferson", "Saquon Barkley", "Jahmyr Gibbs", "Christian McCaffrey", "CeeDee Lamb", "Malik Nabers", "Puka Nacua", "Ashton Jeanty", "Amon-Ra St. Brown", "De'Von Achane", "Josh Allen", "Lamar Jackson", "Jayden Daniels", "Jalen Hurts", "Joe Burrow", "Garrett Wilson", "Marvin Harrison Jr.", "DK Metcalf", "Xavier Worthy", "Mike Evans", "DJ Moore", "Zay Flowers", "Courtland Sutton", "Calvin Ridley", "DeVonta Smith", "Jaylen Waddle", "Jerry Jeudy", "Jameson Williams", "Rashee Rice", "George Pickens", "Rome Odunze", "Travis Hunter", "Jakobi Meyers", "Matthew Golden", "Emeka Egbuka", "Chris Olave", "Ricky Pearsall", "Michael Pittman Jr.", "Stefon Diggs", "Cooper Kupp", "Jordan Addison", "Jauan Jennings", "Deebo Samuel Sr.", "Khalil Shakir", "Keon Coleman", "Chris Godwin", "Josh Downs", "Brock Bowers"]
+        
+        # Check if any preferred player is available
+        preferred_available = filtered_df_sorted[
+            filtered_df_sorted["full_name"].isin(preferred_players)
+        ]
+        if not preferred_available.empty:
+            best_pref = preferred_available.iloc[0]
+            print(f"Drafting preferred player: {best_pref['full_name']}")
+            return best_pref["id"]
+        
         if not filtered_df_sorted.empty:
             best_player = filtered_df_sorted.iloc[0]
             print(best_player["full_name"])
