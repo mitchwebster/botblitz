@@ -36,6 +36,9 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		return err
 	}
 
+	// Cleanup all running bots on exit
+	defer e.stopAllRunningBots()
+
 	curRound := 1
 	for curRound <= int(leagueSettings.TotalRounds) {
 		fmt.Printf("ROUND %d HAS STARTED!\n", curRound)
@@ -53,8 +56,6 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 		for index >= 0 && index <= arrayEdge {
 			// check if ctx is canceled
 			if err := ctx.Err(); err != nil {
-				// cleanup all running bot containers
-				e.stopAllRunningBots()
 				return err
 			}
 
@@ -76,8 +77,6 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 
 		curRound += 1
 	}
-
-	e.stopAllRunningBots()
 
 	return nil
 }
