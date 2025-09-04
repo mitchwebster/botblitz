@@ -1,12 +1,10 @@
 import json
 import os
+from typing import Optional
 
 import pandas as pd
-
-try:
-    import openai
-except ImportError:
-    openai = None
+import openai
+import numpy as np
 
 from blitz_env import AddDropSelection, GameState
 from blitz_env.models import DatabaseManager
@@ -82,7 +80,7 @@ def get_my_team(db: DatabaseManager) -> pd.DataFrame:
     return my_team
 
 
-def get_position_counts(my_team: pd.DataFrame) -> Dict[str, int]:
+def get_position_counts(my_team: pd.DataFrame) -> dict[str, int]:
     """Get count of players by position."""
     return my_team.groupby("position")["position"].count().to_dict()
 
@@ -104,8 +102,8 @@ def calculate_roster_value_penalty(position: str, drafted_count: int) -> float:
 
 
 def get_allowed_positions_to_draft(
-    current_round: int, total_rounds: int, position_counts: Dict[str, int]
-) -> Set[str]:
+    current_round: int, total_rounds: int, position_counts: dict[str, int]
+) -> set[str]:
     """Determine which positions are allowed to draft based on round and roster."""
     if current_round == total_rounds:
         return {"K"}
@@ -153,7 +151,7 @@ def get_players_with_value(db: DatabaseManager) -> pd.DataFrame:
 
 
 def calculate_roster_value(
-    player_row: pd.Series, position_counts: Dict[str, int], current_round: int
+    player_row: pd.Series, position_counts: dict[str, int], current_round: int
 ) -> float:
     """Calculate the roster-adjusted value of a player."""
     base_value = player_row.get("Value", 0)
@@ -311,7 +309,7 @@ def draft_player() -> str:
         db.close()
 
 
-def find_best_add_drop(db: DatabaseManager) -> Tuple[Optional[str], Optional[str]]:
+def find_best_add_drop(db: DatabaseManager) -> tuple[Optional[str], Optional[str]]:
     """Find the best waiver wire add and corresponding drop."""
     my_team = get_my_team(db)
     position_counts = get_position_counts(my_team)
