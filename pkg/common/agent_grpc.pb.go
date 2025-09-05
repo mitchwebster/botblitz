@@ -20,9 +20,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_DraftPlayer_FullMethodName          = "/AgentService/DraftPlayer"
-	AgentService_SubmitFantasyActions_FullMethodName = "/AgentService/SubmitFantasyActions"
-	AgentService_ProposeAddDrop_FullMethodName       = "/AgentService/ProposeAddDrop"
+	AgentService_DraftPlayer_FullMethodName    = "/AgentService/DraftPlayer"
+	AgentService_PerformAddDrop_FullMethodName = "/AgentService/PerformAddDrop"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -30,8 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
 	DraftPlayer(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DraftSelection, error)
-	SubmitFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
-	ProposeAddDrop(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AddDropSelection, error)
+	PerformAddDrop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
 }
 
 type agentServiceClient struct {
@@ -52,20 +50,10 @@ func (c *agentServiceClient) DraftPlayer(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
-func (c *agentServiceClient) SubmitFantasyActions(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AttemptedFantasyActions, error) {
+func (c *agentServiceClient) PerformAddDrop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AttemptedFantasyActions)
-	err := c.cc.Invoke(ctx, AgentService_SubmitFantasyActions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *agentServiceClient) ProposeAddDrop(ctx context.Context, in *GameState, opts ...grpc.CallOption) (*AddDropSelection, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AddDropSelection)
-	err := c.cc.Invoke(ctx, AgentService_ProposeAddDrop_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AgentService_PerformAddDrop_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +65,7 @@ func (c *agentServiceClient) ProposeAddDrop(ctx context.Context, in *GameState, 
 // for forward compatibility.
 type AgentServiceServer interface {
 	DraftPlayer(context.Context, *emptypb.Empty) (*DraftSelection, error)
-	SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error)
-	ProposeAddDrop(context.Context, *GameState) (*AddDropSelection, error)
+	PerformAddDrop(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -92,11 +79,8 @@ type UnimplementedAgentServiceServer struct{}
 func (UnimplementedAgentServiceServer) DraftPlayer(context.Context, *emptypb.Empty) (*DraftSelection, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DraftPlayer not implemented")
 }
-func (UnimplementedAgentServiceServer) SubmitFantasyActions(context.Context, *GameState) (*AttemptedFantasyActions, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SubmitFantasyActions not implemented")
-}
-func (UnimplementedAgentServiceServer) ProposeAddDrop(context.Context, *GameState) (*AddDropSelection, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ProposeAddDrop not implemented")
+func (UnimplementedAgentServiceServer) PerformAddDrop(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PerformAddDrop not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -137,38 +121,20 @@ func _AgentService_DraftPlayer_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AgentService_SubmitFantasyActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GameState)
+func _AgentService_PerformAddDrop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServiceServer).SubmitFantasyActions(ctx, in)
+		return srv.(AgentServiceServer).PerformAddDrop(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AgentService_SubmitFantasyActions_FullMethodName,
+		FullMethod: AgentService_PerformAddDrop_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServiceServer).SubmitFantasyActions(ctx, req.(*GameState))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AgentService_ProposeAddDrop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GameState)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentServiceServer).ProposeAddDrop(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AgentService_ProposeAddDrop_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServiceServer).ProposeAddDrop(ctx, req.(*GameState))
+		return srv.(AgentServiceServer).PerformAddDrop(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -185,12 +151,8 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AgentService_DraftPlayer_Handler,
 		},
 		{
-			MethodName: "SubmitFantasyActions",
-			Handler:    _AgentService_SubmitFantasyActions_Handler,
-		},
-		{
-			MethodName: "ProposeAddDrop",
-			Handler:    _AgentService_ProposeAddDrop_Handler,
+			MethodName: "PerformAddDrop",
+			Handler:    _AgentService_PerformAddDrop_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

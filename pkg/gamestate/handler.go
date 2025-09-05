@@ -606,6 +606,7 @@ type bot struct {
 	Name                  string `gorm:"column:name"`
 	Owner                 string `gorm:"column:owner"`
 	CurrentWaiverPriority int    `gorm:"column:current_waiver_priority"`
+	RemainingWaiverBudget int    `gorm:"column:remaining_waiver_budget"`
 
 	// Relations
 	GameStatuses []gameStatus `gorm:"foreignKey:CurrentBotID"`

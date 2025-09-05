@@ -10,7 +10,6 @@ import (
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	gamestate "github.com/mitchwebster/botblitz/pkg/gamestate"
-	"golang.org/x/exp/slices"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -155,26 +154,4 @@ func GenerateRandomString(length int) string {
 	}
 
 	return string(result)
-}
-
-func FindCurrentBotById(botId string, gameState *common.GameState) (*common.Bot, error) {
-	teamIdx := slices.IndexFunc(gameState.Bots, func(t *common.Bot) bool { return t.Id == botId })
-	if teamIdx < 0 {
-		return nil, fmt.Errorf("Could not find team...concerning...")
-	}
-
-	return gameState.Bots[teamIdx], nil
-}
-
-func FindPlayerById(playerId string, gameState *common.GameState) (*common.Player, error) {
-	if len(playerId) <= 0 {
-		return nil, fmt.Errorf("Cannot find empty player id")
-	}
-
-	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
-	if idx < 0 {
-		return nil, fmt.Errorf("Could not find player with selected id")
-	}
-
-	return gameState.Players[idx], nil
 }

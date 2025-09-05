@@ -31,6 +31,26 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 		println("Scoring previous week")
 	} else {
 		println("Running add/drop for current week")
+
+		bots, err := e.gameStateHandler.GetBots()
+		if err != nil {
+			return err
+		}
+
+		// get the bot with id 0
+		for _, bot := range bots {
+			if bot.Id == "0" {
+				selections, err := e.startContainerAndPerformAddDropAction(ctx, bot)
+				if err != nil {
+					return err
+				}
+
+				println("len of selections:", len(selections.AddDropSelections))
+				for _, selection := range selections.AddDropSelections {
+					println("Selection - add:", selection.PlayerToAddId, " drop:", selection.PlayerToDropId, " bid:", selection.BidAmount)
+				}
+			}
+		}
 	}
 
 	return nil
@@ -321,7 +341,7 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 // }
 
 func getCurrentWeek(year uint32) int {
-	// Weeks since firt day of football: 9/5/24 at 8am UTC (roughly when this runs)
+	// Weeks since firt day of football: 9/5/{year} at 8am UTC (roughly when this runs)
 	pastDate := time.Date(int(year), 9, 5, 8, 0, 0, 0, time.UTC)
 	now := time.Now()
 	duration := now.Sub(pastDate)

@@ -143,9 +143,11 @@ class AttemptedFantasyActions(_message.Message):
     def __init__(self, add_drop_selections: _Optional[_Iterable[_Union[AddDropSelection, _Mapping]]] = ...) -> None: ...
 
 class AddDropSelection(_message.Message):
-    __slots__ = ("player_to_drop_id", "player_to_add_id")
+    __slots__ = ("player_to_drop_id", "player_to_add_id", "bid_amount")
     PLAYER_TO_DROP_ID_FIELD_NUMBER: _ClassVar[int]
     PLAYER_TO_ADD_ID_FIELD_NUMBER: _ClassVar[int]
+    BID_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     player_to_drop_id: str
     player_to_add_id: str
-    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ...) -> None: ...
+    bid_amount: int
+    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ..., bid_amount: _Optional[int] = ...) -> None: ...

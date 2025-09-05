@@ -2,26 +2,23 @@ from concurrent import futures
 import logging
 import subprocess, os, json
 from google.protobuf.json_format import ParseDict
-from blitz_env import DraftSelection
+from blitz_env import DraftSelection, AttemptedFantasyActions
 
 import grpc
 from agent_pb2_grpc import AgentServiceServicer, add_AgentServiceServicer_to_server
-from bot import propose_add_drop
 
 class AgentServiceServicer(AgentServiceServicer):
 
     def __init__(self):
         print("Initialized gRPC server")
 
-    def DraftPlayer(self, request, context):
-        print("Received Request: ")
-
+    def perform_action_in_isolation(self, action):
         # Create pipe for result communication
         r, w = os.pipe()
 
         # Start the subprocess
         proc = subprocess.Popen(
-            ["python3", "isolate_action.py", str(w)],
+            ["python3", "isolate_action.py", str(w), action],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -48,17 +45,19 @@ class AgentServiceServicer(AgentServiceServicer):
             raise Exception("No response from bot: " + stderr)
 
         result_dict = json.loads(result)
+        return result_dict
+
+    def DraftPlayer(self, request, context):
+        result_dict = self.perform_action_in_isolation("draft")
         player_selection = ParseDict(result_dict, DraftSelection())
 
         return DraftSelection(
             player_id=player_selection.player_id
         )
     
-    def ProposeAddDrop(self, request, context):
-        print("Received Request: ")
-        # print(request)
-
-        return propose_add_drop(request)
+    def PerformAddDrop(self, request, context):
+        result_dict = self.perform_action_in_isolation("add_drop")
+        return ParseDict(result_dict, AttemptedFantasyActions())
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

@@ -737,6 +737,7 @@ type AddDropSelection struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	PlayerToDropId string                 `protobuf:"bytes,1,opt,name=player_to_drop_id,json=playerToDropId,proto3" json:"player_to_drop_id,omitempty"`
 	PlayerToAddId  string                 `protobuf:"bytes,2,opt,name=player_to_add_id,json=playerToAddId,proto3" json:"player_to_add_id,omitempty"`
+	BidAmount      uint32                 `protobuf:"varint,3,opt,name=bid_amount,json=bidAmount,proto3" json:"bid_amount,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -783,6 +784,13 @@ func (x *AddDropSelection) GetPlayerToAddId() string {
 		return x.PlayerToAddId
 	}
 	return ""
+}
+
+func (x *AddDropSelection) GetBidAmount() uint32 {
+	if x != nil {
+		return x.BidAmount
+	}
+	return 0
 }
 
 var File_pkg_common_proto_agent_proto protoreflect.FileDescriptor
@@ -854,16 +862,15 @@ const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\x0eDraftSelection\x12\x1b\n" +
 	"\tplayer_id\x18\x01 \x01(\tR\bplayerId\"\\\n" +
 	"\x17AttemptedFantasyActions\x12A\n" +
-	"\x13add_drop_selections\x18\x01 \x03(\v2\x11.AddDropSelectionR\x11addDropSelections\"f\n" +
+	"\x13add_drop_selections\x18\x01 \x03(\v2\x11.AddDropSelectionR\x11addDropSelections\"\x85\x01\n" +
 	"\x10AddDropSelection\x12)\n" +
 	"\x11player_to_drop_id\x18\x01 \x01(\tR\x0eplayerToDropId\x12'\n" +
-	"\x10player_to_add_id\x18\x02 \x01(\tR\rplayerToAddId2\xbb\x01\n" +
+	"\x10player_to_add_id\x18\x02 \x01(\tR\rplayerToAddId\x12\x1d\n" +
+	"\n" +
+	"bid_amount\x18\x03 \x01(\rR\tbidAmount2\x8e\x01\n" +
 	"\fAgentService\x128\n" +
-	"\vDraftPlayer\x12\x16.google.protobuf.Empty\x1a\x0f.DraftSelection\"\x00\x12>\n" +
-	"\x14SubmitFantasyActions\x12\n" +
-	".GameState\x1a\x18.AttemptedFantasyActions\"\x00\x121\n" +
-	"\x0eProposeAddDrop\x12\n" +
-	".GameState\x1a\x11.AddDropSelection\"\x00B\n" +
+	"\vDraftPlayer\x12\x16.google.protobuf.Empty\x1a\x0f.DraftSelection\"\x00\x12D\n" +
+	"\x0ePerformAddDrop\x12\x16.google.protobuf.Empty\x1a\x18.AttemptedFantasyActions\"\x00B\n" +
 	"Z\b.;commonb\x06proto3"
 
 var (
@@ -905,13 +912,11 @@ var file_pkg_common_proto_agent_proto_depIdxs = []int32{
 	2,  // 6: GameState.league_settings:type_name -> LeagueSettings
 	10, // 7: AttemptedFantasyActions.add_drop_selections:type_name -> AddDropSelection
 	12, // 8: AgentService.DraftPlayer:input_type -> google.protobuf.Empty
-	7,  // 9: AgentService.SubmitFantasyActions:input_type -> GameState
-	7,  // 10: AgentService.ProposeAddDrop:input_type -> GameState
-	8,  // 11: AgentService.DraftPlayer:output_type -> DraftSelection
-	9,  // 12: AgentService.SubmitFantasyActions:output_type -> AttemptedFantasyActions
-	10, // 13: AgentService.ProposeAddDrop:output_type -> AddDropSelection
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
+	12, // 9: AgentService.PerformAddDrop:input_type -> google.protobuf.Empty
+	8,  // 10: AgentService.DraftPlayer:output_type -> DraftSelection
+	9,  // 11: AgentService.PerformAddDrop:output_type -> AttemptedFantasyActions
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name

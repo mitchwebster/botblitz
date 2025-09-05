@@ -6,10 +6,11 @@ from .agent_pb2 import (
     GameState, 
     DraftSelection, 
     AddDropSelection,
+    AttemptedFantasyActions,
     Bot,
     PlayerStatus,
     LeagueSettings,
-    PlayerSlot
+    PlayerSlot,
 )
 from.models import (
     Player,

@@ -7,8 +7,7 @@ option go_package = ".;common";
 
 service AgentService {
     rpc DraftPlayer(google.protobuf.Empty) returns (DraftSelection) {}
-    rpc SubmitFantasyActions(GameState) returns (AttemptedFantasyActions) {}
-    rpc ProposeAddDrop(GameState) returns (AddDropSelection) {}
+    rpc PerformAddDrop(google.protobuf.Empty) returns (AttemptedFantasyActions) {}
 }
 
 message LeagueSettings {
@@ -92,4 +91,5 @@ message AttemptedFantasyActions {
 message AddDropSelection {
     string player_to_drop_id = 1;
     string player_to_add_id = 2;
+    uint32 bid_amount = 3;
 }

@@ -269,7 +269,7 @@ func (e *BotEngine) createAndStartContainer(env []string, port string) (string, 
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.AddDropSelection, error) {
+func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.AttemptedFantasyActions, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -286,7 +286,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.Ad
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selection, err := client.ProposeAddDrop(ctx, nil)
+	selection, err := client.PerformAddDrop(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -444,7 +444,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	return draftPick.PlayerId, returnError
 }
 
-func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *common.Bot) (selection *common.AddDropSelection, returnError error) {
+func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *common.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
 	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return nil, err
@@ -456,7 +456,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Using a %s source to find %q\n", bot.SourceType, bot.SourcePath)
 	}
 
-	selection, err = e.callAddDropRPC(ctx, containerInfo.Port)
+	selections, err = e.callAddDropRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +467,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 	// 	}
 	// }
 
-	return selection, returnError
+	return selections, returnError
 }
 
 func (e *BotEngine) CleanupAllPyGrpcServerContainers() error {
