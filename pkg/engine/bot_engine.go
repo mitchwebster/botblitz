@@ -84,7 +84,7 @@ func (e *BotEngine) performValidations() error {
 		return err
 	}
 
-	botValidation := common.ValidateBotConfigs(bots)
+	botValidation := validateBotConfigs(bots)
 	if !botValidation {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
@@ -154,4 +154,23 @@ func GenerateRandomString(length int) string {
 	}
 
 	return string(result)
+}
+
+func validateBotConfigs(bots []gamestate.Bot) bool {
+	uniquenessMap := make(map[string]bool)
+
+	for _, bot := range bots {
+		if bot.ID == "" {
+			return false
+		}
+
+		_, exists := uniquenessMap[bot.ID]
+		if exists {
+			return false
+		}
+
+		uniquenessMap[bot.ID] = true
+	}
+
+	return true
 }

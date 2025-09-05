@@ -120,12 +120,12 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 	return nil
 }
 
-func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, error) {
+func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port string) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.Id)
+		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.ID)
 	}
 
-	botCode := e.sourceCodeCache[bot.Id]
+	botCode := e.sourceCodeCache[bot.ID]
 
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Println("Creating source code file")
@@ -153,7 +153,7 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 
 	env := []string{}
 
-	envVarsFromCache, ok := e.envVarsCache[bot.Id]
+	envVarsFromCache, ok := e.envVarsCache[bot.ID]
 	if ok {
 		env = envVarsFromCache
 	}
@@ -359,42 +359,42 @@ func (e *BotEngine) findAvailablePort() (string, error) {
 	}
 }
 
-func (e *BotEngine) getOrCreateBotContainer(bot *common.Bot) (*BotContainerInfo, error) {
+func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerInfo, error) {
 	// Check if container already exists for this bot
-	if containerInfo, exists := e.botContainers[bot.Id]; exists {
+	if containerInfo, exists := e.botContainers[bot.ID]; exists {
 		if e.settings.VerboseLoggingEnabled {
-			fmt.Printf("Found existing container for bot (%s): %s\n", bot.Id, containerInfo.ContainerID)
+			fmt.Printf("Found existing container for bot (%s): %s\n", bot.ID, containerInfo.ContainerID)
 		}
 
 		// Check if the container is still running
 		if isRunning, err := e.isContainerRunning(containerInfo.ContainerID); err == nil && isRunning {
 			if e.settings.VerboseLoggingEnabled {
-				fmt.Printf("Using existing container for bot (%s): %s\n", bot.Id, containerInfo.ContainerID)
+				fmt.Printf("Using existing container for bot (%s): %s\n", bot.ID, containerInfo.ContainerID)
 			}
 			return containerInfo, nil
 		} else {
 			if e.settings.VerboseLoggingEnabled {
-				fmt.Printf("Container for bot (%s) is not running, cleaning up and will recreate\n", bot.Id)
+				fmt.Printf("Container for bot (%s) is not running, cleaning up and will recreate\n", bot.ID)
 			}
 
 			// Clean up the non-running container
 			err := e.shutDownAndCleanBotServer(containerInfo.ContainerID)
 			if err != nil {
 				if e.settings.VerboseLoggingEnabled {
-					fmt.Printf("Warning: Failed to clean up non-running container for bot %s: %v\n", bot.Id, err)
+					fmt.Printf("Warning: Failed to clean up non-running container for bot %s: %v\n", bot.ID, err)
 				}
 
 				return nil, err
 			}
 
 			// Remove the invalid container ID from the map
-			delete(e.botContainers, bot.Id)
+			delete(e.botContainers, bot.ID)
 		}
 	}
 
 	// Container doesn't exist or is not running, create a new one
 	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Creating new container for bot (%s)\n", bot.Id)
+		fmt.Printf("Creating new container for bot (%s)\n", bot.ID)
 	}
 
 	// Find an available port
@@ -413,21 +413,19 @@ func (e *BotEngine) getOrCreateBotContainer(bot *common.Bot) (*BotContainerInfo,
 		ContainerID: containerId,
 		Port:        port,
 	}
-	e.botContainers[bot.Id] = containerInfo
+	e.botContainers[bot.ID] = containerInfo
 
 	return containerInfo, nil
 }
 
-func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot *common.Bot) (playerId string, returnError error) {
+func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot *gamestate.Bot) (playerId string, returnError error) {
 	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return "", err
 	}
 
 	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %q\n", bot.SourceType, bot.SourcePath)
+		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
 
 	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port)
@@ -444,16 +442,14 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	return draftPick.PlayerId, returnError
 }
 
-func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *common.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
+func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *gamestate.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
 	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return nil, err
 	}
 
 	if e.settings.VerboseLoggingEnabled {
-		fmt.Printf("Setup bot: %s\n", bot.Id)
-		fmt.Printf("Bot details: Id: %s, Username: %s, Repo: %s\n", bot.Id, bot.SourceRepoUsername, bot.SourceRepoName)
-		fmt.Printf("Using a %s source to find %q\n", bot.SourceType, bot.SourcePath)
+		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
 
 	selections, err = e.callAddDropRPC(ctx, containerInfo.Port)

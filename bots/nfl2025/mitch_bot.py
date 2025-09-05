@@ -136,8 +136,8 @@ def draft_player() -> str:
 def perform_add_drop() -> AttemptedFantasyActions:
     selections = [ 
         AddDropSelection(
-            player_to_add_id="5",
-            player_to_drop_id="6",
+            player_to_add_id="17272",
+            player_to_drop_id="19278",
             bid_amount=1
         )
     ]

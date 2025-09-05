@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	common "github.com/mitchwebster/botblitz/pkg/common"
+	"github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
 const AllowedAddsPerRun = 3
@@ -48,59 +51,61 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	}
 
 	// player_id -> bot_id -> AddDropSelection
-	// playerSelectionMap := make(map[string]map[string]*common.AddDropSelection)
+	_ = e.fetchAddDropSubmissions(ctx, bots)
+
+	return nil
+}
+
+func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string]map[string]*common.AddDropSelection {
+	// player_id -> bot_id -> AddDropSelection
+	playerSelectionMap := make(map[string]map[string]*common.AddDropSelection)
 
 	for _, bot := range bots {
-		selections, err := e.startContainerAndPerformAddDropAction(ctx, bot)
+		selections, err := e.startContainerAndPerformAddDropAction(ctx, &bot)
 		if err != nil {
-			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.Id, err)
+			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.ID, err)
 			continue
 		}
 
 		if len(selections.AddDropSelections) > 10 || len(selections.AddDropSelections) <= 0 {
-			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.Id)
+			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.ID)
 			continue
 		}
 
 		for _, selection := range selections.AddDropSelections {
 			// validate player to drop is valid
-			err := e.validatePlayerCanBeDropped(selection.PlayerToDropId, bot.Id)
+			dropPlayerName, err := e.validatePlayerCanBeDropped(selection.PlayerToDropId, bot.ID)
 			if err != nil {
-				fmt.Printf("Invalid player (%s) to drop for bot %s: %s\n", selection.PlayerToDropId, bot.Id, err)
+				fmt.Printf("Invalid player (%s) to drop for bot %s: %s\n", selection.PlayerToDropId, bot.ID, err)
 				continue
 			}
 
 			// validate player to add is valid
 			playerToAdd, err := e.getPlayerAndValidateDraftEligibility(selection.PlayerToAddId)
 			if err != nil {
-				fmt.Printf("Invalid player (%s) to add for bot %s: %s\n", selection.PlayerToAddId, bot.Id, err)
+				fmt.Printf("Invalid player (%s) to add for bot %s: %s\n", selection.PlayerToAddId, bot.ID, err)
 				continue
 			}
 
-			// if selection.BidAmount < 0 || selection.BidAmount > bot.RemainingWaiverBudget {
-			// 	fmt.Printf("Invalid bid amount for bot %s: %d\n", bot.Id, selection.BidAmount)
-			// 	continue
-			// }
+			// validate bid amount is possible
+			if selection.BidAmount < 0 || selection.BidAmount > uint32(bot.RemainingWaiverBudget) {
+				fmt.Printf("Invalid bid amount for bot %s: %d\n", bot.ID, selection.BidAmount)
+				continue
+			}
 
-			// // If we reach here, the player is valid
-			fmt.Printf("Bot %s is adding player: %s\n", bot.Id, playerToAdd.FullName)
+			botSelectionMap, exists := playerSelectionMap[selection.PlayerToAddId]
+			if !exists {
+				botSelectionMap = make(map[string]*common.AddDropSelection)
+				playerSelectionMap[selection.PlayerToAddId] = botSelectionMap
+			}
+
+			// If we reach here, the player is valid
+			fmt.Printf("Recieved add drop from bot %s -> Add %s , Drop %s. Bid: %d\n", bot.ID, playerToAdd.FullName, dropPlayerName, selection.BidAmount)
+			botSelectionMap[bot.ID] = selection
 		}
-
-		// playerSelectionMap[selection.PlayerToAddId] = make(map[string]*common.AddDropSelection)
-		// playerSelectionMap[selection.PlayerToAddId][bot.Id] = selection
 	}
 
-	// selectionMap[bot.Id] = selections
-
-	// for botId, selections := range selectionMap {
-	// 	println("Bot:", botId)
-	// 	println("len of selections:", len(selections.AddDropSelections))
-	// 	for _, selection := range selections.AddDropSelections {
-	// 		println("Selection - add:", selection.PlayerToAddId, " drop:", selection.PlayerToDropId, " bid:", selection.BidAmount)
-	// 	}
-	// }
-
-	return nil
+	return playerSelectionMap
 }
 
 // func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {

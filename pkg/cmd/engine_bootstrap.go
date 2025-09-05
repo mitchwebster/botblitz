@@ -116,9 +116,9 @@ func validateBotsAndFetchSourceCode(handler *gamestate.GameStateHandler) (map[st
 	}
 
 	for _, bot := range botsFromDatabase {
-		_, ok := definedBotMap[bot.Id]
+		_, ok := definedBotMap[bot.ID]
 		if !ok {
-			return nil, nil, errors.New(fmt.Sprintf("The defined bot %s does not exist! %d", bot.Id))
+			return nil, nil, errors.New(fmt.Sprintf("The defined bot %s does not exist! %d", bot.ID))
 		}
 	}
 
