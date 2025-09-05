@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/engine"
@@ -78,58 +77,79 @@ func main() {
 }
 
 func bootstrapWeeklyFantasy() *engine.BotEngine {
-	// TODO: refactor after sqllite upgrade
 	year := uint32(2025)
-	_, err := gamestate.LoadGameStateForWeeklyFantasy(year)
+	gameStateHandler, err := gamestate.LoadGameStateForWeeklyFantasy(year)
 	if err != nil {
 		fmt.Println("Failed to load game state for weekly fantasy")
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	return nil
-	// var year uint32 = 2024
-	// lastGameState, err := engine.LoadLastGameState(year)
-	// if err != nil {
-	// 	fmt.Println("Failed to load last game state")
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
+	engineSettings := engine.BotEngineSettings{
+		VerboseLoggingEnabled: *enableVerboseLogging,
+		GameMode:              engine.WeeklyFantasy,
+	}
 
-	// var sheetClient *engine.SheetsClient = nil // not needed for weekly fantasy
-	// engineSettings := engine.BotEngineSettings{
-	// 	VerboseLoggingEnabled: *enableVerboseLogging,
-	// 	GameMode:              engine.WeeklyFantasy,
-	// }
+	sourceCodeMap, envVarsMap, err := validateBotsAndFetchSourceCode(gameStateHandler)
+	if err != nil {
+		fmt.Println("Failed to validate bots and fetch source code")
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
-	// curWeek := getCurrentWeek()
+	// TODO: load the actual weekly data into the db
 
-	// // Update the current fantasy week so bots know what week to use
-	// lastGameState.CurrentFantasyWeek = uint32(curWeek)
+	return engine.NewBotEngine(gameStateHandler, engineSettings, nil, sourceCodeMap, envVarsMap)
+}
 
-	// dataBytes, err := engine.FetchDataBytes(int(year), curWeek)
-	// if err != nil {
-	// 	fmt.Println("Failed to load data")
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
+func validateBotsAndFetchSourceCode(handler *gamestate.GameStateHandler) (map[string][]byte, map[string][]string, error) {
+	botsFromDatabase, err := handler.GetBots()
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// return engine.NewBotEngine(nil, engineSettings, sheetClient, dataBytes)
+	definedBotMap := make(map[string]*common.Bot)
+	definedBots := fetchBotList()
+
+	for _, bot := range definedBots {
+		definedBotMap[bot.Id] = bot
+	}
+
+	for _, bot := range botsFromDatabase {
+		_, ok := definedBotMap[bot.Id]
+		if !ok {
+			return nil, nil, errors.New(fmt.Sprintf("The defined bot %s does not exist! %d", bot.Id))
+		}
+	}
+
+	sourceCodeMap, envVarsMap, err := getCodeAndEnvs(definedBots)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return sourceCodeMap, envVarsMap, nil
+}
+
+func getCodeAndEnvs(bots []*common.Bot) (map[string][]byte, map[string][]string, error) {
+	sourceCodeMap, err := getSourceCodeMap(bots)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	envVarsMap, err := getEnvVarsMap(bots)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return sourceCodeMap, envVarsMap, nil
 }
 
 func bootstrapDraft() *engine.BotEngine {
 	year := uint32(2025)
 	bots := fetchBotList()
-	sourceCodeMap, err := getSourceCodeMap(bots)
+	sourceCodeMap, envVarsMap, err := getCodeAndEnvs(bots)
 	if err != nil {
-		fmt.Println("Failed to find source code for configured bot")
-		fmt.Println(err)
-		os.Exit(1) // Crash hard
-	}
-
-	envVarsMap, err := getEnvVarsMap(bots)
-	if err != nil {
-		fmt.Println("Failed to find env vars for configured bot")
+		fmt.Println("Failed to find source code / env vars for configured bot")
 		fmt.Println(err)
 		os.Exit(1) // Crash hard
 	}
@@ -162,14 +182,7 @@ func bootstrapDraft() *engine.BotEngine {
 		GameMode:              engine.Draft,
 	}
 
-	dataBytes, err := engine.FetchDataBytes(int(year), 1) // default to week 1 for draft
-	if err != nil {
-		fmt.Println("Failed to load data")
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, sourceCodeMap, envVarsMap, dataBytes)
+	return engine.NewBotEngine(gameStateHandler, engineSettings, sheetClient, sourceCodeMap, envVarsMap)
 }
 
 func fetchBotList() []*common.Bot {
@@ -275,98 +288,6 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Harry",
 			FantasyTeamName: "Harry's team",
 		},
-		// {
-		// 	Id:              "1",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/tyler-bot.py",
-		// 	Owner:           "Tyler",
-		// 	FantasyTeamName: "Tyler's team",
-		// },
-		// {
-		// 	Id:              "2",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/jon-bot.py",
-		// 	Owner:           "Jon",
-		// 	FantasyTeamName: "Jon's team",
-		// },
-		// {
-		// 	Id:              "4",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/harry-bot.py",
-		// 	Owner:           "Harry",
-		// 	FantasyTeamName: "Harry's team",
-		// },
-		// {
-		// 	Id:              "5",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/parker-bot.py",
-		// 	Owner:           "Parker",
-		// 	FantasyTeamName: "Butker School for Women",
-		// },
-		// {
-		// 	Id:              "6",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/matt-bot.py",
-		// 	Owner:           "Matt",
-		// 	FantasyTeamName: "Matt's team",
-		// },
-		// {
-		// 	Id:              "7",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl2025/justin_bot.py",
-		// 	Owner:           "Justin",
-		// 	FantasyTeamName: "Justin's team",
-		// },
-		// {
-		// 	Id:              "8",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl2025/ryan_bot.py",
-		// 	Owner:           "Ryan",
-		// 	FantasyTeamName: "Ryan's team",
-		// 	EnvPath:         "/bots/nfl/envs/ryan.env",
-		// },
-		// {
-		// 	Id:              "9",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl2025/philip_bot.py",
-		// 	Owner:           "Philip",
-		// 	FantasyTeamName: "Philip's team",
-		// 	EnvPath:         "/bots/nfl/envs/philip.env",
-		// },
-		// {
-		// 	Id:              "10",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/standard-bot.py",
-		// 	Owner:           "Chris H",
-		// 	FantasyTeamName: "Chris H's team",
-		// },
-		// {
-		// 	Id:              "11",
-		// 	SourceType:      common.Bot_LOCAL,
-		// 	SourcePath:      "/bots/nfl/standard-bot.py",
-		// 	Owner:           "Jack",
-		// 	FantasyTeamName: "Jack's team",
-		// },
-	}
-}
-
-func fetchPlayerSlots() []*common.PlayerSlot {
-	return []*common.PlayerSlot{
-		{AllowedPlayerPositions: []string{"QB"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"RB"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"WR"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"TE"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"RB", "WR", "TE"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"K"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"DST"}, AllowsAnyPosition: false},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
-		// {AllowedPlayerPositions: []string{"Bench"}, AllowsAnyPosition: true},
 	}
 }
 
@@ -414,14 +335,6 @@ func fetchLeagueSettings(year uint32, bots []*common.Bot) *common.LeagueSettings
 	}
 
 	return &settings
-}
-
-func getCurrentWeek() int {
-	// Weeks since firt day of football: 9/5/24 at 8am UTC (roughly when this runs)
-	pastDate := time.Date(2024, 9, 5, 8, 0, 0, 0, time.UTC)
-	now := time.Now()
-	duration := now.Sub(pastDate)
-	return int(math.Ceil(duration.Hours()/(24*7))) + 1
 }
 
 func getSourceCodeMap(bots []*common.Bot) (map[string][]byte, error) {

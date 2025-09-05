@@ -141,15 +141,15 @@ func (e *BotEngine) startBotContainer(bot *common.Bot, port string) (string, err
 		return "", err
 	}
 
-	absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
-	if err != nil {
-		return "", err
-	}
+	// absDataPath, err := common.BuildLocalAbsolutePath(botResourceDataFolderName)
+	// if err != nil {
+	// 	return "", err
+	// }
 
-	err = WriteDataToFolder(e.dataBytes, absDataPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to write data to folder: %s", err)
-	}
+	// err = WriteDataToFolder(e.dataBytes, absDataPath)
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to write data to folder: %s", err)
+	// }
 
 	env := []string{}
 

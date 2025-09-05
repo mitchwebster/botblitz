@@ -2,26 +2,36 @@ package engine
 
 import (
 	"context"
+	"math"
+	"time"
 )
 
 const AllowedAddsPerRun = 3
 const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
 func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
-	// err := e.performWeeklyFantasyActions(ctx)
-	// if err != nil {
-	// 	return err
-	// }
 
-	// err = SaveGameState(e.gameState)
-	// if err != nil {
-	// 	return err
-	// }
+	println("Running Weekly Fantasy")
+	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
+	if err != nil {
+		return err
+	}
 
-	// err = CleanOldGameStates(e.gameState)
-	// if err != nil {
-	// 	return err
-	// }
+	currentWeek := getCurrentWeek(leagueSettings.Year)
+	println("Current Week:", currentWeek)
+
+	currentFantasyWeekInSaveData, err := e.gameStateHandler.GetCurrentFantasyWeek()
+	if err != nil {
+		return err
+	}
+
+	println("Current Fantasy Week in Save Data:", currentFantasyWeekInSaveData)
+
+	if currentFantasyWeekInSaveData != currentWeek {
+		println("Scoring previous week")
+	} else {
+		println("Running add/drop for current week")
+	}
 
 	return nil
 }
@@ -309,3 +319,11 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 // 	return true
 // }
+
+func getCurrentWeek(year uint32) int {
+	// Weeks since firt day of football: 9/5/24 at 8am UTC (roughly when this runs)
+	pastDate := time.Date(int(year), 9, 5, 8, 0, 0, 0, time.UTC)
+	now := time.Now()
+	duration := now.Sub(pastDate)
+	return int(math.Ceil(duration.Hours()/(24*7))) + 1
+}

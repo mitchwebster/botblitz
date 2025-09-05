@@ -171,8 +171,18 @@ func (handler *GameStateHandler) IncrementDraftPick() error {
 	return nil
 }
 
-func (handler *GameStateHandler) GetCurrentDraftPick() (int, error) {
+func (handler *GameStateHandler) GetCurrentFantasyWeek() (int, error) {
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
 
+	if result.Error != nil {
+		return -1, result.Error
+	}
+
+	return gameStatus.CurrentFantasyWeek, nil
+}
+
+func (handler *GameStateHandler) GetCurrentDraftPick() (int, error) {
 	var gameStatus gameStatus
 	result := handler.db.First(&gameStatus, singleRowTableId)
 
@@ -226,8 +236,7 @@ func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
 		db.Model(&gameStatus).Update("CurrentFantasyWeek", 1)
 	}
 
-	// Load the game state from the database
-	return nil, nil
+	return &GameStateHandler{db: db, dbSaveFilePath: saveFileName, cachedBotList: nil, cachedLeagueSettings: nil}, nil
 }
 
 func initSeason(db *gorm.DB) error {
