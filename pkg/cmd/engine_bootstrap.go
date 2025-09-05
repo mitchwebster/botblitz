@@ -79,6 +79,14 @@ func main() {
 
 func bootstrapWeeklyFantasy() *engine.BotEngine {
 	// TODO: refactor after sqllite upgrade
+	year := uint32(2025)
+	_, err := gamestate.LoadGameStateForWeeklyFantasy(year)
+	if err != nil {
+		fmt.Println("Failed to load game state for weekly fantasy")
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	return nil
 	// var year uint32 = 2024
 	// lastGameState, err := engine.LoadLastGameState(year)

@@ -18,7 +18,7 @@ const AppDatabaseName = "gamestate" + fileSuffix
 const saveFolderRelativePath = "data/game_states"
 const filePrefix = "gs-"
 const draftDesc = "draft"
-const weekDesc = "week"
+const seasonDesc = "season"
 const fileSuffix = ".db"
 const singleRowTableId = 1
 
@@ -198,6 +198,113 @@ func (handler *GameStateHandler) UpdatePlayer(playerID string, availability *str
 	}
 
 	return handler.db.Model(&Player{}).Where("id = ?", playerID).Updates(updates).Error
+}
+
+func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
+	saveFileName, err := getSaveFileName(year, seasonDesc)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	var gameStatus gameStatus
+	result := db.First(&gameStatus, gameStatus)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if gameStatus.CurrentFantasyWeek == 0 {
+		err := initSeason(db)
+		if err != nil {
+			return nil, err
+		}
+
+		db.Model(&gameStatus).Update("CurrentFantasyWeek", 1)
+	}
+
+	// Load the game state from the database
+	return nil, nil
+}
+
+func initSeason(db *gorm.DB) error {
+	exists := db.Migrator().HasTable(&Matchup{})
+	if !exists {
+		err := db.AutoMigrate(&Matchup{})
+		if err != nil {
+			return err
+		}
+	}
+
+	var dbBots []bot
+	result := db.Order("RANDOM()").Find(&dbBots)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	botIds := []string{}
+	// Set the initial waiver priority based on the random order
+	for index, dbBot := range dbBots {
+		fmt.Printf("Bot %d: ID: %s, Name: %s\n", index+1, dbBot.ID, dbBot.Name)
+		botIds = append(botIds, dbBot.ID)
+		result = db.Model(&dbBot).Update("CurrentWaiverPriority", index)
+		if result.Error != nil {
+			return result.Error
+		}
+	}
+	totalWeeks := 14
+	matchups := generateSchedule(botIds, totalWeeks)
+	for _, weekMatchups := range matchups {
+		for _, matchup := range weekMatchups {
+			fmt.Printf("Week %d: %s vs %s\n", matchup.Week, matchup.HomeBotID, matchup.VisitorBotID)
+
+			result := db.Create(&matchup)
+			if result.Error != nil {
+				return fmt.Errorf("failed to insert matchup %v", result.Error)
+			}
+		}
+	}
+
+	return nil
+}
+
+func generateSchedule(botIds []string, weeks int) [][]Matchup {
+	n := len(botIds)
+
+	if n%2 != 0 {
+		botIds = append(botIds, "BYE")
+		n++
+	}
+
+	schedule := make([][]Matchup, weeks)
+
+	// fixed first bot
+	for w := 0; w < weeks; w++ {
+		var weekMatchups []Matchup
+		for i := 0; i < n/2; i++ {
+			home := botIds[i]
+			away := botIds[n-1-i]
+
+			if home != "BYE" && home != "BYE" {
+				weekMatchups = append(weekMatchups, Matchup{
+					Week:         w + 1,
+					HomeBotID:    home,
+					VisitorBotID: away,
+					HomeScore:    0,
+					VisitorScore: 0,
+					WinningBotID: nil,
+				})
+			}
+		}
+		schedule[w] = weekMatchups
+
+		botIds = append([]string{botIds[0]}, append([]string{botIds[n-1]}, botIds[1:n-1]...)...)
+	}
+
+	return schedule
 }
 
 func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSettings) (*GameStateHandler, error) {
@@ -552,4 +659,21 @@ func (p *Player) GetPositionSummary() (string, error) {
 	}
 
 	return strings.Join(allowedPositions, ","), nil
+}
+
+// --------------------
+// Table: matchups
+// --------------------
+type Matchup struct {
+	ID           uint    `gorm:"primaryKey;column:id"`
+	Week         int     `gorm:"column:week"`
+	HomeBotID    string  `gorm:"column:home_bot_id"`
+	VisitorBotID string  `gorm:"column:visitor_bot_id"`
+	HomeScore    float64 `gorm:"column:home_score"`
+	VisitorScore float64 `gorm:"column:visitor_score"`
+	WinningBotID *string `gorm:"column:winning_bot_id"`
+
+	HomeBot    bot  `gorm:"foreignKey:HomeBotID;references:ID"`
+	VisitorBot bot  `gorm:"foreignKey:VisitorBotID;references:ID"`
+	WinningBot *bot `gorm:"foreignKey:WinningBotID;references:ID"`
 }
