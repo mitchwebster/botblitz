@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 )
@@ -31,27 +32,73 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 		println("Scoring previous week")
 	} else {
 		println("Running add/drop for current week")
-
-		bots, err := e.gameStateHandler.GetBots()
+		err := e.performFAABAddDrop(ctx)
 		if err != nil {
 			return err
 		}
-
-		// get the bot with id 0
-		for _, bot := range bots {
-			if bot.Id == "0" {
-				selections, err := e.startContainerAndPerformAddDropAction(ctx, bot)
-				if err != nil {
-					return err
-				}
-
-				println("len of selections:", len(selections.AddDropSelections))
-				for _, selection := range selections.AddDropSelections {
-					println("Selection - add:", selection.PlayerToAddId, " drop:", selection.PlayerToDropId, " bid:", selection.BidAmount)
-				}
-			}
-		}
 	}
+
+	return nil
+}
+
+func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return err
+	}
+
+	// player_id -> bot_id -> AddDropSelection
+	// playerSelectionMap := make(map[string]map[string]*common.AddDropSelection)
+
+	for _, bot := range bots {
+		selections, err := e.startContainerAndPerformAddDropAction(ctx, bot)
+		if err != nil {
+			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.Id, err)
+			continue
+		}
+
+		if len(selections.AddDropSelections) > 10 || len(selections.AddDropSelections) <= 0 {
+			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.Id)
+			continue
+		}
+
+		for _, selection := range selections.AddDropSelections {
+			// validate player to drop is valid
+			err := e.validatePlayerCanBeDropped(selection.PlayerToDropId, bot.Id)
+			if err != nil {
+				fmt.Printf("Invalid player (%s) to drop for bot %s: %s\n", selection.PlayerToDropId, bot.Id, err)
+				continue
+			}
+
+			// validate player to add is valid
+			playerToAdd, err := e.getPlayerAndValidateDraftEligibility(selection.PlayerToAddId)
+			if err != nil {
+				fmt.Printf("Invalid player (%s) to add for bot %s: %s\n", selection.PlayerToAddId, bot.Id, err)
+				continue
+			}
+
+			// if selection.BidAmount < 0 || selection.BidAmount > bot.RemainingWaiverBudget {
+			// 	fmt.Printf("Invalid bid amount for bot %s: %d\n", bot.Id, selection.BidAmount)
+			// 	continue
+			// }
+
+			// // If we reach here, the player is valid
+			fmt.Printf("Bot %s is adding player: %s\n", bot.Id, playerToAdd.FullName)
+		}
+
+		// playerSelectionMap[selection.PlayerToAddId] = make(map[string]*common.AddDropSelection)
+		// playerSelectionMap[selection.PlayerToAddId][bot.Id] = selection
+	}
+
+	// selectionMap[bot.Id] = selections
+
+	// for botId, selections := range selectionMap {
+	// 	println("Bot:", botId)
+	// 	println("len of selections:", len(selections.AddDropSelections))
+	// 	for _, selection := range selections.AddDropSelections {
+	// 		println("Selection - add:", selection.PlayerToAddId, " drop:", selection.PlayerToDropId, " bid:", selection.BidAmount)
+	// 	}
+	// }
 
 	return nil
 }

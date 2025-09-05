@@ -385,7 +385,8 @@ func populateBotsTable(db *gorm.DB, bots []*common.Bot) error {
 			ID:                    commonBot.Id,
 			Name:                  commonBot.FantasyTeamName,
 			Owner:                 commonBot.Owner,
-			CurrentWaiverPriority: 0,     // Decided later
+			CurrentWaiverPriority: 0, // Decided later
+			RemainingWaiverBudget: 100,
 			DraftOrder:            i + 1, // Assign draft order based on array position
 		}
 

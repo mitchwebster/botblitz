@@ -186,18 +186,48 @@ func (e *BotEngine) validateDraftState() error {
 	return nil
 }
 
-func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, currentDraftPick int) (string, error) {
+func (e *BotEngine) getPlayerAndValidateDraftEligibility(playerId string) (*gamestate.Player, error) {
 	if strings.TrimSpace(playerId) == "" {
-		return "", fmt.Errorf("Cannot draft an empty player")
+		return nil, fmt.Errorf("Cannot draft an empty player")
 	}
 
 	player, err := e.gameStateHandler.GetPlayerById(playerId)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if player.Availability == gamestate.Drafted.String() {
-		return "", fmt.Errorf("Cannot draft player again")
+		return nil, fmt.Errorf("Cannot draft player again")
+	}
+
+	return player, nil
+}
+
+func (e *BotEngine) validatePlayerCanBeDropped(playerId string, owningBotId string) error {
+	if strings.TrimSpace(playerId) == "" {
+		return fmt.Errorf("Cannot drop an empty player")
+	}
+
+	player, err := e.gameStateHandler.GetPlayerById(playerId)
+	if err != nil {
+		return err
+	}
+
+	if player.Availability != gamestate.Drafted.String() || player.CurrentBotID == nil {
+		return fmt.Errorf("A player must be drafted before they can be dropped")
+	}
+
+	if *player.CurrentBotID != owningBotId {
+		return fmt.Errorf("A player can only be dropped by their owning team")
+	}
+
+	return nil
+}
+
+func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, currentDraftPick int) (string, error) {
+	player, err := e.getPlayerAndValidateDraftEligibility(playerId)
+	if err != nil {
+		return "", err
 	}
 
 	draftString := gamestate.Drafted.String()
