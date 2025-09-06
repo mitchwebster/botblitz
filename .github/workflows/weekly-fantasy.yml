@@ -47,6 +47,9 @@ jobs:
 
     - name: Test Monorepo
       run: make test
+    
+    - name: Build python module
+      run: make build-py-module
 
     - name: Build docker image
       run: make build-docker
