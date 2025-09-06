@@ -3,7 +3,7 @@ name: BotBlitz Weekly Fantasy
 on:
   workflow_dispatch:
   schedule:
-     - cron: "47 15 * * 2-4"
+     - cron: "47 15 * * 2-3"
 
 jobs:
   buildAndTest:
@@ -31,7 +31,7 @@ jobs:
       run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
     - name: Install python grpc tools
-      run: pip install -r py_grpc_server/requirements.txt
+      run: pip install -r requirements.txt
 
     - name: Check protoc version
       run: protoc --version
@@ -54,24 +54,24 @@ jobs:
     - name: Run Weekly Fantasy
       run: make run-fantasy
     
-    - name: Create PR w/ new gamestate
-      id: cpr
-      uses: peter-evans/create-pull-request@v7
-      with:
-        token: ${{ github.token }}
-        title: '[Automated] Weekly Fantasy GameState Update'
-        commit-message: '[Automated] Weekly Fantasy GameState Update'
-        sign-commits: true
-        add-paths: |
-            data/game_states/*.bin
-        body-path: '/tmp/weekly_transaction_log.txt'
+    # - name: Create PR w/ new gamestate
+    #   id: cpr
+    #   uses: peter-evans/create-pull-request@v7
+    #   with:
+    #     token: ${{ github.token }}
+    #     title: '[Automated] Weekly Fantasy GameState Update'
+    #     commit-message: '[Automated] Weekly Fantasy GameState Update'
+    #     sign-commits: true
+    #     add-paths: |
+    #         data/game_states/*.bin
+    #     body-path: '/tmp/weekly_transaction_log.txt'
 
-    - name: Enable Pull Request Automerge
-      if: steps.cpr.outputs.pull-request-operation == 'created'
-      uses: peter-evans/enable-pull-request-automerge@v3
-      with:
-        token: ${{ github.token }}
-        pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+    # - name: Enable Pull Request Automerge
+    #   if: steps.cpr.outputs.pull-request-operation == 'created'
+    #   uses: peter-evans/enable-pull-request-automerge@v3
+    #   with:
+    #     token: ${{ github.token }}
+    #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
 
     # - name: Run Engine
     #   run: make run-engine
