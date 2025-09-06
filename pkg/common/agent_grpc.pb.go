@@ -20,8 +20,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AgentService_DraftPlayer_FullMethodName    = "/AgentService/DraftPlayer"
-	AgentService_PerformAddDrop_FullMethodName = "/AgentService/PerformAddDrop"
+	AgentService_DraftPlayer_FullMethodName                 = "/AgentService/DraftPlayer"
+	AgentService_PerformWeeklyFantasyActions_FullMethodName = "/AgentService/PerformWeeklyFantasyActions"
 )
 
 // AgentServiceClient is the client API for AgentService service.
@@ -29,7 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentServiceClient interface {
 	DraftPlayer(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*DraftSelection, error)
-	PerformAddDrop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
+	PerformWeeklyFantasyActions(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error)
 }
 
 type agentServiceClient struct {
@@ -50,10 +50,10 @@ func (c *agentServiceClient) DraftPlayer(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
-func (c *agentServiceClient) PerformAddDrop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error) {
+func (c *agentServiceClient) PerformWeeklyFantasyActions(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*AttemptedFantasyActions, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AttemptedFantasyActions)
-	err := c.cc.Invoke(ctx, AgentService_PerformAddDrop_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, AgentService_PerformWeeklyFantasyActions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *agentServiceClient) PerformAddDrop(ctx context.Context, in *emptypb.Emp
 // for forward compatibility.
 type AgentServiceServer interface {
 	DraftPlayer(context.Context, *emptypb.Empty) (*DraftSelection, error)
-	PerformAddDrop(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error)
+	PerformWeeklyFantasyActions(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error)
 	mustEmbedUnimplementedAgentServiceServer()
 }
 
@@ -79,8 +79,8 @@ type UnimplementedAgentServiceServer struct{}
 func (UnimplementedAgentServiceServer) DraftPlayer(context.Context, *emptypb.Empty) (*DraftSelection, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DraftPlayer not implemented")
 }
-func (UnimplementedAgentServiceServer) PerformAddDrop(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PerformAddDrop not implemented")
+func (UnimplementedAgentServiceServer) PerformWeeklyFantasyActions(context.Context, *emptypb.Empty) (*AttemptedFantasyActions, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PerformWeeklyFantasyActions not implemented")
 }
 func (UnimplementedAgentServiceServer) mustEmbedUnimplementedAgentServiceServer() {}
 func (UnimplementedAgentServiceServer) testEmbeddedByValue()                      {}
@@ -121,20 +121,20 @@ func _AgentService_DraftPlayer_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AgentService_PerformAddDrop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _AgentService_PerformWeeklyFantasyActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentServiceServer).PerformAddDrop(ctx, in)
+		return srv.(AgentServiceServer).PerformWeeklyFantasyActions(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AgentService_PerformAddDrop_FullMethodName,
+		FullMethod: AgentService_PerformWeeklyFantasyActions_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServiceServer).PerformAddDrop(ctx, req.(*emptypb.Empty))
+		return srv.(AgentServiceServer).PerformWeeklyFantasyActions(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -151,8 +151,8 @@ var AgentService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AgentService_DraftPlayer_Handler,
 		},
 		{
-			MethodName: "PerformAddDrop",
-			Handler:    _AgentService_PerformAddDrop_Handler,
+			MethodName: "PerformWeeklyFantasyActions",
+			Handler:    _AgentService_PerformWeeklyFantasyActions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

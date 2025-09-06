@@ -1,5 +1,5 @@
 # from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
-from blitz_env import AddDropSelection, AttemptedFantasyActions
+from blitz_env import WaiverClaim, AttemptedFantasyActions
 from blitz_env.models import DatabaseManager
 import pandas as pd
 import json
@@ -133,9 +133,9 @@ def draft_player() -> str:
     finally:
         db.close()
 
-def perform_add_drop() -> AttemptedFantasyActions:
-    selections = [ 
-        AddDropSelection(
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    claims = [ 
+        WaiverClaim(
             player_to_add_id="17272",
             player_to_drop_id="19278",
             bid_amount=1
@@ -143,7 +143,7 @@ def perform_add_drop() -> AttemptedFantasyActions:
     ]
 
     actions = AttemptedFantasyActions(
-        add_drop_selections=selections
+        waiver_claims=claims
     )
 
     return actions

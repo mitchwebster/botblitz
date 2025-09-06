@@ -698,10 +698,10 @@ func (x *DraftSelection) GetPlayerId() string {
 }
 
 type AttemptedFantasyActions struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	AddDropSelections []*AddDropSelection    `protobuf:"bytes,1,rep,name=add_drop_selections,json=addDropSelections,proto3" json:"add_drop_selections,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WaiverClaims  []*WaiverClaim         `protobuf:"bytes,1,rep,name=waiver_claims,json=waiverClaims,proto3" json:"waiver_claims,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AttemptedFantasyActions) Reset() {
@@ -734,14 +734,14 @@ func (*AttemptedFantasyActions) Descriptor() ([]byte, []int) {
 	return file_pkg_common_proto_agent_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *AttemptedFantasyActions) GetAddDropSelections() []*AddDropSelection {
+func (x *AttemptedFantasyActions) GetWaiverClaims() []*WaiverClaim {
 	if x != nil {
-		return x.AddDropSelections
+		return x.WaiverClaims
 	}
 	return nil
 }
 
-type AddDropSelection struct {
+type WaiverClaim struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	PlayerToDropId string                 `protobuf:"bytes,1,opt,name=player_to_drop_id,json=playerToDropId,proto3" json:"player_to_drop_id,omitempty"`
 	PlayerToAddId  string                 `protobuf:"bytes,2,opt,name=player_to_add_id,json=playerToAddId,proto3" json:"player_to_add_id,omitempty"`
@@ -750,20 +750,20 @@ type AddDropSelection struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *AddDropSelection) Reset() {
-	*x = AddDropSelection{}
+func (x *WaiverClaim) Reset() {
+	*x = WaiverClaim{}
 	mi := &file_pkg_common_proto_agent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AddDropSelection) String() string {
+func (x *WaiverClaim) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AddDropSelection) ProtoMessage() {}
+func (*WaiverClaim) ProtoMessage() {}
 
-func (x *AddDropSelection) ProtoReflect() protoreflect.Message {
+func (x *WaiverClaim) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_common_proto_agent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -775,26 +775,26 @@ func (x *AddDropSelection) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AddDropSelection.ProtoReflect.Descriptor instead.
-func (*AddDropSelection) Descriptor() ([]byte, []int) {
+// Deprecated: Use WaiverClaim.ProtoReflect.Descriptor instead.
+func (*WaiverClaim) Descriptor() ([]byte, []int) {
 	return file_pkg_common_proto_agent_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *AddDropSelection) GetPlayerToDropId() string {
+func (x *WaiverClaim) GetPlayerToDropId() string {
 	if x != nil {
 		return x.PlayerToDropId
 	}
 	return ""
 }
 
-func (x *AddDropSelection) GetPlayerToAddId() string {
+func (x *WaiverClaim) GetPlayerToAddId() string {
 	if x != nil {
 		return x.PlayerToAddId
 	}
 	return ""
 }
 
-func (x *AddDropSelection) GetBidAmount() uint32 {
+func (x *WaiverClaim) GetBidAmount() uint32 {
 	if x != nil {
 		return x.BidAmount
 	}
@@ -870,17 +870,17 @@ const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\x12current_draft_pick\x18\x05 \x01(\rR\x10currentDraftPick\x120\n" +
 	"\x14current_fantasy_week\x18\x06 \x01(\rR\x12currentFantasyWeek\"-\n" +
 	"\x0eDraftSelection\x12\x1b\n" +
-	"\tplayer_id\x18\x01 \x01(\tR\bplayerId\"\\\n" +
-	"\x17AttemptedFantasyActions\x12A\n" +
-	"\x13add_drop_selections\x18\x01 \x03(\v2\x11.AddDropSelectionR\x11addDropSelections\"\x85\x01\n" +
-	"\x10AddDropSelection\x12)\n" +
+	"\tplayer_id\x18\x01 \x01(\tR\bplayerId\"L\n" +
+	"\x17AttemptedFantasyActions\x121\n" +
+	"\rwaiver_claims\x18\x01 \x03(\v2\f.WaiverClaimR\fwaiverClaims\"\x80\x01\n" +
+	"\vWaiverClaim\x12)\n" +
 	"\x11player_to_drop_id\x18\x01 \x01(\tR\x0eplayerToDropId\x12'\n" +
 	"\x10player_to_add_id\x18\x02 \x01(\tR\rplayerToAddId\x12\x1d\n" +
 	"\n" +
-	"bid_amount\x18\x03 \x01(\rR\tbidAmount2\x8e\x01\n" +
+	"bid_amount\x18\x03 \x01(\rR\tbidAmount2\x9b\x01\n" +
 	"\fAgentService\x128\n" +
-	"\vDraftPlayer\x12\x16.google.protobuf.Empty\x1a\x0f.DraftSelection\"\x00\x12D\n" +
-	"\x0ePerformAddDrop\x12\x16.google.protobuf.Empty\x1a\x18.AttemptedFantasyActions\"\x00B\n" +
+	"\vDraftPlayer\x12\x16.google.protobuf.Empty\x1a\x0f.DraftSelection\"\x00\x12Q\n" +
+	"\x1bPerformWeeklyFantasyActions\x12\x16.google.protobuf.Empty\x1a\x18.AttemptedFantasyActions\"\x00B\n" +
 	"Z\b.;commonb\x06proto3"
 
 var (
@@ -908,7 +908,7 @@ var file_pkg_common_proto_agent_proto_goTypes = []any{
 	(*GameState)(nil),               // 7: GameState
 	(*DraftSelection)(nil),          // 8: DraftSelection
 	(*AttemptedFantasyActions)(nil), // 9: AttemptedFantasyActions
-	(*AddDropSelection)(nil),        // 10: AddDropSelection
+	(*WaiverClaim)(nil),             // 10: WaiverClaim
 	nil,                             // 11: LeagueSettings.SlotsPerTeamEntry
 	(*emptypb.Empty)(nil),           // 12: google.protobuf.Empty
 }
@@ -920,11 +920,11 @@ var file_pkg_common_proto_agent_proto_depIdxs = []int32{
 	4,  // 4: GameState.players:type_name -> Player
 	6,  // 5: GameState.bots:type_name -> Bot
 	2,  // 6: GameState.league_settings:type_name -> LeagueSettings
-	10, // 7: AttemptedFantasyActions.add_drop_selections:type_name -> AddDropSelection
+	10, // 7: AttemptedFantasyActions.waiver_claims:type_name -> WaiverClaim
 	12, // 8: AgentService.DraftPlayer:input_type -> google.protobuf.Empty
-	12, // 9: AgentService.PerformAddDrop:input_type -> google.protobuf.Empty
+	12, // 9: AgentService.PerformWeeklyFantasyActions:input_type -> google.protobuf.Empty
 	8,  // 10: AgentService.DraftPlayer:output_type -> DraftSelection
-	9,  // 11: AgentService.PerformAddDrop:output_type -> AttemptedFantasyActions
+	9,  // 11: AgentService.PerformWeeklyFantasyActions:output_type -> AttemptedFantasyActions
 	10, // [10:12] is the sub-list for method output_type
 	8,  // [8:10] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name

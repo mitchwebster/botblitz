@@ -40,8 +40,8 @@ class AgentServiceStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=agent__pb2.DraftSelection.FromString,
                 _registered_method=True)
-        self.PerformAddDrop = channel.unary_unary(
-                '/AgentService/PerformAddDrop',
+        self.PerformWeeklyFantasyActions = channel.unary_unary(
+                '/AgentService/PerformWeeklyFantasyActions',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=agent__pb2.AttemptedFantasyActions.FromString,
                 _registered_method=True)
@@ -56,7 +56,7 @@ class AgentServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PerformAddDrop(self, request, context):
+    def PerformWeeklyFantasyActions(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -70,8 +70,8 @@ def add_AgentServiceServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=agent__pb2.DraftSelection.SerializeToString,
             ),
-            'PerformAddDrop': grpc.unary_unary_rpc_method_handler(
-                    servicer.PerformAddDrop,
+            'PerformWeeklyFantasyActions': grpc.unary_unary_rpc_method_handler(
+                    servicer.PerformWeeklyFantasyActions,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=agent__pb2.AttemptedFantasyActions.SerializeToString,
             ),
@@ -114,7 +114,7 @@ class AgentService(object):
             _registered_method=True)
 
     @staticmethod
-    def PerformAddDrop(request,
+    def PerformWeeklyFantasyActions(request,
             target,
             options=(),
             channel_credentials=None,
@@ -127,7 +127,7 @@ class AgentService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/AgentService/PerformAddDrop',
+            '/AgentService/PerformWeeklyFantasyActions',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             agent__pb2.AttemptedFantasyActions.FromString,
             options,

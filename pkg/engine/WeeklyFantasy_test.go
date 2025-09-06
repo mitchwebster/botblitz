@@ -15,7 +15,7 @@ func TestPerformFAABAddDropInternal(t *testing.T) {
 	}
 
 	// Setup add/drop selections
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{
 				PlayerToDropId: "playerA",
@@ -65,7 +65,7 @@ func TestFAABWithCompetingBids(t *testing.T) {
 		{ID: "bot3", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}},
 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 60}},
 		"bot3": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 40}},
@@ -90,7 +90,7 @@ func TestFAABWithInsufficientBudget(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}},
 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 40}},
 	}
@@ -113,7 +113,7 @@ func TestFAABWithMultiplePlayerClaims(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50},
 			{PlayerToDropId: "playerB", PlayerToAddId: "playerY", BidAmount: 30},
@@ -151,7 +151,7 @@ func TestFAABWithMultiplePlayerClaimsWithLowPriorities(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
 			{PlayerToDropId: "playerB", PlayerToAddId: "playerY", BidAmount: 50},
@@ -191,7 +191,7 @@ func TestFAABWithMultiplePlayerClaimsWithManyBotsAndPlayers(t *testing.T) {
 		{ID: "bot4", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
 			{PlayerToDropId: "playerB", PlayerToAddId: "playerY", BidAmount: 50},
@@ -248,7 +248,7 @@ func TestFAABWithTiedBids(t *testing.T) {
 		{ID: "bot4", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
 		"bot3": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 30}},
@@ -277,7 +277,7 @@ func TestFAABWithRepeatedClaimsFromSameBot(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			// Multiple claims for same player with different amounts and drop players
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
@@ -309,7 +309,7 @@ func TestFAABWithOneBotWinningMultipleTimes(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			// Multiple claims for same player with different amounts and drop players
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
@@ -350,7 +350,7 @@ func TestFAABWithRepeatedClaimsAndMultiplePlayers(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
-	botSelectionMap := map[string][]*common.AddDropSelection{
+	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			// Multiple claims for playerX
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},

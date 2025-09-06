@@ -55,8 +55,8 @@ class AgentServiceServicer(AgentServiceServicer):
             player_id=player_selection.player_id
         )
     
-    def PerformAddDrop(self, request, context):
-        result_dict = self.perform_action_in_isolation("add_drop")
+    def PerformWeeklyFantasyActions(self, request, context):
+        result_dict = self.perform_action_in_isolation("perform_weekly_fantasy_actions")
         return ParseDict(result_dict, AttemptedFantasyActions())
 
 def serve():

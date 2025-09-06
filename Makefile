@@ -44,6 +44,7 @@ build-py-module:
 	 python3 setup.py sdist bdist_wheel
 	
 build-docker:
+	$(MAKE) build-py-module
 	docker build -f py-server-dockerfile -t py_grpc_server .
 
 debug-docker:

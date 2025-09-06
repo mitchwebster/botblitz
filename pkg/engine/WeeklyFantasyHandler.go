@@ -39,7 +39,7 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	return err
 }
 
-func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection, winningClaims map[string][]*common.AddDropSelection) error {
+func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMap map[string][]*common.WaiverClaim, winningClaims map[string][]*common.WaiverClaim) error {
 	var builder strings.Builder
 
 	botMap := make(map[string]gamestate.Bot)
@@ -72,16 +72,16 @@ func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMa
 	return err
 }
 
-func copySelectionMap(botSelectionMap map[string][]*common.AddDropSelection) map[string][]*common.AddDropSelection {
-	newMap := make(map[string][]*common.AddDropSelection)
+func copySelectionMap(botSelectionMap map[string][]*common.WaiverClaim) map[string][]*common.WaiverClaim {
+	newMap := make(map[string][]*common.WaiverClaim)
 	for k, v := range botSelectionMap {
-		newMap[k] = make([]*common.AddDropSelection, len(v))
+		newMap[k] = make([]*common.WaiverClaim, len(v))
 		copy(newMap[k], v)
 	}
 	return newMap
 }
 
-func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[string][]*common.AddDropSelection) map[string][]*common.AddDropSelection {
+func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[string][]*common.WaiverClaim) map[string][]*common.WaiverClaim {
 	// bot_id -> remaining budget
 	remainingBudgetMap := getInitialBotBudgets(bots)
 
@@ -91,8 +91,8 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 	// player_id -> bot_id who dropped them
 	droppedPlayers := make(map[string]string)
 
-	// bot_id -> add_drop_selection
-	winningClaims := make(map[string][]*common.AddDropSelection)
+	// bot_id -> waiver_claim
+	winningClaims := make(map[string][]*common.WaiverClaim)
 
 	botSelectionMap := copySelectionMap(originalSelectionMap)
 
@@ -148,7 +148,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 
 					_, exists := winningClaims[bot]
 					if !exists {
-						winningClaims[bot] = make([]*common.AddDropSelection, 0)
+						winningClaims[bot] = make([]*common.WaiverClaim, 0)
 					}
 
 					winningClaims[bot] = append(winningClaims[bot], claims[i])
@@ -177,7 +177,7 @@ func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int) (strin
 	return worstTeam, bidValue
 }
 
-func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.AddDropSelection, remainingBudgets map[string]int) map[string]map[string]int {
+func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.WaiverClaim, remainingBudgets map[string]int) map[string]map[string]int {
 	highestBids := make(map[string]map[string]int)
 
 	for bot, selections := range botSelectionMap {
@@ -225,23 +225,24 @@ func getInitialBotBudgets(bots []gamestate.Bot) map[string]int {
 	return initialBudgets
 }
 
-func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string][]*common.AddDropSelection {
-	// bot_id -> AddDropSelection
-	botSelectionMap := make(map[string][]*common.AddDropSelection)
+func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string][]*common.WaiverClaim {
+	// bot_id -> []WaiverClaim
+	botSelectionMap := make(map[string][]*common.WaiverClaim)
 
 	for _, bot := range bots {
-		selections, err := e.startContainerAndPerformAddDropAction(ctx, &bot)
+		// TODO: in the future this may need to change to handle trades, etc. as well
+		selections, err := e.startContainerAndPerformWeeklyFantasyActions(ctx, &bot)
 		if err != nil {
 			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.ID, err)
 			continue
 		}
 
-		if len(selections.AddDropSelections) > MaxAddDropsPerRun || len(selections.AddDropSelections) <= 0 {
+		if len(selections.WaiverClaims) > MaxAddDropsPerRun || len(selections.WaiverClaims) <= 0 {
 			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.ID)
 			continue
 		}
 
-		for _, selection := range selections.AddDropSelections {
+		for _, selection := range selections.WaiverClaims {
 			// validate player to drop is valid
 			dropPlayerName, err := e.validatePlayerCanBeDropped(selection.PlayerToDropId, bot.ID)
 			if err != nil {
@@ -267,7 +268,7 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 
 			validActionArray, exists := botSelectionMap[bot.ID]
 			if !exists {
-				validActionArray = make([]*common.AddDropSelection, 0)
+				validActionArray = make([]*common.WaiverClaim, 0)
 			}
 
 			validActionArray = append(validActionArray, selection)

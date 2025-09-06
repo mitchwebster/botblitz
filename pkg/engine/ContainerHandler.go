@@ -269,7 +269,7 @@ func (e *BotEngine) createAndStartContainer(env []string, port string) (string, 
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.AttemptedFantasyActions, error) {
+func (e *BotEngine) callWeeklyFantasyActionsRPC(ctx context.Context, port string) (*common.AttemptedFantasyActions, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -286,7 +286,7 @@ func (e *BotEngine) callAddDropRPC(ctx context.Context, port string) (*common.At
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
-	selection, err := client.PerformAddDrop(ctx, nil)
+	selection, err := client.PerformWeeklyFantasyActions(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
 		return nil, err
@@ -442,7 +442,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 	return draftPick.PlayerId, returnError
 }
 
-func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, bot *gamestate.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
+func (e *BotEngine) startContainerAndPerformWeeklyFantasyActions(ctx context.Context, bot *gamestate.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
 	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
 		return nil, err
@@ -452,7 +452,7 @@ func (e *BotEngine) startContainerAndPerformAddDropAction(ctx context.Context, b
 		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
 
-	selections, err = e.callAddDropRPC(ctx, containerInfo.Port)
+	selections, err = e.callWeeklyFantasyActionsRPC(ctx, containerInfo.Port)
 	if err != nil {
 		return nil, err
 	}

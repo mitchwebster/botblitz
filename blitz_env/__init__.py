@@ -5,7 +5,7 @@ from .agent_pb2 import (
     Player, 
     GameState, 
     DraftSelection, 
-    AddDropSelection,
+    WaiverClaim,
     AttemptedFantasyActions,
     Bot,
     PlayerStatus,
