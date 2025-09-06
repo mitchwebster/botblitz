@@ -36,21 +36,24 @@ func TestPerformFAABAddDropInternal(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Validate the results
-	winningClaimMap, exists := winningClaims["playerX"]
+	winningClaimsArr, exists := winningClaims["bot2"]
 	if !exists {
-		t.Error("Expected winning claims to be non-empty for playerX")
+		t.Error("Expected winning claims to be non-empty for bot2")
 	}
 
-	winningClaim, exists := winningClaimMap["bot2"]
-	if !exists || len(winningClaimMap) != 1 {
+	for i, v := range winningClaimsArr {
+		print(i, v)
+	}
+
+	if len(winningClaimsArr) != 1 {
 		t.Error("Failed assertion: exactly one winning player claim from bot2")
 	}
 
-	if winningClaim.BidAmount != 60 {
+	if winningClaimsArr[0].BidAmount != 60 {
 		t.Error("Failed assertion: winning bid amount from bot2 is not 60")
 	}
 
-	if winningClaim.PlayerToDropId != "playerB" {
+	if winningClaimsArr[0].PlayerToDropId != "playerB" {
 		t.Error("Failed assertion: dropped player should be playerB")
 	}
 }
@@ -71,13 +74,13 @@ func TestFAABWithCompetingBids(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Bot2 should win with highest bid
-	if claim, exists := winningClaims["playerX"]["bot2"]; !exists || claim.BidAmount != 60 {
+	if claim, exists := winningClaims["bot2"]; !exists || len(claim) != 1 || claim[0].BidAmount != 60 {
 		t.Errorf("Expected bot2 to win playerX with bid 60")
 	}
 
 	// Check correct player was dropped
-	if claim := winningClaims["playerX"]["bot2"]; claim.PlayerToDropId != "playerB" {
-		t.Errorf("Expected playerB to be dropped, got %s", claim.PlayerToDropId)
+	if claim := winningClaims["bot2"]; claim[0].PlayerToDropId != "playerB" {
+		t.Errorf("Expected playerB to be dropped, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -95,12 +98,12 @@ func TestFAABWithInsufficientBudget(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Bot2 should win despite lower bid since bot1 has insufficient funds
-	claim, exists := winningClaims["playerX"]["bot2"]
-	if !exists || claim.BidAmount != 40 {
+	claim, exists := winningClaims["bot2"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 40 {
 		t.Errorf("Expected bot2 to win playerX with bid 40")
 	}
-	if claim.PlayerToDropId != "playerB" {
-		t.Errorf("Expected playerB to be dropped, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerB" {
+		t.Errorf("Expected playerB to be dropped, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -124,21 +127,21 @@ func TestFAABWithMultiplePlayerClaims(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Check bot1 wins playerX with correct drop
-	claim, exists := winningClaims["playerX"]["bot1"]
-	if !exists || claim.BidAmount != 50 {
+	claim, exists := winningClaims["bot1"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot1 to win playerX with bid 50")
 	}
-	if claim.PlayerToDropId != "playerA" {
-		t.Errorf("Expected playerA to be dropped for playerX, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerA" {
+		t.Errorf("Expected playerA to be dropped for playerX, got %s", claim[0].PlayerToDropId)
 	}
 
 	// Check bot2 wins playerY with correct drop
-	claim, exists = winningClaims["playerY"]["bot2"]
-	if !exists || claim.BidAmount != 35 {
+	claim, exists = winningClaims["bot2"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 35 {
 		t.Errorf("Expected bot2 to win playerY with bid 35")
 	}
-	if claim.PlayerToDropId != "playerD" {
-		t.Errorf("Expected playerD to be dropped for playerY, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerD" {
+		t.Errorf("Expected playerD to be dropped for playerY, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -162,21 +165,21 @@ func TestFAABWithMultiplePlayerClaimsWithLowPriorities(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Check bot2 wins playerX with correct drop
-	claim, exists := winningClaims["playerX"]["bot2"]
-	if !exists || claim.BidAmount != 40 {
+	claim, exists := winningClaims["bot2"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 40 {
 		t.Errorf("Expected bot2 to win playerX with bid 40")
 	}
-	if claim.PlayerToDropId != "playerC" {
-		t.Errorf("Expected playerC to be dropped for playerX, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerC" {
+		t.Errorf("Expected playerC to be dropped for playerX, got %s", claim[0].PlayerToDropId)
 	}
 
 	// Check bot1 wins playerY with correct drop
-	claim, exists = winningClaims["playerY"]["bot1"]
-	if !exists || claim.BidAmount != 50 {
+	claim, exists = winningClaims["bot1"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot1 to win playerY with bid 50")
 	}
-	if claim.PlayerToDropId != "playerB" {
-		t.Errorf("Expected playerB to be dropped for playerY, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerB" {
+		t.Errorf("Expected playerB to be dropped for playerY, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -210,30 +213,30 @@ func TestFAABWithMultiplePlayerClaimsWithManyBotsAndPlayers(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Check bot3 wins playerX with correct drop
-	claim, exists := winningClaims["playerX"]["bot3"]
-	if !exists || claim.BidAmount != 70 {
+	claim, exists := winningClaims["bot3"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 70 {
 		t.Errorf("Expected bot3 to win playerX with bid 70")
 	}
-	if claim.PlayerToDropId != "playerE" {
-		t.Errorf("Expected playerE to be dropped for playerX, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerE" {
+		t.Errorf("Expected playerE to be dropped for playerX, got %s", claim[0].PlayerToDropId)
 	}
 
 	// Check bot3 wins playerY with correct drop
-	claim, exists = winningClaims["playerY"]["bot1"]
-	if !exists || claim.BidAmount != 50 {
+	claim, exists = winningClaims["bot1"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot1 to win playerY with bid 50")
 	}
-	if claim.PlayerToDropId != "playerB" {
-		t.Errorf("Expected playerB to be dropped for playerY, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerB" {
+		t.Errorf("Expected playerB to be dropped for playerY, got %s", claim[0].PlayerToDropId)
 	}
 
 	// Check bot4 wins playerV with correct drop
-	claim, exists = winningClaims["playerV"]["bot4"]
-	if !exists || claim.BidAmount != 60 {
+	claim, exists = winningClaims["bot4"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 60 {
 		t.Errorf("Expected bot4 to win playerV with bid 60")
 	}
-	if claim.PlayerToDropId != "playerH" {
-		t.Errorf("Expected playerH to be dropped for playerV, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerH" {
+		t.Errorf("Expected playerH to be dropped for playerV, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -257,14 +260,14 @@ func TestFAABWithTiedBids(t *testing.T) {
 	// TODO: change once we fix tie break rules
 
 	// Bot4 should win with equal bid but higher priority
-	claim, exists := winningClaims["playerX"]["bot4"]
-	if !exists || claim.BidAmount != 50 {
+	claim, exists := winningClaims["bot4"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot4 to win playerX with bid 50 due to higher waiver priority")
 	}
 
 	// Check correct player was dropped
-	if claim.PlayerToDropId != "playerC" {
-		t.Errorf("Expected playerC to be dropped, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerC" {
+		t.Errorf("Expected playerC to be dropped, got %s", claim[0].PlayerToDropId)
 	}
 }
 
@@ -289,14 +292,55 @@ func TestFAABWithRepeatedClaimsFromSameBot(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Should use bot1's highest bid (50)
-	claim, exists := winningClaims["playerX"]["bot1"]
-	if !exists || claim.BidAmount != 50 {
+	claim, exists := winningClaims["bot1"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot1 to win playerX with highest bid of 50")
 	}
 
 	// Check correct player was dropped (should be playerB associated with highest bid)
-	if claim.PlayerToDropId != "playerB" {
-		t.Errorf("Expected playerB to be dropped, got %s", claim.PlayerToDropId)
+	if claim[0].PlayerToDropId != "playerB" {
+		t.Errorf("Expected playerB to be dropped, got %s", claim[0].PlayerToDropId)
+	}
+}
+
+func TestFAABWithOneBotWinningMultipleTimes(t *testing.T) {
+	bots := []gamestate.Bot{
+		{ID: "bot1", RemainingWaiverBudget: 100},
+		{ID: "bot2", RemainingWaiverBudget: 100},
+	}
+
+	botSelectionMap := map[string][]*common.AddDropSelection{
+		"bot1": {
+			// Multiple claims for same player with different amounts and drop players
+			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
+			{PlayerToDropId: "playerB", PlayerToAddId: "playerY", BidAmount: 20},
+		},
+		"bot2": {
+			{PlayerToDropId: "playerD", PlayerToAddId: "playerX", BidAmount: 10},
+		},
+	}
+
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+
+	// Should use bot1's highest bid (50)
+	claims, exists := winningClaims["bot1"]
+	if !exists || len(claims) != 2 {
+		t.Errorf("Expected bot1 to win twice")
+	}
+
+	correctMatches := 0
+	for _, claim := range claims {
+		if claim.PlayerToAddId == "playerX" && claim.PlayerToDropId == "playerA" && claim.BidAmount == 30 {
+			correctMatches++
+		}
+
+		if claim.PlayerToAddId == "playerY" && claim.PlayerToDropId == "playerB" && claim.BidAmount == 20 {
+			correctMatches++
+		}
+	}
+
+	if correctMatches != 2 {
+		t.Errorf("Failed to get correct matches for bot1, got %d", correctMatches)
 	}
 }
 
@@ -324,20 +368,20 @@ func TestFAABWithRepeatedClaimsAndMultiplePlayers(t *testing.T) {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Check playerX goes to bot1 with highest bid
-	if claim, exists := winningClaims["playerX"]["bot1"]; !exists || claim.BidAmount != 50 {
+	if claim, exists := winningClaims["bot1"]; !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
 		t.Errorf("Expected bot1 to win playerX with bid 50")
 	}
 
 	// Check playerY goes to bot2
-	if claim, exists := winningClaims["playerY"]["bot2"]; !exists || claim.BidAmount != 60 {
+	if claim, exists := winningClaims["bot2"]; !exists || len(claim) != 1 || claim[0].BidAmount != 60 {
 		t.Errorf("Expected bot2 to win playerY with bid 60")
 	}
 
 	// Verify correct players were dropped
-	if winningClaims["playerX"]["bot1"].PlayerToDropId != "playerB" {
+	if winningClaims["bot1"][0].PlayerToDropId != "playerB" {
 		t.Error("Expected playerB to be dropped for winning playerX claim")
 	}
-	if winningClaims["playerY"]["bot2"].PlayerToDropId != "playerE" {
+	if winningClaims["bot2"][0].PlayerToDropId != "playerE" {
 		t.Error("Expected playerE to be dropped for winning playerY claim")
 	}
 }

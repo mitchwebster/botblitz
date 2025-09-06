@@ -429,8 +429,8 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 		}
 
 		env = append(env, value)
+		fmt.Printf("Retrieved env vars from Github: %s\n", bot.GithubEnvName)
 	} else {
-		fmt.Printf("Grabbing env vars from local file system: %s\n", bot.EnvPath)
 		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
 		if err != nil {
 			return env, err
@@ -443,6 +443,7 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 
 		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
 		env = append(strings.Split(string(envContent), "\n"))
+		fmt.Printf("Retrieved env vars from local file system: %s\n", bot.EnvPath)
 	}
 
 	return env, nil

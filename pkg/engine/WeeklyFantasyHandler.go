@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/gamestate"
@@ -23,9 +25,9 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Process winning claims
-	for player, claims := range winningClaims {
-		for bot, claim := range claims {
-			fmt.Printf("Bot %s won claim for player %s with bid %d\n", bot, player, claim.BidAmount)
+	for bot, claims := range winningClaims {
+		for _, claim := range claims {
+			fmt.Printf("Bot %s won claim for player %s with bid %d\n", bot, claim.PlayerToAddId, claim.BidAmount)
 			err := e.gameStateHandler.PerformAddDrop(bot, claim.PlayerToAddId, claim.PlayerToDropId, int(claim.BidAmount))
 			if err != nil {
 				return err
@@ -33,18 +35,66 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	err = e.summarizeAddDropResults(bots, botSelectionMap, winningClaims)
+	return err
 }
 
-func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection) map[string]map[string]*common.AddDropSelection {
+func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection, winningClaims map[string][]*common.AddDropSelection) error {
+	var builder strings.Builder
+
+	botMap := make(map[string]gamestate.Bot)
+	for _, bot := range bots {
+		botMap[bot.ID] = bot
+	}
+
+	builder.WriteString("--- Add/Drop Summary --- \n")
+
+	builder.WriteString("--- Valid claims submitted --- \n")
+	for botID, claims := range botSelectionMap {
+		builder.WriteString(fmt.Sprintf("Bot %s (%s):\n", botMap[botID].Name, botMap[botID].Owner))
+		for _, claim := range claims {
+			builder.WriteString(fmt.Sprintf("\t- Add: %s , Drop: %s, Bid: %d\n", claim.PlayerToAddId, claim.PlayerToDropId, claim.BidAmount))
+		}
+	}
+	builder.WriteString("------ \n")
+
+	builder.WriteString("--- Winning Claims --- \n")
+	for botID, claims := range winningClaims {
+		builder.WriteString(fmt.Sprintf("Bot %s (%s):\n", botMap[botID].Name, botMap[botID].Owner))
+		for _, claim := range claims {
+			builder.WriteString(fmt.Sprintf("\t- Added: %s , Dropped: %s, Bid: %d\n", claim.PlayerToAddId, claim.PlayerToDropId, claim.BidAmount))
+		}
+	}
+	builder.WriteString("------ \n")
+
+	fmt.Println(builder.String())
+	err := e.saveTransactionLogToFile(builder.String())
+	return err
+}
+
+func copySelectionMap(botSelectionMap map[string][]*common.AddDropSelection) map[string][]*common.AddDropSelection {
+	newMap := make(map[string][]*common.AddDropSelection)
+	for k, v := range botSelectionMap {
+		newMap[k] = make([]*common.AddDropSelection, len(v))
+		copy(newMap[k], v)
+	}
+	return newMap
+}
+
+func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[string][]*common.AddDropSelection) map[string][]*common.AddDropSelection {
 	// bot_id -> remaining budget
 	remainingBudgetMap := getInitialBotBudgets(bots)
+
+	// player_id -> bot_id who added them
+	playersAlreadyAdded := make(map[string]string)
 
 	// player_id -> bot_id who dropped them
 	droppedPlayers := make(map[string]string)
 
-	// player_id -> bot_id -> add_drop_selection
-	winningClaims := make(map[string]map[string]*common.AddDropSelection)
+	// bot_id -> add_drop_selection
+	winningClaims := make(map[string][]*common.AddDropSelection)
+
+	botSelectionMap := copySelectionMap(originalSelectionMap)
 
 	anyClaims := true
 
@@ -76,7 +126,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 				}
 
 				// if the player this claim is looking for has already been claimed then drop this claim
-				_, exists = winningClaims[claims[i].PlayerToAddId]
+				_, exists = playersAlreadyAdded[claims[i].PlayerToAddId]
 				if exists {
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
 					continue
@@ -93,9 +143,15 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 					// We found the highest bid for this player in priority order
 					foundWinner = true
 					droppedPlayers[claims[i].PlayerToDropId] = bot
+					playersAlreadyAdded[claims[i].PlayerToAddId] = bot
 					remainingBudgetMap[bot] -= int(claims[i].BidAmount)
-					winningClaims[claims[i].PlayerToAddId] = make(map[string]*common.AddDropSelection)
-					winningClaims[claims[i].PlayerToAddId][bot] = claims[i]
+
+					_, exists := winningClaims[bot]
+					if !exists {
+						winningClaims[bot] = make([]*common.AddDropSelection, 0)
+					}
+
+					winningClaims[bot] = append(winningClaims[bot], claims[i])
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
 					break
 				}
@@ -287,21 +343,21 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 // 	return nil
 // }
 
-// func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {
-// 	file, err := os.Create(TransactionLogFullPath)
-// 	if err != nil {
-// 		fmt.Println("Error creating file:", err)
-// 		return err
-// 	}
-// 	defer file.Close() // Ensure the file is closed after writing
+func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {
+	file, err := os.Create(TransactionLogFullPath)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return err
+	}
+	defer file.Close() // Ensure the file is closed after writing
 
-// 	content := []byte(transactionLogStr)
-// 	if _, err := file.Write(content); err != nil {
-// 		return err
-// 	}
+	content := []byte(transactionLogStr)
+	if _, err := file.Write(content); err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // func (e *BotEngine) makePreviouslyOnHoldPlayersAvailable() {
 // 	for _, player := range e.gameState.Players {
