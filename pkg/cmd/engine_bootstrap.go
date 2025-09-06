@@ -37,8 +37,8 @@ func main() {
 	var botEngine *engine.BotEngine = nil
 	if mode == engine.Draft {
 		botEngine = bootstrapDraft()
-	} else if mode == engine.WeeklyFantasy {
-		botEngine = bootstrapWeeklyFantasy()
+	} else if mode == engine.PerformAddDrop {
+		botEngine = bootstrapWeeklyFantasy(mode)
 	} else {
 		fmt.Println("Invalid GameMode provided")
 		os.Exit(1)
@@ -77,7 +77,7 @@ func main() {
 	}
 }
 
-func bootstrapWeeklyFantasy() *engine.BotEngine {
+func bootstrapWeeklyFantasy(gameMode engine.GameMode) *engine.BotEngine {
 	year := uint32(2025)
 	gameStateHandler, err := gamestate.LoadGameStateForWeeklyFantasy(year)
 	if err != nil {
@@ -88,7 +88,7 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: *enableVerboseLogging,
-		GameMode:              engine.WeeklyFantasy,
+		GameMode:              gameMode,
 	}
 
 	sourceCodeMap, envVarsMap, err := validateBotsAndFetchSourceCode(gameStateHandler)

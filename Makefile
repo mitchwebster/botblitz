@@ -26,11 +26,11 @@ test:
 run-draft:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
 
-run-fantasy:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy
+run-add-drop:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformAddDrop
 
-run-fantasy-github:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy -is_running_on_github=true
+run-add-drop-github:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformAddDrop -is_running_on_github=true
 
 # must be run after make gen 
 build-py-module:

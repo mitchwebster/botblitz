@@ -113,7 +113,13 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return e.runDraft(ctx)
 	}
 
-	return e.runWeeklyFantasy(ctx)
+	if e.settings.GameMode == PerformAddDrop {
+		return e.performFAABAddDrop(ctx)
+	}
+
+	// Add scoring methods
+
+	return errors.New("Unknown game mode")
 }
 
 func (e *BotEngine) collectBotResources() error {

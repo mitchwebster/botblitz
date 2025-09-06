@@ -11,23 +11,6 @@ import (
 const MaxAddDropsPerRun = 10
 const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
-func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
-
-	println("Running Weekly Fantasy")
-
-	currentFantasyWeekInSaveData, err := e.gameStateHandler.GetCurrentFantasyWeek()
-	if err != nil {
-		return err
-	}
-
-	println("Current Fantasy Week in Save Data:", currentFantasyWeekInSaveData)
-
-	// On Wednesdays run add/drop
-	println("Running add/drop for current week")
-	err = e.performFAABAddDrop(ctx)
-	return err
-}
-
 func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	// Fetch bots in a random order
 	bots, err := e.gameStateHandler.GetBots()
