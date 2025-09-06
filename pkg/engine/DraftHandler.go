@@ -195,7 +195,7 @@ func (e *BotEngine) getPlayerAndValidateDraftEligibility(playerId string) (*game
 		return nil, err
 	}
 
-	if player.Availability == gamestate.Drafted.String() {
+	if player.Availability == gamestate.Drafted.String() || player.Availability == gamestate.OnHold.String() {
 		return nil, fmt.Errorf("Cannot draft player again")
 	}
 

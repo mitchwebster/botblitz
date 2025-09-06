@@ -10,7 +10,7 @@ import (
 	"github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
-const AllowedAddsPerRun = 3
+const MaxAddDropsPerRun = 10
 const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
 func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
@@ -45,20 +45,140 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 }
 
 func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
+	// Fetch bots in a random order
 	bots, err := e.gameStateHandler.GetBots()
 	if err != nil {
 		return err
 	}
 
-	// player_id -> bot_id -> AddDropSelection
-	_ = e.fetchAddDropSubmissions(ctx, bots)
-
+	// bot_id -> []AddDropSelection
+	botSelectionMap := e.fetchAddDropSubmissions(ctx, bots)
+	performFAABAddDropInternal(bots, botSelectionMap)
 	return nil
 }
 
-func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string]map[string]*common.AddDropSelection {
-	// player_id -> bot_id -> AddDropSelection
-	playerSelectionMap := make(map[string]map[string]*common.AddDropSelection)
+func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection) {
+	// bot_id -> remaining budget
+	remainingBudget := getInitialBotBudgets(bots)
+
+	// player_id -> bot_id who dropped them
+	droppedPlayers := make(map[string]string)
+
+	// player_id -> bot_id -> add_drop_selection
+	winningClaims := make(map[string]map[string]*common.AddDropSelection)
+
+	anyClaims := true
+
+	for anyClaims {
+		// player_id -> current_highest_bid (unvalidated)
+		highestBidsByPlayer := getHighestBidsByPlayerMap(botSelectionMap)
+		anyClaims = len(highestBidsByPlayer) > 0
+
+		for i := 0; i < MaxAddDropsPerRun; i++ {
+			foundWinner := false
+
+			// go through this round of claims and see if any are winners
+			for bot, claims := range botSelectionMap {
+				if len(claims) == 0 || i >= len(claims) {
+					continue
+				}
+
+				// Validate this bot can actually pay for the player
+				if claims[i].BidAmount > uint32(remainingBudget[bot]) {
+					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					continue
+				}
+
+				// if the player for this claim has already been dropped, then skip this claim
+				_, exists := droppedPlayers[claims[i].PlayerToDropId]
+				if exists {
+					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					continue
+				}
+
+				// if the player this claim is looking for has already been claimed then drop this claim
+				_, exists = winningClaims[claims[i].PlayerToAddId]
+				if exists {
+					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					continue
+				}
+
+				highestBidForThisPlayerMap := highestBidsByPlayer[claims[i].PlayerToAddId]
+				winnerBot, winningBidAmount := getWinningBotAndBidAmount(highestBidForThisPlayerMap)
+
+				if uint32(winningBidAmount) == claims[i].BidAmount && winnerBot == bot {
+					// We found the highest bid for this player in priority order
+					foundWinner = true
+					droppedPlayers[claims[i].PlayerToDropId] = bot
+					remainingBudget[bot] -= int(claims[i].BidAmount)
+					winningClaims[claims[i].PlayerToAddId][bot] = claims[i]
+				}
+			}
+
+			if foundWinner {
+				break
+			}
+		}
+	}
+}
+
+func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int) (string, int) {
+	bidValue := -1
+	worstTeam := "" // TODO: figure out how to get the worst team
+	for bot, bid := range highestBidForThisPlayerMap {
+		bidValue = bid
+		worstTeam = bot
+	}
+
+	return worstTeam, bidValue
+}
+
+func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.AddDropSelection) map[string]map[string]int {
+	highestBids := make(map[string]map[string]int)
+
+	for bot, selections := range botSelectionMap {
+		for _, selection := range selections {
+			_, exists := highestBids[selection.PlayerToAddId]
+			if !exists {
+				highestBids[selection.PlayerToAddId] = make(map[string]int)
+			}
+
+			bidAmount := int(selection.BidAmount)
+			currentMap, _ := highestBids[selection.PlayerToAddId]
+
+			previousMaxBid := -1
+			for _, curValue := range currentMap {
+				previousMaxBid = curValue
+				break
+			}
+
+			if bidAmount > previousMaxBid {
+				// Clear the old entries, make a new one
+				highestBids[selection.PlayerToAddId] = make(map[string]int)
+				highestBids[selection.PlayerToAddId][bot] = bidAmount
+			} else if bidAmount == previousMaxBid {
+				// Add this entry
+				highestBids[selection.PlayerToAddId][bot] = bidAmount
+			}
+		}
+	}
+
+	return highestBids
+}
+
+func getInitialBotBudgets(bots []gamestate.Bot) map[string]int {
+	initialBudgets := make(map[string]int)
+
+	for _, bot := range bots {
+		initialBudgets[bot.ID] = bot.RemainingWaiverBudget
+	}
+
+	return initialBudgets
+}
+
+func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string][]*common.AddDropSelection {
+	// bot_id -> AddDropSelection
+	botSelectionMap := make(map[string][]*common.AddDropSelection)
 
 	for _, bot := range bots {
 		selections, err := e.startContainerAndPerformAddDropAction(ctx, &bot)
@@ -67,7 +187,7 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 			continue
 		}
 
-		if len(selections.AddDropSelections) > 10 || len(selections.AddDropSelections) <= 0 {
+		if len(selections.AddDropSelections) > MaxAddDropsPerRun || len(selections.AddDropSelections) <= 0 {
 			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.ID)
 			continue
 		}
@@ -93,19 +213,20 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 				continue
 			}
 
-			botSelectionMap, exists := playerSelectionMap[selection.PlayerToAddId]
-			if !exists {
-				botSelectionMap = make(map[string]*common.AddDropSelection)
-				playerSelectionMap[selection.PlayerToAddId] = botSelectionMap
-			}
-
 			// If we reach here, the player is valid
 			fmt.Printf("Recieved add drop from bot %s -> Add %s , Drop %s. Bid: %d\n", bot.ID, playerToAdd.FullName, dropPlayerName, selection.BidAmount)
-			botSelectionMap[bot.ID] = selection
+
+			validActionArray, exists := botSelectionMap[bot.ID]
+			if !exists {
+				validActionArray = make([]*common.AddDropSelection, 0)
+			}
+
+			validActionArray = append(validActionArray, selection)
+			botSelectionMap[bot.ID] = validActionArray
 		}
 	}
 
-	return playerSelectionMap
+	return botSelectionMap
 }
 
 // func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
