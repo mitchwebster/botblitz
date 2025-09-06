@@ -3,8 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"math"
-	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/gamestate"
@@ -16,13 +14,6 @@ const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 	println("Running Weekly Fantasy")
-	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
-	if err != nil {
-		return err
-	}
-
-	currentWeek := getCurrentWeek(leagueSettings.Year)
-	println("Current Week:", currentWeek)
 
 	currentFantasyWeekInSaveData, err := e.gameStateHandler.GetCurrentFantasyWeek()
 	if err != nil {
@@ -31,17 +22,10 @@ func (e *BotEngine) runWeeklyFantasy(ctx context.Context) error {
 
 	println("Current Fantasy Week in Save Data:", currentFantasyWeekInSaveData)
 
-	if currentFantasyWeekInSaveData != currentWeek {
-		println("Scoring previous week")
-	} else {
-		println("Running add/drop for current week")
-		err := e.performFAABAddDrop(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	// On Wednesdays run add/drop
+	println("Running add/drop for current week")
+	err = e.performFAABAddDrop(ctx)
+	return err
 }
 
 func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
@@ -539,10 +523,10 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 // 	return true
 // }
 
-func getCurrentWeek(year uint32) int {
-	// Weeks since first day of football: 9/5/{year} at 8am UTC (roughly when this runs)
-	pastDate := time.Date(int(year), 9, 5, 8, 0, 0, 0, time.UTC)
-	now := time.Now()
-	duration := now.Sub(pastDate)
-	return int(math.Floor(duration.Hours()/(24*7))) + 1
-}
+// func getCurrentWeek(year uint32) int {
+// 	// Weeks since first day of football: 9/5/{year} at 8am UTC (roughly when this runs)
+// 	pastDate := time.Date(int(year), 9, 5, 8, 0, 0, 0, time.UTC)
+// 	now := time.Now()
+// 	duration := now.Sub(pastDate)
+// 	return int(math.Floor(duration.Hours()/(24*7))) + 1
+// }
