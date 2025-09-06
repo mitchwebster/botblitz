@@ -464,6 +464,7 @@ type Bot struct {
 	SourcePath            string                 `protobuf:"bytes,7,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
 	EnvPath               string                 `protobuf:"bytes,8,opt,name=env_path,json=envPath,proto3" json:"env_path,omitempty"`
 	CurrentWaiverPriority uint32                 `protobuf:"varint,9,opt,name=current_waiver_priority,json=currentWaiverPriority,proto3" json:"current_waiver_priority,omitempty"`
+	GithubEnvName         string                 `protobuf:"bytes,10,opt,name=github_env_name,json=githubEnvName,proto3" json:"github_env_name,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -559,6 +560,13 @@ func (x *Bot) GetCurrentWaiverPriority() uint32 {
 		return x.CurrentWaiverPriority
 	}
 	return 0
+}
+
+func (x *Bot) GetGithubEnvName() string {
+	if x != nil {
+		return x.GithubEnvName
+	}
+	return ""
 }
 
 type GameState struct {
@@ -835,7 +843,7 @@ const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\fAvailability\x12\r\n" +
 	"\tAVAILABLE\x10\x00\x12\v\n" +
 	"\aDRAFTED\x10\x01\x12\v\n" +
-	"\aON_HOLD\x10\x02\"\xf6\x02\n" +
+	"\aON_HOLD\x10\x02\"\x9e\x03\n" +
 	"\x03Bot\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12*\n" +
 	"\x11fantasy_team_name\x18\x02 \x01(\tR\x0ffantasyTeamName\x12\x14\n" +
@@ -847,7 +855,9 @@ const file_pkg_common_proto_agent_proto_rawDesc = "" +
 	"\vsource_path\x18\a \x01(\tR\n" +
 	"sourcePath\x12\x19\n" +
 	"\benv_path\x18\b \x01(\tR\aenvPath\x126\n" +
-	"\x17current_waiver_priority\x18\t \x01(\rR\x15currentWaiverPriority\"\x1f\n" +
+	"\x17current_waiver_priority\x18\t \x01(\rR\x15currentWaiverPriority\x12&\n" +
+	"\x0fgithub_env_name\x18\n" +
+	" \x01(\tR\rgithubEnvName\"\x1f\n" +
 	"\x06Source\x12\t\n" +
 	"\x05LOCAL\x10\x00\x12\n" +
 	"\n" +
