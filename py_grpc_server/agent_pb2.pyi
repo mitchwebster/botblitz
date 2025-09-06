@@ -87,7 +87,7 @@ class PlayerStatus(_message.Message):
     def __init__(self, availability: _Optional[_Union[PlayerStatus.Availability, str]] = ..., pick_chosen: _Optional[int] = ..., current_team_bot_id: _Optional[str] = ...) -> None: ...
 
 class Bot(_message.Message):
-    __slots__ = ("id", "fantasy_team_name", "owner", "source_type", "source_repo_username", "source_repo_name", "source_path", "env_path", "current_waiver_priority")
+    __slots__ = ("id", "fantasy_team_name", "owner", "source_type", "source_repo_username", "source_repo_name", "source_path", "env_path", "current_waiver_priority", "github_env_name")
     class Source(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
         LOCAL: _ClassVar[Bot.Source]
@@ -103,6 +103,7 @@ class Bot(_message.Message):
     SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
     ENV_PATH_FIELD_NUMBER: _ClassVar[int]
     CURRENT_WAIVER_PRIORITY_FIELD_NUMBER: _ClassVar[int]
+    GITHUB_ENV_NAME_FIELD_NUMBER: _ClassVar[int]
     id: str
     fantasy_team_name: str
     owner: str
@@ -112,7 +113,8 @@ class Bot(_message.Message):
     source_path: str
     env_path: str
     current_waiver_priority: int
-    def __init__(self, id: _Optional[str] = ..., fantasy_team_name: _Optional[str] = ..., owner: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., env_path: _Optional[str] = ..., current_waiver_priority: _Optional[int] = ...) -> None: ...
+    github_env_name: str
+    def __init__(self, id: _Optional[str] = ..., fantasy_team_name: _Optional[str] = ..., owner: _Optional[str] = ..., source_type: _Optional[_Union[Bot.Source, str]] = ..., source_repo_username: _Optional[str] = ..., source_repo_name: _Optional[str] = ..., source_path: _Optional[str] = ..., env_path: _Optional[str] = ..., current_waiver_priority: _Optional[int] = ..., github_env_name: _Optional[str] = ...) -> None: ...
 
 class GameState(_message.Message):
     __slots__ = ("players", "bots", "league_settings", "current_bot_team_id", "current_draft_pick", "current_fantasy_week")

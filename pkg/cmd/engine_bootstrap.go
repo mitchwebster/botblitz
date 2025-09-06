@@ -19,6 +19,7 @@ var (
 	enableGoogleSheets   = flag.Bool("enable_google_sheets", true, "If enabled, draft results are written to Google Sheets")
 	enableVerboseLogging = flag.Bool("enable_verbose_logging", false, "If enabled, additional logging is printed to the console and stdout+stderr is captured from each bot invocation and saved to files under /tmp/")
 	gameMode             = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
+	isRunningOnGithub    = flag.Bool("is_running_on_github", false, "If enabled, the engine is running on GitHub")
 )
 
 func main() {
@@ -156,7 +157,7 @@ func bootstrapDraft() *engine.BotEngine {
 
 	shuffleBotOrder(bots) // randomize draft order
 
-	settings := fetchLeagueSettings(year, bots)
+	settings := fetchLeagueSettings(year, uint32(len(bots)))
 	gameStateHandler, err := gamestate.NewGameStateHandlerForDraft(bots, settings)
 	if err != nil {
 		fmt.Println("Failed to build gameState db unexpectedly")
@@ -215,6 +216,7 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Ryan",
 			FantasyTeamName: "Ryan's team",
 			EnvPath:         "/bots/nfl/envs/ryan.env",
+			GithubEnvName:   "RYAN_ENV",
 		},
 		{
 			Id:              "4",
@@ -223,6 +225,7 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Philip",
 			FantasyTeamName: "Philip's team",
 			EnvPath:         "/bots/nfl/envs/philip.env",
+			GithubEnvName:   "PHILIP_ENV",
 		},
 		{
 			Id:              "5",
@@ -266,6 +269,7 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Tyler",
 			FantasyTeamName: "Tyler's team",
 			EnvPath:         "/bots/nfl/envs/tyler.env",
+			GithubEnvName:   "TYLER_ENV",
 		},
 		{
 			Id:              "11",
@@ -309,7 +313,7 @@ func shuffleBotOrder(bots []*common.Bot) {
 	}
 }
 
-func fetchLeagueSettings(year uint32, bots []*common.Bot) *common.LeagueSettings {
+func fetchLeagueSettings(year uint32, numTeams uint32) *common.LeagueSettings {
 	playerslots := make(map[string]uint32)
 	playerslots["QB"] = 1
 	playerslots["RB"] = 2
@@ -326,7 +330,7 @@ func fetchLeagueSettings(year uint32, bots []*common.Bot) *common.LeagueSettings
 	}
 
 	settings := common.LeagueSettings{
-		NumTeams:           uint32(len(bots)),
+		NumTeams:           numTeams,
 		IsSnakeDraft:       true,
 		TotalRounds:        uint32(total_rounds),
 		PointsPerReception: 1.0,
@@ -393,7 +397,7 @@ func getEnvVarsMap(bots []*common.Bot) (map[string][]string, error) {
 	envVarsMap := make(map[string][]string)
 
 	for _, bot := range bots {
-		if bot.EnvPath == "" {
+		if bot.EnvPath == "" && bot.GithubEnvName == "" {
 			continue
 		}
 
@@ -413,19 +417,33 @@ func getEnvVarsMap(bots []*common.Bot) (map[string][]string, error) {
 func fetchEnvVars(bot *common.Bot) ([]string, error) {
 	env := []string{}
 
-	fmt.Printf("Grabbing env vars from: %s\n", bot.EnvPath)
-	envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
-	if err != nil {
-		return env, err
-	}
+	if isRunningOnGithub != nil && *isRunningOnGithub {
+		if bot.GithubEnvName == "" {
+			return env, errors.New(fmt.Sprintf("Bot %s is missing a github_env_name, cannot fetch env var from GitHub Actions", bot.Owner))
+		}
 
-	envContent, err := os.ReadFile(envAbsPath)
-	if err != nil {
-		return env, err
-	}
+		//Load env using name
+		value := os.Getenv(bot.GithubEnvName)
+		if value == "" {
+			return env, errors.New(fmt.Sprintf("%s is not set", bot.GithubEnvName))
+		}
 
-	// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
-	env = append(strings.Split(string(envContent), "\n"))
+		env = append(env, value)
+	} else {
+		fmt.Printf("Grabbing env vars from local file system: %s\n", bot.EnvPath)
+		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
+		if err != nil {
+			return env, err
+		}
+
+		envContent, err := os.ReadFile(envAbsPath)
+		if err != nil {
+			return env, err
+		}
+
+		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
+		env = append(strings.Split(string(envContent), "\n"))
+	}
 
 	return env, nil
 }

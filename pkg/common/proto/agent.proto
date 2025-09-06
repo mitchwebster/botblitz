@@ -70,6 +70,7 @@ message Bot {
     string env_path = 8;
 
     uint32 current_waiver_priority = 9;
+    string github_env_name = 10;
 }
 
 message GameState {

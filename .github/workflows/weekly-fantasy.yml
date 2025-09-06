@@ -55,8 +55,12 @@ jobs:
       run: make build-docker
     
     - name: Run Weekly Fantasy
-      run: make run-fantasy
-    
+      run: make run-fantasy-github
+      env:
+          RYAN_ENV: ${{ secrets.RYAN_ENV }}
+          TYLER_ENV: ${{ secrets.TYLER_ENV }}
+          PHILIP_ENV: ${{ secrets.PHILIP_ENV }}
+
     # - name: Create PR w/ new gamestate
     #   id: cpr
     #   uses: peter-evans/create-pull-request@v7
