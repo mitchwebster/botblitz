@@ -1,4 +1,4 @@
-name: BotBlitz Weekly Add/Drop
+name: BotBlitz Weekly Fantasy
 
 on:
   workflow_dispatch:
@@ -54,8 +54,8 @@ jobs:
     - name: Build docker image
       run: make build-docker
 
-    - name: Run Add/Drop
-      run: make run-add-drop-github
+    - name: Run Weekly Fantasy
+      run: make run-weekly-fantasy-github
       env:
           RYAN_ENV: ${{ secrets.RYAN_ENV }}
           TYLER_ENV: ${{ secrets.TYLER_ENV }}

@@ -13,6 +13,11 @@ import (
 const MaxAddDropsPerRun = 10
 const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
+func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
+	// TODO: add trades, etc.
+	return e.performFAABAddDrop(ctx)
+}
+
 func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	// Fetch bots in a random order
 	bots, err := e.gameStateHandler.GetBots()

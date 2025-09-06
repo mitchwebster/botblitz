@@ -110,8 +110,8 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return e.runDraft(ctx)
 	}
 
-	if e.settings.GameMode == PerformAddDrop {
-		return e.performFAABAddDrop(ctx)
+	if e.settings.GameMode == PerformWeeklyFantasyActions {
+		return e.performWeeklyFantasyActions(ctx)
 	}
 
 	// Add scoring methods
