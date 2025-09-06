@@ -126,6 +126,33 @@ func (handler *GameStateHandler) GetLeagueSettings() (*common.LeagueSettings, er
 	return handler.cachedLeagueSettings, nil
 }
 
+func (handler *GameStateHandler) PerformAddDrop(botId string, playerToAdd string, playerToDrop string, budgetReduction int) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Player{}).Where("id = ?", playerToAdd).Update("CurrentBotID", botId).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToAdd).Update("Availability", Drafted.String()).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToDrop).Update("CurrentBotID", nil).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToDrop).Update("Availability", Available.String()).Error; err != nil {
+			return err // rollback
+		}
+
+		result := tx.Model(&Bot{}).Where("id = ?", botId).Update("RemainingWaiverBudget", gorm.Expr("remaining_waiver_budget - ?", budgetReduction))
+		if result.Error != nil {
+			return result.Error
+		}
+
+		return nil // commit
+	})
+}
+
 func (handler *GameStateHandler) SetCurrentBotTeamId(botId string) error {
 	var gameStatus gameStatus
 	result := handler.db.First(&gameStatus, singleRowTableId)

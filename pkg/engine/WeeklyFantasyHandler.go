@@ -53,13 +53,25 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 
 	// bot_id -> []AddDropSelection
 	botSelectionMap := e.fetchAddDropSubmissions(ctx, bots)
-	performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+
+	// Process winning claims
+	for player, claims := range winningClaims {
+		for bot, claim := range claims {
+			fmt.Printf("Bot %s won claim for player %s with bid %d\n", bot, player, claim.BidAmount)
+			err := e.gameStateHandler.PerformAddDrop(bot, claim.PlayerToAddId, claim.PlayerToDropId, int(claim.BidAmount))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
-func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection) {
+func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string][]*common.AddDropSelection) map[string]map[string]*common.AddDropSelection {
 	// bot_id -> remaining budget
-	remainingBudget := getInitialBotBudgets(bots)
+	remainingBudgetMap := getInitialBotBudgets(bots)
 
 	// player_id -> bot_id who dropped them
 	droppedPlayers := make(map[string]string)
@@ -71,7 +83,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 
 	for anyClaims {
 		// player_id -> current_highest_bid (unvalidated)
-		highestBidsByPlayer := getHighestBidsByPlayerMap(botSelectionMap)
+		highestBidsByPlayer := getHighestBidsByPlayerMap(botSelectionMap, remainingBudgetMap)
 		anyClaims = len(highestBidsByPlayer) > 0
 
 		for i := 0; i < MaxAddDropsPerRun; i++ {
@@ -84,7 +96,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 				}
 
 				// Validate this bot can actually pay for the player
-				if claims[i].BidAmount > uint32(remainingBudget[bot]) {
+				if claims[i].BidAmount > uint32(remainingBudgetMap[bot]) {
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
 					continue
 				}
@@ -103,15 +115,22 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 					continue
 				}
 
+				fmt.Printf("Validated claim successfully %s\n", claims[i])
+
 				highestBidForThisPlayerMap := highestBidsByPlayer[claims[i].PlayerToAddId]
 				winnerBot, winningBidAmount := getWinningBotAndBidAmount(highestBidForThisPlayerMap)
+				println("Winning bot for this player is ", winnerBot, " with bid ", winningBidAmount)
 
 				if uint32(winningBidAmount) == claims[i].BidAmount && winnerBot == bot {
+					fmt.Printf("Found the winning bot! %s with a bid of %d\n", bot, claims[i].BidAmount)
 					// We found the highest bid for this player in priority order
 					foundWinner = true
 					droppedPlayers[claims[i].PlayerToDropId] = bot
-					remainingBudget[bot] -= int(claims[i].BidAmount)
+					remainingBudgetMap[bot] -= int(claims[i].BidAmount)
+					winningClaims[claims[i].PlayerToAddId] = make(map[string]*common.AddDropSelection)
 					winningClaims[claims[i].PlayerToAddId][bot] = claims[i]
+					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					break
 				}
 			}
 
@@ -120,6 +139,8 @@ func performFAABAddDropInternal(bots []gamestate.Bot, botSelectionMap map[string
 			}
 		}
 	}
+
+	return winningClaims
 }
 
 func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int) (string, int) {
@@ -133,7 +154,7 @@ func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int) (strin
 	return worstTeam, bidValue
 }
 
-func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.AddDropSelection) map[string]map[string]int {
+func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.AddDropSelection, remainingBudgets map[string]int) map[string]map[string]int {
 	highestBids := make(map[string]map[string]int)
 
 	for bot, selections := range botSelectionMap {
@@ -150,6 +171,11 @@ func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.AddDropSelec
 			for _, curValue := range currentMap {
 				previousMaxBid = curValue
 				break
+			}
+
+			// Check if the bot can afford this bid
+			if bidAmount > remainingBudgets[bot] {
+				continue
 			}
 
 			if bidAmount > previousMaxBid {
@@ -514,9 +540,9 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 // }
 
 func getCurrentWeek(year uint32) int {
-	// Weeks since firt day of football: 9/5/{year} at 8am UTC (roughly when this runs)
+	// Weeks since first day of football: 9/5/{year} at 8am UTC (roughly when this runs)
 	pastDate := time.Date(int(year), 9, 5, 8, 0, 0, 0, time.UTC)
 	now := time.Now()
 	duration := now.Sub(pastDate)
-	return int(math.Ceil(duration.Hours()/(24*7))) + 1
+	return int(math.Floor(duration.Hours()/(24*7))) + 1
 }
