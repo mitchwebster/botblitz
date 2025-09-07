@@ -4,6 +4,27 @@ import sys
 from blitz_env.stats_db import fp_stats_dynamic  # Adjust the import as necessary
 import pandas as pd
 
+def get_stats_for_week(year, week):
+    range = 'week'
+    # Fetch stats for each position using fp_stats_dynamic
+    rb_df = fp_stats_dynamic(page='rb', year=year, range=range, week=week, scoring='PPR')
+
+    qb_df = fp_stats_dynamic(page='qb', year=year, range=range, week=week, scoring='PPR')
+
+    te_df = fp_stats_dynamic(page='te', year=year, range=range, week=week, scoring='PPR')
+
+    wr_df = fp_stats_dynamic(page='wr', year=year, range=range, week=week, scoring='PPR')
+
+    k_df = fp_stats_dynamic(page='k', year=year, range=range, week=week, scoring='PPR')
+
+    dst_df = fp_stats_dynamic(page='dst', year=year, range=range, week=week, scoring='PPR')
+
+    # Concatenate all positions
+    week_df = pd.concat([rb_df, qb_df, te_df, wr_df, k_df, dst_df], ignore_index=True)
+    week_df['year'] = year
+    week_df.sort_values(by="FPTS", ascending=False, inplace=True)
+    return week_df
+
 def load_and_save_stats(year, weeks, output_folder, aws_profile=None):
     # Check if output folder is an S3 path
     is_s3 = output_folder.startswith('s3://')

@@ -32,6 +32,9 @@ run-weekly-fantasy:
 run-weekly-fantasy-github:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformWeeklyFantasyActions -is_running_on_github=true
 
+run-fantasy-github:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy -is_running_on_github=true
+
 # must be run after make gen 
 build-py-module:
 	 cp -f py_grpc_server/loadPlayers.py blitz_env/loadPlayers.py

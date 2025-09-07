@@ -16,10 +16,12 @@ import (
 const AppDatabaseName = "gamestate" + fileSuffix
 
 const saveFolderRelativePath = "data/game_states"
+const statsFolderRelativePath = "data/stats"
 const filePrefix = "gs-"
 const draftDesc = "draft"
 const seasonDesc = "season"
 const fileSuffix = ".db"
+const statsDatabaseFileName = "stats.db"
 const singleRowTableId = 1
 
 // GameStateDatabase encapsulates the SQLite database operations
@@ -387,7 +389,7 @@ func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSe
 		return err
 	}
 
-	err = populateStatsTables(db)
+	err = populateStatsTables(db, settings.Year)
 	if err != nil {
 		return err
 	}
@@ -472,9 +474,54 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	return nil
 }
 
-func populateStatsTables(db *gorm.DB) error {
+func getStatsDatabaseFilePath(year uint32) (string, error) {
+	statsFolderName := statsFolderRelativePath + "/" + strconv.Itoa(int(year))
+	absPath, err := common.BuildLocalAbsolutePath(statsFolderName)
+	if err != nil {
+		return "", err
+	}
+
+	return absPath + "/" + statsDatabaseFileName, nil
+}
+
+func RefreshWeeklyStats(db *gorm.DB, year uint32) error {
+	// Get the data for this
+	statsDBFile, err := getStatsDatabaseFilePath(year)
+	if err != nil {
+		return err
+	}
+
 	// Attach the other DB
-	if err := db.Exec(`ATTACH DATABASE 'stats.db' AS other;`).Error; err != nil {
+	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
+	if err := db.Exec(attachQuery).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`DETACH DATABASE other;`).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func populateStatsTables(db *gorm.DB, year uint32) error {
+	// Get the data for this
+	statsDBFile, err := getStatsDatabaseFilePath(year)
+	if err != nil {
+		return err
+	}
+
+	// Attach the other DB
+	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
+	if err := db.Exec(attachQuery).Error; err != nil {
 		return err
 	}
 
