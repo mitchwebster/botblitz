@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List
 import pandas as pd
 from sqlalchemy import create_engine, inspect
+import os
 
 # --- Adjust these imports to your project structure if needed ---
 from blitz_env.download_stats import get_stats_for_week
@@ -37,6 +38,7 @@ def main():
 
     df = get_stats_for_week(year=year, week=week)
 
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)  # create directory if missing
     engine = create_engine(f"sqlite:///{db_path}")
     table_name = "weekly_stats"
 
