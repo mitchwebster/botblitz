@@ -139,15 +139,17 @@ class DraftSelection(_message.Message):
     def __init__(self, player_id: _Optional[str] = ...) -> None: ...
 
 class AttemptedFantasyActions(_message.Message):
-    __slots__ = ("add_drop_selections",)
-    ADD_DROP_SELECTIONS_FIELD_NUMBER: _ClassVar[int]
-    add_drop_selections: _containers.RepeatedCompositeFieldContainer[AddDropSelection]
-    def __init__(self, add_drop_selections: _Optional[_Iterable[_Union[AddDropSelection, _Mapping]]] = ...) -> None: ...
+    __slots__ = ("waiver_claims",)
+    WAIVER_CLAIMS_FIELD_NUMBER: _ClassVar[int]
+    waiver_claims: _containers.RepeatedCompositeFieldContainer[WaiverClaim]
+    def __init__(self, waiver_claims: _Optional[_Iterable[_Union[WaiverClaim, _Mapping]]] = ...) -> None: ...
 
-class AddDropSelection(_message.Message):
-    __slots__ = ("player_to_drop_id", "player_to_add_id")
+class WaiverClaim(_message.Message):
+    __slots__ = ("player_to_drop_id", "player_to_add_id", "bid_amount")
     PLAYER_TO_DROP_ID_FIELD_NUMBER: _ClassVar[int]
     PLAYER_TO_ADD_ID_FIELD_NUMBER: _ClassVar[int]
+    BID_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     player_to_drop_id: str
     player_to_add_id: str
-    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ...) -> None: ...
+    bid_amount: int
+    def __init__(self, player_to_drop_id: _Optional[str] = ..., player_to_add_id: _Optional[str] = ..., bid_amount: _Optional[int] = ...) -> None: ...

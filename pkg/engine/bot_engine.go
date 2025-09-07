@@ -10,7 +10,6 @@ import (
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	gamestate "github.com/mitchwebster/botblitz/pkg/gamestate"
-	"golang.org/x/exp/slices"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -27,26 +26,23 @@ type BotContainerInfo struct {
 }
 
 type BotEngine struct {
-	settings                    BotEngineSettings
-	sourceCodeCache             map[string][]byte
-	envVarsCache                map[string][]string
-	gameStateHandler            *gamestate.GameStateHandler
-	sheetsClient                *SheetsClient
-	weeklyFantasyTransactionLog strings.Builder
-	botContainers               map[string]*BotContainerInfo // map of bot ID to container info
+	settings         BotEngineSettings
+	sourceCodeCache  map[string][]byte
+	envVarsCache     map[string][]string
+	gameStateHandler *gamestate.GameStateHandler
+	sheetsClient     *SheetsClient
+	botContainers    map[string]*BotContainerInfo // map of bot ID to container info
 }
 
 func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, envVarsCache map[string][]string) *BotEngine {
-	var builder strings.Builder
 
 	return &BotEngine{
-		settings:                    settings,
-		sourceCodeCache:             sourceCodeCache,
-		envVarsCache:                envVarsCache,
-		gameStateHandler:            gameStateHandler,
-		sheetsClient:                sheetsClient,
-		weeklyFantasyTransactionLog: builder,
-		botContainers:               make(map[string]*BotContainerInfo),
+		settings:         settings,
+		sourceCodeCache:  sourceCodeCache,
+		envVarsCache:     envVarsCache,
+		gameStateHandler: gameStateHandler,
+		sheetsClient:     sheetsClient,
+		botContainers:    make(map[string]*BotContainerInfo),
 	}
 }
 
@@ -85,7 +81,7 @@ func (e *BotEngine) performValidations() error {
 		return err
 	}
 
-	botValidation := common.ValidateBotConfigs(bots)
+	botValidation := validateBotConfigs(bots)
 	if !botValidation {
 		return errors.New("Bot validation failed, please check provided bots")
 	}
@@ -114,7 +110,13 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return e.runDraft(ctx)
 	}
 
-	return e.runWeeklyFantasy(ctx)
+	if e.settings.GameMode == PerformWeeklyFantasyActions {
+		return e.performWeeklyFantasyActions(ctx)
+	}
+
+	// Add scoring methods
+
+	return errors.New("Unknown game mode")
 }
 
 func (e *BotEngine) collectBotResources() error {
@@ -157,24 +159,21 @@ func GenerateRandomString(length int) string {
 	return string(result)
 }
 
-func FindCurrentBotById(botId string, gameState *common.GameState) (*common.Bot, error) {
-	teamIdx := slices.IndexFunc(gameState.Bots, func(t *common.Bot) bool { return t.Id == botId })
-	if teamIdx < 0 {
-		return nil, fmt.Errorf("Could not find team...concerning...")
+func validateBotConfigs(bots []gamestate.Bot) bool {
+	uniquenessMap := make(map[string]bool)
+
+	for _, bot := range bots {
+		if bot.ID == "" {
+			return false
+		}
+
+		_, exists := uniquenessMap[bot.ID]
+		if exists {
+			return false
+		}
+
+		uniquenessMap[bot.ID] = true
 	}
 
-	return gameState.Bots[teamIdx], nil
-}
-
-func FindPlayerById(playerId string, gameState *common.GameState) (*common.Player, error) {
-	if len(playerId) <= 0 {
-		return nil, fmt.Errorf("Cannot find empty player id")
-	}
-
-	idx := slices.IndexFunc(gameState.Players, func(p *common.Player) bool { return p.Id == playerId })
-	if idx < 0 {
-		return nil, fmt.Errorf("Could not find player with selected id")
-	}
-
-	return gameState.Players[idx], nil
+	return true
 }

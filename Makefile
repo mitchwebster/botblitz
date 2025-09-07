@@ -26,8 +26,11 @@ test:
 run-draft:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
 
-run-fantasy:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy
+run-weekly-fantasy:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformWeeklyFantasyActions
+
+run-weekly-fantasy-github:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformWeeklyFantasyActions -is_running_on_github=true
 
 run-fantasy-github:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy -is_running_on_github=true
@@ -44,6 +47,7 @@ build-py-module:
 	 python3 setup.py sdist bdist_wheel
 	
 build-docker:
+	$(MAKE) build-py-module
 	docker build -f py-server-dockerfile -t py_grpc_server .
 
 debug-docker:

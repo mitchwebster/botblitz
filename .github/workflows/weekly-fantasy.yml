@@ -3,7 +3,7 @@ name: BotBlitz Weekly Fantasy
 on:
   workflow_dispatch:
   schedule:
-     - cron: "47 15 * * 2-3"
+     - cron: "47 15 * * 3"
 
 jobs:
   buildAndTest:
@@ -53,9 +53,9 @@ jobs:
 
     - name: Build docker image
       run: make build-docker
-    
+
     - name: Run Weekly Fantasy
-      run: make run-fantasy-github
+      run: make run-weekly-fantasy-github
       env:
           RYAN_ENV: ${{ secrets.RYAN_ENV }}
           TYLER_ENV: ${{ secrets.TYLER_ENV }}

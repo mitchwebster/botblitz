@@ -30,7 +30,7 @@ type GameStateHandler struct {
 	dbSaveFilePath string
 
 	// Cache the invariants to avoid repeated DB queries for no reason
-	cachedBotList        []*common.Bot
+	cachedBotList        []Bot
 	cachedLeagueSettings *common.LeagueSettings
 }
 
@@ -83,31 +83,20 @@ func (handler *GameStateHandler) GetRandomPlayer() (*Player, error) {
 	return &player, nil
 }
 
-func (handler *GameStateHandler) GetBots() ([]*common.Bot, error) {
+func (handler *GameStateHandler) GetBots() ([]Bot, error) {
 	if handler.cachedBotList != nil {
 		return handler.cachedBotList, nil
 	}
 
 	// list all of the bots from the database and convert to the common bot
-	var dbBots []bot
+	var dbBots []Bot
 	result := handler.db.Order("RANDOM()").Find(&dbBots)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
 	}
 
-	commonBots := make([]*common.Bot, len(dbBots))
-	for i, dbBot := range dbBots {
-		commonBot := &common.Bot{
-			Id:                    dbBot.ID,
-			FantasyTeamName:       dbBot.Name,
-			Owner:                 dbBot.Owner,
-			CurrentWaiverPriority: uint32(dbBot.CurrentWaiverPriority),
-		}
-		commonBots[i] = commonBot
-	}
-
 	// Cache the result
-	handler.cachedBotList = commonBots
+	handler.cachedBotList = dbBots
 
 	return handler.cachedBotList, nil
 }
@@ -137,6 +126,33 @@ func (handler *GameStateHandler) GetLeagueSettings() (*common.LeagueSettings, er
 	handler.cachedLeagueSettings = leagueSettings
 
 	return handler.cachedLeagueSettings, nil
+}
+
+func (handler *GameStateHandler) PerformAddDrop(botId string, playerToAdd string, playerToDrop string, budgetReduction int) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Player{}).Where("id = ?", playerToAdd).Update("CurrentBotID", botId).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToAdd).Update("Availability", Drafted.String()).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToDrop).Update("CurrentBotID", nil).Error; err != nil {
+			return err // rollback
+		}
+
+		if err := tx.Model(&Player{}).Where("id = ?", playerToDrop).Update("Availability", Available.String()).Error; err != nil {
+			return err // rollback
+		}
+
+		result := tx.Model(&Bot{}).Where("id = ?", botId).Update("RemainingWaiverBudget", gorm.Expr("remaining_waiver_budget - ?", budgetReduction))
+		if result.Error != nil {
+			return result.Error
+		}
+
+		return nil // commit
+	})
 }
 
 func (handler *GameStateHandler) SetCurrentBotTeamId(botId string) error {
@@ -250,7 +266,7 @@ func initSeason(db *gorm.DB) error {
 		}
 	}
 
-	var dbBots []bot
+	var dbBots []Bot
 	result := db.Order("RANDOM()").Find(&dbBots)
 	if result.Error != nil {
 		return result.Error
@@ -339,7 +355,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 	}
 
 	// Auto migrate the database tables
-	err = db.AutoMigrate(&bot{}, &gameStatus{}, &leagueSettings{}, &Player{})
+	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &leagueSettings{}, &Player{})
 	if err != nil {
 		return nil, err
 	}
@@ -383,11 +399,12 @@ func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSe
 
 func populateBotsTable(db *gorm.DB, bots []*common.Bot) error {
 	for i, commonBot := range bots {
-		dbBot := bot{
+		dbBot := Bot{
 			ID:                    commonBot.Id,
 			Name:                  commonBot.FantasyTeamName,
 			Owner:                 commonBot.Owner,
-			CurrentWaiverPriority: 0,     // Decided later
+			CurrentWaiverPriority: 0, // Decided later
+			RemainingWaiverBudget: 100,
 			DraftOrder:            i + 1, // Assign draft order based on array position
 		}
 
@@ -647,12 +664,13 @@ func getSaveFolderPath(year uint32) (string, error) {
 // --------------------
 // Table: bots
 // --------------------
-type bot struct {
+type Bot struct {
 	ID                    string `gorm:"primaryKey;column:id"`
 	DraftOrder            int    `gorm:"column:draft_order"`
 	Name                  string `gorm:"column:name"`
 	Owner                 string `gorm:"column:owner"`
 	CurrentWaiverPriority int    `gorm:"column:current_waiver_priority"`
+	RemainingWaiverBudget int    `gorm:"column:remaining_waiver_budget"`
 
 	// Relations
 	GameStatuses []gameStatus `gorm:"foreignKey:CurrentBotID"`
@@ -669,7 +687,7 @@ type gameStatus struct {
 	CurrentFantasyWeek int     `gorm:"column:current_fantasy_week"`
 
 	// Relation
-	CurrentBot *bot `gorm:"foreignKey:CurrentBotID;references:ID"`
+	CurrentBot *Bot `gorm:"foreignKey:CurrentBotID;references:ID"`
 }
 
 // --------------------
@@ -704,7 +722,7 @@ type Player struct {
 	CurrentBotID     *string `gorm:"column:current_bot_id"`
 
 	// Relation
-	CurrentBot *bot `gorm:"foreignKey:CurrentBotID;references:ID"`
+	CurrentBot *Bot `gorm:"foreignKey:CurrentBotID;references:ID"`
 }
 
 func (p *Player) GetPositionSummary() (string, error) {
@@ -729,7 +747,7 @@ type Matchup struct {
 	VisitorScore float64 `gorm:"column:visitor_score"`
 	WinningBotID *string `gorm:"column:winning_bot_id"`
 
-	HomeBot    bot  `gorm:"foreignKey:HomeBotID;references:ID"`
-	VisitorBot bot  `gorm:"foreignKey:VisitorBotID;references:ID"`
-	WinningBot *bot `gorm:"foreignKey:WinningBotID;references:ID"`
+	HomeBot    Bot  `gorm:"foreignKey:HomeBotID;references:ID"`
+	VisitorBot Bot  `gorm:"foreignKey:VisitorBotID;references:ID"`
+	WinningBot *Bot `gorm:"foreignKey:WinningBotID;references:ID"`
 }

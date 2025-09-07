@@ -37,8 +37,8 @@ func main() {
 	var botEngine *engine.BotEngine = nil
 	if mode == engine.Draft {
 		botEngine = bootstrapDraft()
-	} else if mode == engine.WeeklyFantasy {
-		botEngine = bootstrapWeeklyFantasy()
+	} else if mode == engine.PerformWeeklyFantasyActions {
+		botEngine = bootstrapWeeklyFantasy(mode)
 	} else {
 		fmt.Println("Invalid GameMode provided")
 		os.Exit(1)
@@ -77,7 +77,7 @@ func main() {
 	}
 }
 
-func bootstrapWeeklyFantasy() *engine.BotEngine {
+func bootstrapWeeklyFantasy(gameMode engine.GameMode) *engine.BotEngine {
 	year := uint32(2025)
 	gameStateHandler, err := gamestate.LoadGameStateForWeeklyFantasy(year)
 	if err != nil {
@@ -88,7 +88,7 @@ func bootstrapWeeklyFantasy() *engine.BotEngine {
 
 	engineSettings := engine.BotEngineSettings{
 		VerboseLoggingEnabled: *enableVerboseLogging,
-		GameMode:              engine.WeeklyFantasy,
+		GameMode:              gameMode,
 	}
 
 	sourceCodeMap, envVarsMap, err := validateBotsAndFetchSourceCode(gameStateHandler)
@@ -117,9 +117,9 @@ func validateBotsAndFetchSourceCode(handler *gamestate.GameStateHandler) (map[st
 	}
 
 	for _, bot := range botsFromDatabase {
-		_, ok := definedBotMap[bot.Id]
+		_, ok := definedBotMap[bot.ID]
 		if !ok {
-			return nil, nil, errors.New(fmt.Sprintf("The defined bot %s does not exist!", bot.Id))
+			return nil, nil, errors.New(fmt.Sprintf("The defined bot %s does not exist! %d", bot.ID))
 		}
 	}
 
@@ -244,7 +244,7 @@ func fetchBotList() []*common.Bot {
 		{
 			Id:              "7",
 			SourceType:      common.Bot_LOCAL,
-			SourcePath:      "/bots/nfl/standard-bot.py",
+			SourcePath:      "/bots/nfl2025/standard-bot.py",
 			Owner:           "Claude",
 			FantasyTeamName: "Standard Bot",
 		},
@@ -429,8 +429,8 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 		}
 
 		env = append(env, value)
+		fmt.Printf("Retrieved env vars from Github: %s\n", bot.GithubEnvName)
 	} else {
-		fmt.Printf("Grabbing env vars from local file system: %s\n", bot.EnvPath)
 		envAbsPath, err := common.BuildLocalAbsolutePath(bot.EnvPath)
 		if err != nil {
 			return env, err
@@ -443,6 +443,7 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 
 		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
 		env = append(strings.Split(string(envContent), "\n"))
+		fmt.Printf("Retrieved env vars from local file system: %s\n", bot.EnvPath)
 	}
 
 	return env, nil

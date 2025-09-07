@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	common "github.com/mitchwebster/botblitz/pkg/common"
 	"github.com/mitchwebster/botblitz/pkg/gamestate"
 )
 
@@ -47,9 +46,9 @@ func (e *BotEngine) runDraft(ctx context.Context) error {
 			}
 
 			curBot := bots[index]
-			e.gameStateHandler.SetCurrentBotTeamId(curBot.Id)
+			e.gameStateHandler.SetCurrentBotTeamId(curBot.ID)
 			fmt.Printf("\n-----------------------------------------\n")
-			err := e.performDraftAction(ctx, curBot, index)
+			err := e.performDraftAction(ctx, &curBot, index)
 			fmt.Printf("\n-----------------------------------------\n")
 			if err != nil {
 				return err
@@ -113,7 +112,7 @@ func (e *BotEngine) initializeDraftSheet() error {
 			return err
 		}
 
-		content := bot.FantasyTeamName + "(" + bot.Owner + ")"
+		content := bot.Name + "(" + bot.Owner + ")"
 		newCol := rune(int(InitialCol) + i)
 		err = e.sheetsClient.WriteContentToCell(IntialRow, newCol, content)
 		if err != nil {
@@ -124,7 +123,7 @@ func (e *BotEngine) initializeDraftSheet() error {
 	return nil
 }
 
-func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, currentBotIndex int) error {
+func (e *BotEngine) performDraftAction(ctx context.Context, bot *gamestate.Bot, currentBotIndex int) error {
 	pickNum, err := e.gameStateHandler.GetCurrentDraftPick()
 	if err != nil {
 		return err
@@ -135,7 +134,7 @@ func (e *BotEngine) performDraftAction(ctx context.Context, bot *common.Bot, cur
 		return err
 	}
 
-	fmt.Printf("[Pick: %d] %s will choose next...\n", pickNum, bot.FantasyTeamName)
+	fmt.Printf("[Pick: %d] %s will choose next...\n", pickNum, bot.Name)
 
 	summary := ""
 	playerIdFromBot, err := e.startContainerAndPerformDraftAction(ctx, bot)
@@ -186,9 +185,26 @@ func (e *BotEngine) validateDraftState() error {
 	return nil
 }
 
-func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, currentDraftPick int) (string, error) {
+func (e *BotEngine) getPlayerAndValidateDraftEligibility(playerId string) (*gamestate.Player, error) {
 	if strings.TrimSpace(playerId) == "" {
-		return "", fmt.Errorf("Cannot draft an empty player")
+		return nil, fmt.Errorf("Cannot draft an empty player")
+	}
+
+	player, err := e.gameStateHandler.GetPlayerById(playerId)
+	if err != nil {
+		return nil, err
+	}
+
+	if player.Availability == gamestate.Drafted.String() || player.Availability == gamestate.OnHold.String() {
+		return nil, fmt.Errorf("Cannot draft player again")
+	}
+
+	return player, nil
+}
+
+func (e *BotEngine) validatePlayerCanBeDropped(playerId string, owningBotId string) (string, error) {
+	if strings.TrimSpace(playerId) == "" {
+		return "", fmt.Errorf("Cannot drop an empty player")
 	}
 
 	player, err := e.gameStateHandler.GetPlayerById(playerId)
@@ -196,15 +212,28 @@ func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, c
 		return "", err
 	}
 
-	if player.Availability == gamestate.Drafted.String() {
-		return "", fmt.Errorf("Cannot draft player again")
+	if player.Availability != gamestate.Drafted.String() || player.CurrentBotID == nil {
+		return "", fmt.Errorf("A player must be drafted before they can be dropped")
+	}
+
+	if *player.CurrentBotID != owningBotId {
+		return "", fmt.Errorf("A player can only be dropped by their owning team")
+	}
+
+	return player.FullName, nil
+}
+
+func (e *BotEngine) validateAndMakeDraftPick(bot *gamestate.Bot, playerId string, currentDraftPick int) (string, error) {
+	player, err := e.getPlayerAndValidateDraftEligibility(playerId)
+	if err != nil {
+		return "", err
 	}
 
 	draftString := gamestate.Drafted.String()
 
-	e.gameStateHandler.UpdatePlayer(playerId, &draftString, &currentDraftPick, &bot.Id)
+	e.gameStateHandler.UpdatePlayer(playerId, &draftString, &currentDraftPick, &bot.ID)
 
-	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", currentDraftPick, bot.FantasyTeamName, bot.Owner, player.FullName)
+	fmt.Printf("With the %d pick of the bot draft, %s (%s) has selected: %s\n", currentDraftPick, bot.Name, bot.Owner, player.FullName)
 
 	positionSummary, err := player.GetPositionSummary()
 	if err != nil {
@@ -216,7 +245,7 @@ func (e *BotEngine) validateAndMakeDraftPick(bot *common.Bot, playerId string, c
 	return summary, nil
 }
 
-func (e *BotEngine) draftPlayerOnInvalidResponse(bot *common.Bot, currentDraftPick int) (string, error) {
+func (e *BotEngine) draftPlayerOnInvalidResponse(bot *gamestate.Bot, currentDraftPick int) (string, error) {
 	fmt.Println("Auto-drafting due to failure")
 
 	tries := 0
