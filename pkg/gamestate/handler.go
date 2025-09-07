@@ -467,6 +467,34 @@ func getStatsDatabaseFilePath(year uint32) (string, error) {
 	return absPath + "/" + statsDatabaseFileName, nil
 }
 
+func RefreshWeeklyStats(db *gorm.DB, year uint32) error {
+	// Get the data for this
+	statsDBFile, err := getStatsDatabaseFilePath(year)
+	if err != nil {
+		return err
+	}
+
+	// Attach the other DB
+	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
+	if err := db.Exec(attachQuery).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec(`DETACH DATABASE other;`).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func populateStatsTables(db *gorm.DB, year uint32) error {
 	// Get the data for this
 	statsDBFile, err := getStatsDatabaseFilePath(year)
