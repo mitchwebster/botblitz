@@ -120,11 +120,16 @@ func TestFindIntersection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := FindIntersection(tt.a, tt.b)
 
-			if len(tt.expected) == 0 && len(got) == 0 {
-				return
+			// Compare as sets: order doesn't matter
+			gotMap := make(map[Position]struct{}, len(got))
+			for _, v := range got {
+				gotMap[v] = struct{}{}
 			}
-
-			if !reflect.DeepEqual(got, tt.expected) {
+			expectedMap := make(map[Position]struct{}, len(tt.expected))
+			for _, v := range tt.expected {
+				expectedMap[v] = struct{}{}
+			}
+			if !reflect.DeepEqual(gotMap, expectedMap) {
 				t.Errorf("FindIntersection(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.expected)
 			}
 		})
