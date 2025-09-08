@@ -531,6 +531,10 @@ func (handler *GameStateHandler) RefreshWeeklyStats() error {
 		return err
 	}
 
+	if !fileExists(statsDBFile) {
+		return fmt.Errorf("stats.db file does not exist, it will need to be created using collect_stats.py and collect_weekly_stats.py")
+	}
+
 	// Remove the weekly stats table from the game state
 	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
 		return err
@@ -561,6 +565,10 @@ func populateStatsTables(db *gorm.DB, year uint32) error {
 		return err
 	}
 
+	if !fileExists(statsDBFile) {
+		return fmt.Errorf("stats.db file does not exist, it will need to be created using collect_stats.py and collect_weekly_stats.py")
+	}
+
 	// Attach the other DB
 	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
 	if err := db.Exec(attachQuery).Error; err != nil {
@@ -580,6 +588,19 @@ func populateStatsTables(db *gorm.DB, year uint32) error {
 	}
 
 	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true // file exists
+	}
+
+	if os.IsNotExist(err) {
+		return false // file does not exist
+	}
+
+	return false
 }
 
 func loadPlayers(year uint32) ([]Player, error) {
@@ -818,13 +839,15 @@ func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeekly
 			p.id, 
 			p.full_name, 
 			p.allowed_positions, 
-			w.FPTS, 
-			p.current_bot_id
+			p.current_bot_id,
+			max(w.FPTS) as FPTS
 		FROM players AS p
 		INNER JOIN weekly_stats AS w
 			ON p.id = w.fantasypros_id
-		WHERE w.week = ? 
+		WHERE w.week = ?
 		AND p.current_bot_id IS NOT NULL
+		GROUP BY 1, 2, 3, 4
+		ORDER BY FPTS desc
 	`, gameStatus.CurrentFantasyWeek).Scan(&results).Error
 
 	if err != nil {
