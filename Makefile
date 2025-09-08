@@ -32,8 +32,8 @@ run-weekly-fantasy:
 run-weekly-fantasy-github:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformWeeklyFantasyActions -is_running_on_github=true
 
-run-fantasy-github:
-	go run pkg/cmd/engine_bootstrap.go -game_mode=WeeklyFantasy -is_running_on_github=true
+run-finish-week:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=FinishPreviousWeek
 
 # must be run after make gen 
 build-py-module:

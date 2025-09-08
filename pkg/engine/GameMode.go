@@ -12,11 +12,11 @@ type GameMode int
 const (
 	Draft GameMode = iota
 	PerformWeeklyFantasyActions
-	ScorePreviousWeek
+	FinishPreviousWeek
 )
 
 func (s GameMode) String() string {
-	return [...]string{"Draft", "PerformWeeklyFantasyActions", "ScorePreviousWeek"}[s]
+	return [...]string{"Draft", "PerformWeeklyFantasyActions", "FinishPreviousWeek"}[s]
 }
 
 func GameModeFromString(s string) (GameMode, error) {
@@ -25,8 +25,8 @@ func GameModeFromString(s string) (GameMode, error) {
 		return Draft, nil
 	case "performweeklyfantasyactions":
 		return PerformWeeklyFantasyActions, nil
-	case "scorepreviousweek":
-		return ScorePreviousWeek, nil
+	case "finishpreviousweek":
+		return FinishPreviousWeek, nil
 	default:
 		return -1, fmt.Errorf("invalid status: %s", s)
 	}

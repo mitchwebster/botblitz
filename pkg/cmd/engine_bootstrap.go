@@ -20,6 +20,7 @@ var (
 	enableVerboseLogging = flag.Bool("enable_verbose_logging", false, "If enabled, additional logging is printed to the console and stdout+stderr is captured from each bot invocation and saved to files under /tmp/")
 	gameMode             = flag.String("game_mode", "Draft", "Used to determine which GameMode the engine should run")
 	isRunningOnGithub    = flag.Bool("is_running_on_github", false, "If enabled, the engine is running on GitHub")
+	year                 = flag.Int("year", 2025, "The year to run the engine against")
 )
 
 func main() {
@@ -39,6 +40,8 @@ func main() {
 		botEngine = bootstrapDraft()
 	} else if mode == engine.PerformWeeklyFantasyActions {
 		botEngine = bootstrapWeeklyFantasy(mode)
+	} else if mode == engine.FinishPreviousWeek {
+		botEngine = bootstrapFinishWeek(mode)
 	} else {
 		fmt.Println("Invalid GameMode provided")
 		os.Exit(1)
@@ -78,7 +81,7 @@ func main() {
 }
 
 func bootstrapWeeklyFantasy(gameMode engine.GameMode) *engine.BotEngine {
-	year := uint32(2025)
+	year := uint32(*year)
 	gameStateHandler, err := gamestate.LoadGameStateForWeeklyFantasy(year)
 	if err != nil {
 		fmt.Println("Failed to load game state for weekly fantasy")
@@ -101,6 +104,24 @@ func bootstrapWeeklyFantasy(gameMode engine.GameMode) *engine.BotEngine {
 	// TODO: load the actual weekly data into the db
 
 	return engine.NewBotEngine(gameStateHandler, engineSettings, nil, sourceCodeMap, envVarsMap)
+}
+
+func bootstrapFinishWeek(gameMode engine.GameMode) *engine.BotEngine {
+	year := uint32(*year)
+	gameStateHandler, err := gamestate.LoadGameStateForWeeklyFantasy(year)
+	if err != nil {
+		fmt.Println("Failed to load game state for weekly fantasy")
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	engineSettings := engine.BotEngineSettings{
+		VerboseLoggingEnabled: *enableVerboseLogging,
+		GameMode:              gameMode,
+	}
+
+	// Do not load any source code here as we should not be calling any bots when finishing the week
+	return engine.NewBotEngine(gameStateHandler, engineSettings, nil, nil, nil)
 }
 
 func validateBotsAndFetchSourceCode(handler *gamestate.GameStateHandler) (map[string][]byte, map[string][]string, error) {
@@ -146,7 +167,7 @@ func getCodeAndEnvs(bots []*common.Bot) (map[string][]byte, map[string][]string,
 }
 
 func bootstrapDraft() *engine.BotEngine {
-	year := uint32(2025)
+	year := uint32(*year)
 	bots := fetchBotList()
 	sourceCodeMap, envVarsMap, err := getCodeAndEnvs(bots)
 	if err != nil {
@@ -315,14 +336,14 @@ func shuffleBotOrder(bots []*common.Bot) {
 
 func fetchLeagueSettings(year uint32, numTeams uint32) *common.LeagueSettings {
 	playerslots := make(map[string]uint32)
-	playerslots["QB"] = 1
-	playerslots["RB"] = 2
-	playerslots["WR"] = 2
-	playerslots["SUPERFLEX"] = 1 // QB/RB/WR/TE
-	playerslots["FLEX"] = 1      // RB/WR/TE
-	playerslots["K"] = 1
-	playerslots["DST"] = 1
-	playerslots["BENCH"] = 3
+	playerslots[engine.QB.String()] = 1
+	playerslots[engine.RB.String()] = 2
+	playerslots[engine.WR.String()] = 2
+	playerslots[engine.SUPERFLEX.String()] = 1
+	playerslots[engine.FLEX.String()] = 1
+	playerslots[engine.K.String()] = 1
+	playerslots[engine.DST.String()] = 1
+	playerslots[engine.BENCH.String()] = 3
 
 	total_rounds := uint32(0)
 	for _, v := range playerslots {
@@ -446,5 +467,6 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 		fmt.Printf("Retrieved env vars from local file system: %s\n", bot.EnvPath)
 	}
 
+	fmt.Printf("Successfully found env vars for bot (%s)\n", bot.Id)
 	return env, nil
 }

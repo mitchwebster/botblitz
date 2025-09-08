@@ -35,7 +35,6 @@ type BotEngine struct {
 }
 
 func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, envVarsCache map[string][]string) *BotEngine {
-
 	return &BotEngine{
 		settings:         settings,
 		sourceCodeCache:  sourceCodeCache,
@@ -114,7 +113,9 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return e.performWeeklyFantasyActions(ctx)
 	}
 
-	// Add scoring methods
+	if e.settings.GameMode == FinishPreviousWeek {
+		return e.finishWeek(ctx)
+	}
 
 	return errors.New("Unknown game mode")
 }

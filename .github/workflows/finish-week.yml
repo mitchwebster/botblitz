@@ -3,7 +3,7 @@ name: BotBlitz End of Week Workflow
 on:
   workflow_dispatch:
   schedule:
-     - cron: "47 15 * * 2"
+     - cron: "47 23 * * 2"
 
 jobs:
   buildAndTest:
@@ -70,21 +70,22 @@ jobs:
         echo "Running stats download for week range: $CURRENT_WEEK"
 
         # Get weekly stats added to stats.db
-        python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK
+        python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
+    
+    - name: Finish previous fantasy week
+      run: make run-finish-week
 
-        
-
-    # - name: Create PR w/ new gamestate
-    #   id: cpr
-    #   uses: peter-evans/create-pull-request@v7
-    #   with:
-    #     token: ${{ github.token }}
-    #     title: '[Automated] Weekly Fantasy GameState Update'
-    #     commit-message: '[Automated] Weekly Fantasy GameState Update'
-    #     sign-commits: true
-    #     add-paths: |
-    #         data/game_states/*.bin
-    #     body-path: '/tmp/weekly_transaction_log.txt'
+    - name: Create PR w/ new gamestate
+      id: cpr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ github.token }}
+        title: '[Automated] End of week updates'
+        commit-message: '[Automated] End of week updates'
+        sign-commits: true
+        add-paths: |
+            data/*.db
+        body-path: '/tmp/weekly_transaction_log.txt'
 
     # - name: Enable Pull Request Automerge
     #   if: steps.cpr.outputs.pull-request-operation == 'created'

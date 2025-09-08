@@ -31,7 +31,7 @@ type GameStateHandler struct {
 
 	// Cache the invariants to avoid repeated DB queries for no reason
 	cachedBotList        []Bot
-	cachedLeagueSettings *common.LeagueSettings
+	cachedLeagueSettings *LeagueSettings
 }
 
 type PlayerStatus int
@@ -101,29 +101,46 @@ func (handler *GameStateHandler) GetBots() ([]Bot, error) {
 	return handler.cachedBotList, nil
 }
 
-func (handler *GameStateHandler) GetLeagueSettings() (*common.LeagueSettings, error) {
+func (handler *GameStateHandler) GetMatchupsForWeek(week uint32) ([]Matchup, error) {
+	var matchups []Matchup
+	result := handler.db.Where("week = ?", week).Find(&matchups)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch matchups from database: %v", result.Error)
+	}
+
+	return matchups, nil
+}
+
+// UpdateMatchup updates the winner and points for each team in a matchup within a transaction
+func (handler *GameStateHandler) SetMatchResult(matchupID uint, homeScore, visitorScore float64, winningBotID string) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]interface{}{
+			"home_score":     homeScore,
+			"visitor_score":  visitorScore,
+			"winning_bot_id": winningBotID,
+		}
+		if err := tx.Model(&Matchup{}).Where("id = ?", matchupID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (handler *GameStateHandler) GetLeagueSettings() (*LeagueSettings, error) {
 	if handler.cachedLeagueSettings != nil {
 		return handler.cachedLeagueSettings, nil
 	}
 
 	// list all of the bots from the database and convert to the common bot
-	var settings leagueSettings
+	var settings LeagueSettings
 	result := handler.db.First(&settings, singleRowTableId)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	leagueSettings := &common.LeagueSettings{
-		NumTeams:           uint32(settings.NumTeams),
-		SlotsPerTeam:       nil,
-		IsSnakeDraft:       settings.IsSnakeDraft,
-		TotalRounds:        uint32(settings.TotalRounds),
-		PointsPerReception: float32(settings.PointsPerReception),
-		Year:               uint32(settings.Year),
-	}
 	// Cache the result
-	handler.cachedLeagueSettings = leagueSettings
+	handler.cachedLeagueSettings = &settings
 
 	return handler.cachedLeagueSettings, nil
 }
@@ -182,6 +199,24 @@ func (handler *GameStateHandler) IncrementDraftPick() error {
 	nextPick := gameStatus.CurrentDraftPick + 1
 
 	result = handler.db.Model(&gameStatus).Update("CurrentDraftPick", nextPick)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
+
+func (handler *GameStateHandler) IncrementFantasyWeek() error {
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	nextWeek := gameStatus.CurrentFantasyWeek + 1
+
+	result = handler.db.Model(&gameStatus).Update("CurrentFantasyWeek", nextWeek)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -355,7 +390,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 	}
 
 	// Auto migrate the database tables
-	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &leagueSettings{}, &Player{})
+	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &Player{})
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +459,7 @@ func populateLeagueSettingsTable(db *gorm.DB, settings *common.LeagueSettings) e
 		return fmt.Errorf("failed to marshal player slots to JSON: %v", err)
 	}
 
-	dbLeagueSettings := leagueSettings{
+	dbLeagueSettings := LeagueSettings{
 		Year:               int(settings.Year),
 		PlayerSlots:        string(playerSlotsJSON),
 		IsSnakeDraft:       settings.IsSnakeDraft,
@@ -484,28 +519,35 @@ func getStatsDatabaseFilePath(year uint32) (string, error) {
 	return absPath + "/" + statsDatabaseFileName, nil
 }
 
-func RefreshWeeklyStats(db *gorm.DB, year uint32) error {
-	// Get the data for this
-	statsDBFile, err := getStatsDatabaseFilePath(year)
+func (handler *GameStateHandler) RefreshWeeklyStats() error {
+	settings, err := handler.GetLeagueSettings()
 	if err != nil {
+		return err
+	}
+
+	// Get the data for this
+	statsDBFile, err := getStatsDatabaseFilePath(uint32(settings.Year))
+	if err != nil {
+		return err
+	}
+
+	// Remove the weekly stats table from the game state
+	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
 		return err
 	}
 
 	// Attach the other DB
 	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
-	if err := db.Exec(attachQuery).Error; err != nil {
+	println(attachQuery)
+	if err := handler.db.Exec(attachQuery).Error; err != nil {
 		return err
 	}
 
-	if err := db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
+	if err := handler.db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
 		return err
 	}
 
-	if err := db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec(`DETACH DATABASE other;`).Error; err != nil {
+	if err := handler.db.Exec(`DETACH DATABASE other;`).Error; err != nil {
 		return err
 	}
 
@@ -693,7 +735,7 @@ type gameStatus struct {
 // --------------------
 // Table: league_settings
 // --------------------
-type leagueSettings struct {
+type LeagueSettings struct {
 	ID                 int     `gorm:"primaryKey;column:id"`
 	NumTeams           int     `gorm:"column:num_teams"`
 	Year               int     `gorm:"column:year"`
@@ -750,4 +792,44 @@ type Matchup struct {
 	HomeBot    Bot  `gorm:"foreignKey:HomeBotID;references:ID"`
 	VisitorBot Bot  `gorm:"foreignKey:VisitorBotID;references:ID"`
 	WinningBot *Bot `gorm:"foreignKey:WinningBotID;references:ID"`
+}
+
+// NOT A TABLE - just a query result
+type PlayerWeeklyScore struct {
+	ID               string  `gorm:"column:id"`
+	FullName         string  `gorm:"column:full_name"`
+	AllowedPositions string  `gorm:"column:allowed_positions"`
+	FPTS             float64 `gorm:"column:FPTS"`
+	CurrentBotID     string  `gorm:"column:current_bot_id"`
+}
+
+func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeeklyScore, int, error) {
+	var gameStatus gameStatus
+	result := handler.db.First(&gameStatus, singleRowTableId)
+
+	if result.Error != nil {
+		return nil, -1, result.Error
+	}
+
+	var results []PlayerWeeklyScore
+
+	err := handler.db.Raw(`
+		SELECT 
+			p.id, 
+			p.full_name, 
+			p.allowed_positions, 
+			w.FPTS, 
+			p.current_bot_id
+		FROM players AS p
+		INNER JOIN weekly_stats AS w
+			ON p.id = w.fantasypros_id
+		WHERE w.week = ? 
+		AND p.current_bot_id IS NOT NULL
+	`, gameStatus.CurrentFantasyWeek).Scan(&results).Error
+
+	if err != nil {
+		return nil, -1, err
+	}
+
+	return results, gameStatus.CurrentFantasyWeek, nil
 }
