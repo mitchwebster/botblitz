@@ -5,7 +5,7 @@ import json
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
 from blitz_env.models import DatabaseManager
-from blitz_env.agent_pb2 import GameState, AddDropSelection
+from blitz_env import AttemptedFantasyActions, WaiverClaim
 
 class PhilipFantasyBot:
     """
@@ -395,22 +395,20 @@ def draft_player() -> str:
     bot = PhilipFantasyBot()
     return bot.draft_player()
 
-def propose_add_drop(game_state: GameState) -> AddDropSelection:
-    """
-    Propose add/drop transactions for weekly roster management
-    
-    Args:
-        game_state: Current game state with player information
-        
-    Returns:
-        AddDropSelection: Add/drop recommendation
-    """
-    # For now, return empty selection (no add/drop)
-    # This can be enhanced later with weekly roster optimization logic
-    return AddDropSelection(
-        player_to_add_id="",
-        player_to_drop_id=""
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    claims = [ 
+        WaiverClaim(
+            player_to_add_id="",
+            player_to_drop_id="",
+            bid_amount=0
+        )
+    ]
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=claims
     )
+
+    return actions
 
 # Test the bot if run directly
 if __name__ == "__main__":

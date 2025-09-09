@@ -3,7 +3,7 @@ name: BotBlitz Weekly Fantasy
 on:
   workflow_dispatch:
   schedule:
-     - cron: "47 15 * * 3"
+     - cron: "47 20 * * 3"
 
 jobs:
   buildAndTest:
@@ -61,17 +61,17 @@ jobs:
           TYLER_ENV: ${{ secrets.TYLER_ENV }}
           PHILIP_ENV: ${{ secrets.PHILIP_ENV }}
 
-    # - name: Create PR w/ new gamestate
-    #   id: cpr
-    #   uses: peter-evans/create-pull-request@v7
-    #   with:
-    #     token: ${{ github.token }}
-    #     title: '[Automated] Weekly Fantasy GameState Update'
-    #     commit-message: '[Automated] Weekly Fantasy GameState Update'
-    #     sign-commits: true
-    #     add-paths: |
-    #         data/game_states/*.bin
-    #     body-path: '/tmp/weekly_transaction_log.txt'
+    - name: Create PR w/ new gamestate
+      id: cpr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ github.token }}
+        title: '[Automated] Weekly Fantasy Update'
+        commit-message: '[Automated] Weekly Fantasy Update'
+        sign-commits: true
+        add-paths: |
+            data/*.db
+        body-path: '/tmp/weekly_transaction_log.txt'
 
     # - name: Enable Pull Request Automerge
     #   if: steps.cpr.outputs.pull-request-operation == 'created'

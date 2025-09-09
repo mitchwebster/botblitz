@@ -138,7 +138,7 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
         WaiverClaim(
             player_to_add_id="",
             player_to_drop_id="",
-            bid_amount=1
+            bid_amount=0
         )
     ]
 

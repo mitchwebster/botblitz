@@ -26,7 +26,11 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 	}
 
 	// bot_id -> []AddDropSelection
-	botSelectionMap := e.fetchAddDropSubmissions(ctx, bots)
+	botSelectionMap, err := e.fetchAddDropSubmissions(ctx, bots)
+	if err != nil {
+		return err
+	}
+
 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
 
 	// Process winning claims
@@ -96,8 +100,9 @@ func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMa
 	}
 	builder.WriteString("------ \n")
 
-	fmt.Println(builder.String())
-	err := e.saveTransactionLogToFile(builder.String())
+	summaryStr := builder.String()
+	fmt.Println(summaryStr)
+	err := e.saveTransactionLogToFile(summaryStr)
 	if err != nil {
 		fmt.Println("Failed to save transaction log to file: ", err)
 	}
@@ -256,21 +261,33 @@ func getInitialBotBudgets(bots []gamestate.Bot) map[string]int {
 	return initialBudgets
 }
 
-func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string][]*common.WaiverClaim {
+func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) (map[string][]*common.WaiverClaim, error) {
 	// bot_id -> []WaiverClaim
 	botSelectionMap := make(map[string][]*common.WaiverClaim)
 
 	for _, bot := range bots {
 		// TODO: in the future this may need to change to handle trades, etc. as well
+
+		// Need to update current_bot_id so bots know who they are
+		err := e.gameStateHandler.SetCurrentBotTeamId(bot.ID)
+		if err != nil {
+			return botSelectionMap, err
+		}
+
 		selections, err := e.startContainerAndPerformWeeklyFantasyActions(ctx, &bot)
 		if err != nil {
 			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.ID, err)
 			continue
 		}
 
-		if len(selections.WaiverClaims) > MaxAddDropsPerRun || len(selections.WaiverClaims) <= 0 {
-			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.ID)
+		if len(selections.WaiverClaims) <= 0 {
+			fmt.Printf("No add drop selections submitted for bot: %s\n", bot.ID)
 			continue
+		}
+
+		if len(selections.WaiverClaims) > MaxAddDropsPerRun {
+			fmt.Printf("WARNING: bot (%s) submitted %d waiver claims, only considering first %d\n", bot.ID, len(selections.WaiverClaims), MaxAddDropsPerRun)
+			selections.WaiverClaims = selections.WaiverClaims[:MaxAddDropsPerRun]
 		}
 
 		for _, selection := range selections.WaiverClaims {
@@ -307,7 +324,7 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		}
 	}
 
-	return botSelectionMap
+	return botSelectionMap, nil
 }
 
 func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {

@@ -3,6 +3,42 @@ from blitz_env.models import DatabaseManager
 import pandas as pd
 import json
 
+def get_current_fantasy_week(db):
+    df = pd.read_sql("SELECT * FROM game_statuses", db.engine)
+    return df.iloc[0]["current_fantasy_week"]
+
+def get_current_bot_id(db):
+    df = pd.read_sql("SELECT * FROM game_statuses", db.engine)
+    return df.iloc[0]["current_bot_id"]
+
+def get_my_remaining_budget(db, current_bot_id):
+    queryStr = f"SELECT * FROM bots where id = '{current_bot_id}'"
+    df = pd.read_sql(queryStr, db.engine) 
+    return df.iloc[0]["remaining_waiver_budget"]
+
+def get_current_opponent_id(db, current_bot_id, week):
+    queryStr = f"SELECT * FROM matchups where week = {week} AND (home_bot_id = '{current_bot_id}' OR visitor_bot_id = '{current_bot_id}')"
+    df = pd.read_sql(queryStr, db.engine)
+    matchup = df.iloc[0]
+
+    if matchup["home_bot_id"] == current_bot_id:
+        return matchup["visitor_bot_id"]
+    elif matchup["visitor_bot_id"] == current_bot_id:
+        return matchup["home_bot_id"]
+    else:
+        return "Unknown"
+
+def get_season_stats_for_available_players(db):
+    queryStr = """
+        SELECT *
+		FROM players AS p
+		INNER JOIN weekly_stats AS w
+			ON p.id = w.fantasypros_id
+		WHERE p.current_bot_id IS NULL
+		ORDER BY FPTS desc
+    """
+    return pd.read_sql(queryStr, db.engine)
+
 def get_positions_to_fill(db):
     df = pd.read_sql("SELECT * FROM league_settings", db.engine)
     return json.loads(df.iloc[0]["player_slots"])
@@ -91,16 +127,37 @@ def draft_player() -> str:
         db.close()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    claims = [ 
-        WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=1
+    db = DatabaseManager()
+    try:
+        current_fantasy_week = get_current_fantasy_week(db)
+        current_bot_id = get_current_bot_id(db)
+        current_budget = get_my_remaining_budget(db, current_bot_id)
+        current_opponent = get_current_opponent_id(db, current_bot_id, current_fantasy_week)
+        data_on_available_players = get_season_stats_for_available_players(db)
+
+        print(f"Current Fantasy Week: {current_fantasy_week}")
+        print(f"My Bot Id: {current_bot_id}")
+        print(f"My Remaining Budget: {current_budget}")
+        print(f"My Opponent Id: {current_opponent}")
+
+        for index, row in data_on_available_players.iterrows():
+            print(index, row["week"], row["full_name"], row["allowed_positions"], row["FPTS"])
+
+        claims = [ 
+            WaiverClaim(
+                player_to_add_id="",
+                player_to_drop_id="",
+                bid_amount=0
+            )
+        ]
+
+        actions = AttemptedFantasyActions(
+            waiver_claims=claims
         )
-    ]
 
-    actions = AttemptedFantasyActions(
-        waiver_claims=claims
-    )
+        return actions
+    finally:
+        db.close()
 
-    return actions
+if __name__ == "__main__":
+    result = perform_weekly_fantasy_actions()
