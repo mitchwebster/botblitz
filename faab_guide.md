@@ -44,7 +44,7 @@ If you'd like to test your waiver submission code, you can locally run `make bui
 ## More Advanced Rules
 
 ### How are ties handled?
-Ties are currently handled randomly. This is subject to change throughout the season.
+Ties are awarded to the worse team, which is decided first based on record (Wins vs. Losses) and then based on total points.
 
 ### Waiver Claims are evaluated in order
 Each waiver claim you submit will be evaluated in order. This matters when you are submitting multiple claims as early claims may deplete your budget and cause later claims to become invalid. For example, consider the following scenario:
