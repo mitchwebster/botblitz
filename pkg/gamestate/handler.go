@@ -119,7 +119,17 @@ func (handler *GameStateHandler) GetBotsInRandomOrder() ([]Bot, error) {
 	return handler.cachedBotList, nil
 }
 
-func (handler *GameStateHandler) GetMatchupsForWeek(week uint32) ([]Matchup, error) {
+func (handler *GameStateHandler) GetPastMatchups(currentWeek int) ([]Matchup, error) {
+	var matchups []Matchup
+	result := handler.db.Where("week < ?", currentWeek).Find(&matchups)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch matchups from database: %v", result.Error)
+	}
+
+	return matchups, nil
+}
+
+func (handler *GameStateHandler) GetMatchupsForWeek(week int) ([]Matchup, error) {
 	var matchups []Matchup
 	result := handler.db.Where("week = ?", week).Find(&matchups)
 	if result.Error != nil {

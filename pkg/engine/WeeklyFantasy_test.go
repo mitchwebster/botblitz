@@ -14,6 +14,21 @@ func TestPerformFAABAddDropInternal(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	// Setup add/drop selections
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
@@ -33,7 +48,7 @@ func TestPerformFAABAddDropInternal(t *testing.T) {
 	}
 
 	// Call the function under test
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Validate the results
 	winningClaimsArr, exists := winningClaims["bot2"]
@@ -65,13 +80,34 @@ func TestFAABWithCompetingBids(t *testing.T) {
 		{ID: "bot3", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+		"bot3": BotRanking{
+			Ranking:      3,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}},
 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 60}},
 		"bot3": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 40}},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Bot2 should win with highest bid
 	if claim, exists := winningClaims["bot2"]; !exists || len(claim) != 1 || claim[0].BidAmount != 60 {
@@ -90,12 +126,27 @@ func TestFAABWithInsufficientBudget(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}},
 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 40}},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Bot2 should win despite lower bid since bot1 has insufficient funds
 	claim, exists := winningClaims["bot2"]
@@ -113,6 +164,21 @@ func TestFAABWithMultiplePlayerClaims(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50},
@@ -124,7 +190,7 @@ func TestFAABWithMultiplePlayerClaims(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Check bot1 wins playerX with correct drop
 	claim, exists := winningClaims["bot1"]
@@ -151,6 +217,21 @@ func TestFAABWithMultiplePlayerClaimsWithLowPriorities(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
@@ -162,7 +243,7 @@ func TestFAABWithMultiplePlayerClaimsWithLowPriorities(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Check bot2 wins playerX with correct drop
 	claim, exists := winningClaims["bot2"]
@@ -191,6 +272,33 @@ func TestFAABWithMultiplePlayerClaimsWithManyBotsAndPlayers(t *testing.T) {
 		{ID: "bot4", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  2,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  2,
+			MatchupsLost: 0,
+		},
+		"bot3": BotRanking{
+			Ranking:      3,
+			TotalPoints:  5,
+			MatchupsWon:  1,
+			MatchupsLost: 1,
+		},
+		"bot4": BotRanking{
+			Ranking:      4,
+			TotalPoints:  5,
+			MatchupsWon:  1,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 30},
@@ -210,7 +318,7 @@ func TestFAABWithMultiplePlayerClaimsWithManyBotsAndPlayers(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Check bot3 wins playerX with correct drop
 	claim, exists := winningClaims["bot3"]
@@ -240,42 +348,81 @@ func TestFAABWithMultiplePlayerClaimsWithManyBotsAndPlayers(t *testing.T) {
 	}
 }
 
-// TODO: this test is currently broken as the tie system is random
-// func TestFAABWithTiedBids(t *testing.T) {
-// 	bots := []gamestate.Bot{
-// 		{ID: "bot1", RemainingWaiverBudget: 100},
-// 		{ID: "bot2", RemainingWaiverBudget: 100},
-// 		{ID: "bot3", RemainingWaiverBudget: 100},
-// 		{ID: "bot4", RemainingWaiverBudget: 100},
-// 	}
+func TestFAABWithTiedBids(t *testing.T) {
+	bots := []gamestate.Bot{
+		{ID: "bot1", RemainingWaiverBudget: 100},
+		{ID: "bot2", RemainingWaiverBudget: 100},
+		{ID: "bot3", RemainingWaiverBudget: 100},
+		{ID: "bot4", RemainingWaiverBudget: 100},
+	}
 
-// 	botSelectionMap := map[string][]*common.WaiverClaim{
-// 		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
-// 		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
-// 		"bot3": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 30}},
-// 		"bot4": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
-// 	}
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  2,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  2,
+			MatchupsLost: 0,
+		},
+		"bot3": BotRanking{
+			Ranking:      3,
+			TotalPoints:  5,
+			MatchupsWon:  1,
+			MatchupsLost: 1,
+		},
+		"bot4": BotRanking{
+			Ranking:      4,
+			TotalPoints:  5,
+			MatchupsWon:  1,
+			MatchupsLost: 1,
+		},
+	}
 
-// 	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	botSelectionMap := map[string][]*common.WaiverClaim{
+		"bot1": {{PlayerToDropId: "playerA", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
+		"bot2": {{PlayerToDropId: "playerB", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
+		"bot3": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 30}},
+		"bot4": {{PlayerToDropId: "playerC", PlayerToAddId: "playerX", BidAmount: 50}}, // Same bid amount
+	}
 
-// 	// TODO: change once we fix tie break rules
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
-// 	// Bot4 should win with equal bid but higher priority
-// 	claim, exists := winningClaims["bot4"]
-// 	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
-// 		t.Errorf("Expected bot4 to win playerX with bid 50 due to higher waiver priority")
-// 	}
+	// Bot4 should win with equal bid but higher priority (lower ranking)
+	claim, exists := winningClaims["bot4"]
+	if !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
+		t.Errorf("Expected bot4 to win playerX with bid 50 due to higher waiver priority")
+	}
 
-// 	// Check correct player was dropped
-// 	if claim[0].PlayerToDropId != "playerC" {
-// 		t.Errorf("Expected playerC to be dropped, got %s", claim[0].PlayerToDropId)
-// 	}
-// }
+	// Check correct player was dropped
+	if claim[0].PlayerToDropId != "playerC" {
+		t.Errorf("Expected playerC to be dropped, got %s", claim[0].PlayerToDropId)
+	}
+}
 
 func TestFAABWithRepeatedClaimsFromSameBot(t *testing.T) {
 	bots := []gamestate.Bot{
 		{ID: "bot1", RemainingWaiverBudget: 100},
 		{ID: "bot2", RemainingWaiverBudget: 100},
+	}
+
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
 	}
 
 	botSelectionMap := map[string][]*common.WaiverClaim{
@@ -290,7 +437,7 @@ func TestFAABWithRepeatedClaimsFromSameBot(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Should use bot1's highest bid (50)
 	claim, exists := winningClaims["bot1"]
@@ -310,6 +457,21 @@ func TestFAABWithOneBotWinningMultipleTimes(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			// Multiple claims for same player with different amounts and drop players
@@ -321,7 +483,7 @@ func TestFAABWithOneBotWinningMultipleTimes(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Should use bot1's highest bid (50)
 	claims, exists := winningClaims["bot1"]
@@ -351,6 +513,21 @@ func TestFAABWithRepeatedClaimsAndMultiplePlayers(t *testing.T) {
 		{ID: "bot2", RemainingWaiverBudget: 100},
 	}
 
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
 	botSelectionMap := map[string][]*common.WaiverClaim{
 		"bot1": {
 			// Multiple claims for playerX
@@ -366,7 +543,7 @@ func TestFAABWithRepeatedClaimsAndMultiplePlayers(t *testing.T) {
 		},
 	}
 
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
 
 	// Check playerX goes to bot1 with highest bid
 	if claim, exists := winningClaims["bot1"]; !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
