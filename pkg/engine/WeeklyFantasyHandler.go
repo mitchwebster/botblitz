@@ -25,6 +25,10 @@ func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
 		return err
 	}
 
+	if len(bots) <= 0 {
+		return fmt.Errorf("Cannot perform FAAB add/drop if no bots are configured")
+	}
+
 	// bot_id -> []AddDropSelection
 	botSelectionMap, err := e.fetchAddDropSubmissions(ctx, bots)
 	if err != nil {
@@ -262,6 +266,8 @@ func getInitialBotBudgets(bots []gamestate.Bot) map[string]int {
 }
 
 func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) (map[string][]*common.WaiverClaim, error) {
+	fmt.Println("Fetching waiver claims from all bots...")
+
 	// bot_id -> []WaiverClaim
 	botSelectionMap := make(map[string][]*common.WaiverClaim)
 
@@ -324,6 +330,7 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		}
 	}
 
+	fmt.Println("Finished getting all waiver claims")
 	return botSelectionMap, nil
 }
 

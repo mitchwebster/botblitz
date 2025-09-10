@@ -90,6 +90,24 @@ func (handler *GameStateHandler) GetBots() ([]Bot, error) {
 
 	// list all of the bots from the database and convert to the common bot
 	var dbBots []Bot
+	result := handler.db.Order("id ASC").Find(&dbBots)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
+	}
+
+	// Cache the result
+	handler.cachedBotList = dbBots
+
+	return handler.cachedBotList, nil
+}
+
+func (handler *GameStateHandler) GetBotsInRandomOrder() ([]Bot, error) {
+	if handler.cachedBotList != nil {
+		return handler.cachedBotList, nil
+	}
+
+	// list all of the bots from the database and convert to the common bot
+	var dbBots []Bot
 	result := handler.db.Order("RANDOM()").Find(&dbBots)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)

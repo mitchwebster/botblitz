@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
@@ -176,12 +175,18 @@ func bootstrapDraft() *engine.BotEngine {
 		os.Exit(1) // Crash hard
 	}
 
-	shuffleBotOrder(bots) // randomize draft order
-
 	settings := fetchLeagueSettings(year, uint32(len(bots)))
 	gameStateHandler, err := gamestate.NewGameStateHandlerForDraft(bots, settings)
 	if err != nil {
 		fmt.Println("Failed to build gameState db unexpectedly")
+		fmt.Println(err)
+		os.Exit(1) // Crash hard
+	}
+
+	// Randomly initialize the bot cache for usage later on
+	_, err = gameStateHandler.GetBotsInRandomOrder()
+	if err != nil {
+		fmt.Println("Failed to get bots from newly created db")
 		fmt.Println(err)
 		os.Exit(1) // Crash hard
 	}
@@ -313,24 +318,6 @@ func fetchBotList() []*common.Bot {
 			Owner:           "Harry",
 			FantasyTeamName: "Harry's team",
 		},
-	}
-}
-
-func shuffleBotOrder(bots []*common.Bot) {
-	n := len(bots)
-	indices := make([]int, 0, n)
-
-	for i := 0; i < n; i++ {
-		indices = append(indices, i)
-	}
-
-	rand.Shuffle(len(indices), func(i, j int) {
-		bots[i], bots[j] = bots[j], bots[i]
-	})
-
-	fmt.Println("New Bot Order:")
-	for i := 0; i < n; i++ {
-		fmt.Println(bots[i])
 	}
 }
 
