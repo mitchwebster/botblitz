@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
@@ -13,21 +14,170 @@ import (
 const MaxAddDropsPerRun = 10
 const TransactionLogFullPath = "/tmp/weekly_transaction_log.txt"
 
-func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
-	// TODO: add trades, etc.
-	return e.performFAABAddDrop(ctx)
+type BotRanking struct {
+	Ranking      uint32  `json:"ranking"`
+	TotalPoints  float32 `json:"totalPoints"`
+	MatchupsWon  uint32  `json:"matchupsWon"`
+	MatchupsLost uint32  `json:"matchupsLost"`
 }
 
-func (e *BotEngine) performFAABAddDrop(ctx context.Context) error {
-	// Fetch bots in a random order
+func (e *BotEngine) performWeeklyFantasyActions(ctx context.Context) error {
+	rankingsMap, err := e.summarizeUpcomingWeekMatchups(ctx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: add trades, etc.
+	return e.performFAABAddDrop(ctx, rankingsMap)
+}
+
+func (e *BotEngine) summarizeUpcomingWeekMatchups(ctx context.Context) (map[string]BotRanking, error) {
+	currentFantasyWeek, err := e.gameStateHandler.GetCurrentFantasyWeek()
+	if err != nil {
+		return nil, err
+	}
+
+	bots, err := e.gameStateHandler.GetBots()
+	if err != nil {
+		return nil, err
+	}
+
+	pastMatchups, err := e.gameStateHandler.GetPastMatchups(currentFantasyWeek)
+	if err != nil {
+		return nil, err
+	}
+
+	botNameMap := make(map[string]string)
+	for _, bot := range bots {
+		botNameMap[bot.ID] = bot.Name
+	}
+
+	rankingsMap := getLeaderboard(bots, pastMatchups)
+	printLeaderboard(rankingsMap, bots, botNameMap)
+
+	currentMatchups, err := e.gameStateHandler.GetMatchupsForWeek(currentFantasyWeek)
+	if err != nil {
+		return nil, err
+	}
+
+	printCurrentMatchups(currentFantasyWeek, currentMatchups, rankingsMap, botNameMap)
+
+	return rankingsMap, nil
+}
+
+func printCurrentMatchups(currentFantasyWeek int, matchups []gamestate.Matchup, rankings map[string]BotRanking, botNameMap map[string]string) {
+	fmt.Printf("--- Matchups for Fantasy Week %d  ---\n", currentFantasyWeek)
+	for _, matchup := range matchups {
+		homeTeamName := botNameMap[matchup.HomeBotID]
+		homeTeamRank := rankings[matchup.HomeBotID]
+		visitorTeamName := botNameMap[matchup.VisitorBotID]
+		visitorTeamRank := rankings[matchup.VisitorBotID]
+		fmt.Printf("%s (#%d) vs. %s (#%d)\n", homeTeamName, homeTeamRank.Ranking, visitorTeamName, visitorTeamRank.Ranking)
+	}
+	fmt.Print("--------------------------\n\n")
+}
+
+func printLeaderboard(rankings map[string]BotRanking, bots []gamestate.Bot, botNameMap map[string]string) {
+	fmt.Println("--- Current Leaderboard ---")
+	fmt.Printf("%-16s %-10s %-12s %-12s %-12s\n", "Name", "Rank", "TotalPoints", "Won", "Lost")
+
+	type rankedBot struct {
+		ID string
+		BotRanking
+	}
+
+	// Create a slice to sort by ranking
+	// Convert rankings map to a slice for sorting
+	var rankingSlice []rankedBot
+	for k, b := range rankings {
+		rankingSlice = append(rankingSlice, rankedBot{
+			ID:         k,
+			BotRanking: b,
+		})
+	}
+
+	// Sort by BotRanking.Ranking
+	sort.Slice(rankingSlice, func(i, j int) bool {
+		return rankingSlice[i].BotRanking.Ranking < rankingSlice[j].BotRanking.Ranking
+	})
+
+	for _, b := range rankingSlice {
+		fmt.Printf("%-16s %-10d %-12.2f %-12d %-12d\n",
+			botNameMap[b.ID], b.BotRanking.Ranking, b.BotRanking.TotalPoints, b.BotRanking.MatchupsWon, b.BotRanking.MatchupsLost)
+	}
+	fmt.Print("--------------------------\n\n")
+}
+
+func getLeaderboard(bots []gamestate.Bot, pastMatchups []gamestate.Matchup) map[string]BotRanking {
+	botScoreMap := make(map[string]float32)
+	botVictoryMap := make(map[string]uint32)
+	botLossMap := make(map[string]uint32)
+	botIdArr := make([]string, len(bots))
+
+	for i, bot := range bots {
+		botIdArr[i] = bot.ID
+		botScoreMap[bot.ID] = 0
+		botVictoryMap[bot.ID] = 0
+		botLossMap[bot.ID] = 0
+	}
+
+	for _, matchup := range pastMatchups {
+		// Update home team's score
+		botScoreMap[matchup.HomeBotID] = botScoreMap[matchup.HomeBotID] + float32(matchup.HomeScore)
+		botScoreMap[matchup.VisitorBotID] = botScoreMap[matchup.VisitorBotID] + float32(matchup.VisitorScore)
+
+		// Update record
+		if matchup.HomeScore > matchup.VisitorScore {
+			botVictoryMap[matchup.HomeBotID]++
+			botLossMap[matchup.VisitorBotID]++
+		} else if matchup.VisitorScore > matchup.HomeScore {
+			botVictoryMap[matchup.VisitorBotID]++
+			botLossMap[matchup.HomeBotID]++
+		} else {
+			println("There was a tie.... this is not soccer...")
+		}
+	}
+
+	sort.Slice(botIdArr, func(i, j int) bool {
+		// First sort by victories
+		if botVictoryMap[botIdArr[i]] != botVictoryMap[botIdArr[j]] {
+			return botVictoryMap[botIdArr[i]] > botVictoryMap[botIdArr[j]]
+		}
+
+		// Then by total points
+		return botScoreMap[botIdArr[i]] > botScoreMap[botIdArr[j]]
+	})
+
+	rankingsMap := make(map[string]BotRanking)
+	for i, id := range botIdArr {
+		rankingsMap[id] = BotRanking{
+			Ranking:      uint32(i + 1), // Ranking can be set later if needed
+			TotalPoints:  botScoreMap[id],
+			MatchupsWon:  botVictoryMap[id],
+			MatchupsLost: botLossMap[id],
+		}
+	}
+
+	return rankingsMap
+}
+
+func (e *BotEngine) performFAABAddDrop(ctx context.Context, botRankings map[string]BotRanking) error {
 	bots, err := e.gameStateHandler.GetBots()
 	if err != nil {
 		return err
 	}
 
+	if len(bots) <= 0 {
+		return fmt.Errorf("Cannot perform FAAB add/drop if no bots are configured")
+	}
+
 	// bot_id -> []AddDropSelection
-	botSelectionMap := e.fetchAddDropSubmissions(ctx, bots)
-	winningClaims := performFAABAddDropInternal(bots, botSelectionMap)
+	botSelectionMap, err := e.fetchAddDropSubmissions(ctx, bots)
+	if err != nil {
+		return err
+	}
+
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankings)
 
 	// Process winning claims
 	for bot, claims := range winningClaims {
@@ -96,8 +246,9 @@ func (e *BotEngine) summarizeAddDropResults(bots []gamestate.Bot, botSelectionMa
 	}
 	builder.WriteString("------ \n")
 
-	fmt.Println(builder.String())
-	err := e.saveTransactionLogToFile(builder.String())
+	summaryStr := builder.String()
+	fmt.Println(summaryStr)
+	err := e.saveTransactionLogToFile(summaryStr)
 	if err != nil {
 		fmt.Println("Failed to save transaction log to file: ", err)
 	}
@@ -112,7 +263,7 @@ func copySelectionMap(botSelectionMap map[string][]*common.WaiverClaim) map[stri
 	return newMap
 }
 
-func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[string][]*common.WaiverClaim) map[string][]*common.WaiverClaim {
+func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[string][]*common.WaiverClaim, botRankings map[string]BotRanking) map[string][]*common.WaiverClaim {
 	// bot_id -> remaining budget
 	remainingBudgetMap := getInitialBotBudgets(bots)
 
@@ -166,7 +317,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 				fmt.Printf("Validated claim successfully %s\n", claims[i])
 
 				highestBidForThisPlayerMap := highestBidsByPlayer[claims[i].PlayerToAddId]
-				winnerBot, winningBidAmount := getWinningBotAndBidAmount(highestBidForThisPlayerMap)
+				winnerBot, winningBidAmount := getWinningBotAndBidAmount(highestBidForThisPlayerMap, botRankings)
 				println("Winning bot for this player is ", winnerBot, " with bid ", winningBidAmount)
 
 				if uint32(winningBidAmount) == claims[i].BidAmount && winnerBot == bot {
@@ -197,15 +348,23 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 	return winningClaims
 }
 
-func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int) (string, int) {
+func getWinningBotAndBidAmount(highestBidForThisPlayerMap map[string]int, botRankings map[string]BotRanking) (string, int) {
 	bidValue := -1
-	worstTeam := "" // TODO: figure out how to get the worst team
+	winningBotId := ""
+	worstTeamRanking := -1
+
+	// Ties are resolved in favor of the team that is currently worse
 	for bot, bid := range highestBidForThisPlayerMap {
+		if int(botRankings[bot].Ranking) < worstTeamRanking {
+			continue
+		}
+
 		bidValue = bid
-		worstTeam = bot
+		winningBotId = bot
+		worstTeamRanking = int(botRankings[bot].Ranking)
 	}
 
-	return worstTeam, bidValue
+	return winningBotId, bidValue
 }
 
 func getHighestBidsByPlayerMap(botSelectionMap map[string][]*common.WaiverClaim, remainingBudgets map[string]int) map[string]map[string]int {
@@ -256,21 +415,35 @@ func getInitialBotBudgets(bots []gamestate.Bot) map[string]int {
 	return initialBudgets
 }
 
-func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) map[string][]*common.WaiverClaim {
+func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestate.Bot) (map[string][]*common.WaiverClaim, error) {
+	fmt.Println("Fetching waiver claims from all bots...")
+
 	// bot_id -> []WaiverClaim
 	botSelectionMap := make(map[string][]*common.WaiverClaim)
 
 	for _, bot := range bots {
 		// TODO: in the future this may need to change to handle trades, etc. as well
+
+		// Need to update current_bot_id so bots know who they are
+		err := e.gameStateHandler.SetCurrentBotTeamId(bot.ID)
+		if err != nil {
+			return botSelectionMap, err
+		}
+
 		selections, err := e.startContainerAndPerformWeeklyFantasyActions(ctx, &bot)
 		if err != nil {
 			fmt.Printf("Failed to get selections for bot %s: %s\n", bot.ID, err)
 			continue
 		}
 
-		if len(selections.WaiverClaims) > MaxAddDropsPerRun || len(selections.WaiverClaims) <= 0 {
-			fmt.Printf("Invalid number of add/drop selections for bot: %s\n", bot.ID)
+		if len(selections.WaiverClaims) <= 0 {
+			fmt.Printf("No add drop selections submitted for bot: %s\n", bot.ID)
 			continue
+		}
+
+		if len(selections.WaiverClaims) > MaxAddDropsPerRun {
+			fmt.Printf("WARNING: bot (%s) submitted %d waiver claims, only considering first %d\n", bot.ID, len(selections.WaiverClaims), MaxAddDropsPerRun)
+			selections.WaiverClaims = selections.WaiverClaims[:MaxAddDropsPerRun]
 		}
 
 		for _, selection := range selections.WaiverClaims {
@@ -307,7 +480,8 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		}
 	}
 
-	return botSelectionMap
+	fmt.Println("Finished getting all waiver claims")
+	return botSelectionMap, nil
 }
 
 func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {

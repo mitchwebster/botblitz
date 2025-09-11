@@ -1,5 +1,5 @@
 from blitz_env.models import DatabaseManager
-from blitz_env import GameState, AddDropSelection
+from blitz_env import AttemptedFantasyActions, WaiverClaim
 import pandas as pd
 import numpy as np
 import json
@@ -150,18 +150,17 @@ def draft_player() -> str:
     df = get_players_df_with_value()
     return df[df["availability"] == "AVAILABLE"].sort_values(by="RosterValue", ascending=False).iloc[0]["id"]
 
-def propose_add_drop(game_state: GameState) -> AddDropSelection:
-    """
-    Selects a player to draft based on the highest rank.
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    claims = [ 
+        WaiverClaim(
+            player_to_add_id="",
+            player_to_drop_id="",
+            bid_amount=0
+        )
+    ]
 
-    Args:
-        players (List[Player]): A list of Player objects.
-
-    Returns:
-        str: The id of the drafted player.
-    """
-
-    return AddDropSelection(
-        player_to_add_id="", # do not add
-        player_to_drop_id="" # do not drop
+    actions = AttemptedFantasyActions(
+        waiver_claims=claims
     )
+
+    return actions

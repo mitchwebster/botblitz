@@ -90,6 +90,24 @@ func (handler *GameStateHandler) GetBots() ([]Bot, error) {
 
 	// list all of the bots from the database and convert to the common bot
 	var dbBots []Bot
+	result := handler.db.Order("id ASC").Find(&dbBots)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
+	}
+
+	// Cache the result
+	handler.cachedBotList = dbBots
+
+	return handler.cachedBotList, nil
+}
+
+func (handler *GameStateHandler) GetBotsInRandomOrder() ([]Bot, error) {
+	if handler.cachedBotList != nil {
+		return handler.cachedBotList, nil
+	}
+
+	// list all of the bots from the database and convert to the common bot
+	var dbBots []Bot
 	result := handler.db.Order("RANDOM()").Find(&dbBots)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to fetch bots from database: %v", result.Error)
@@ -101,7 +119,17 @@ func (handler *GameStateHandler) GetBots() ([]Bot, error) {
 	return handler.cachedBotList, nil
 }
 
-func (handler *GameStateHandler) GetMatchupsForWeek(week uint32) ([]Matchup, error) {
+func (handler *GameStateHandler) GetPastMatchups(currentWeek int) ([]Matchup, error) {
+	var matchups []Matchup
+	result := handler.db.Where("week < ?", currentWeek).Find(&matchups)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to fetch matchups from database: %v", result.Error)
+	}
+
+	return matchups, nil
+}
+
+func (handler *GameStateHandler) GetMatchupsForWeek(week int) ([]Matchup, error) {
 	var matchups []Matchup
 	result := handler.db.Where("week = ?", week).Find(&matchups)
 	if result.Error != nil {

@@ -6,7 +6,7 @@ import pandas as pd
 import openai
 import numpy as np
 
-from blitz_env import AddDropSelection, GameState
+from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
 
 
@@ -347,16 +347,17 @@ def find_best_add_drop(db: DatabaseManager) -> tuple[Optional[str], Optional[str
     return None, None
 
 
-def propose_add_drop(game_state: GameState) -> AddDropSelection:
-    """Smart waiver wire management based on value analysis."""
-    db = DatabaseManager()
-    try:
-        add_id, drop_id = find_best_add_drop(db)
-        return AddDropSelection(
-            player_to_add_id=add_id or "", player_to_drop_id=drop_id or ""
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    claims = [ 
+        WaiverClaim(
+            player_to_add_id="",
+            player_to_drop_id="",
+            bid_amount=0
         )
-    except Exception as e:
-        print(f"Error in propose_add_drop: {e}")
-        return AddDropSelection(player_to_add_id="", player_to_drop_id="")
-    finally:
-        db.close()
+    ]
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=claims
+    )
+
+    return actions

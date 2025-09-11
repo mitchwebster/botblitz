@@ -1,4 +1,4 @@
-from blitz_env import GameState, AddDropSelection
+from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
 import pandas as pd
 import json
@@ -345,35 +345,17 @@ def draft_player() -> str:
     neuromorphic_processor = NeuromorphicDraftingProcessorFactory.get_neural_instance()
     return neuromorphic_processor.execute_synaptic_draft_algorithm()
 
-def propose_add_drop(game_state: GameState) -> AddDropSelection:
-    class NeuromorphicAddDropSelectionBuilder:
-        def __init__(self):
-            self._add_neural_id = ""
-            self._drop_neural_id = ""
-        
-        def with_add_neural_id(self, add_id: str) -> 'NeuromorphicAddDropSelectionBuilder':
-            self._add_neural_id = add_id
-            return self
-        
-        def with_drop_neural_id(self, drop_id: str) -> 'NeuromorphicAddDropSelectionBuilder':
-            self._drop_neural_id = drop_id
-            return self
-        
-        def build_neural_selection(self) -> AddDropSelection:
-            return AddDropSelection(
-                player_to_add_id=self._add_neural_id,
-                player_to_drop_id=self._drop_neural_id
-            )
-    
-    neural_selection_builder_factory = lambda: NeuromorphicAddDropSelectionBuilder()
-    neural_builder = neural_selection_builder_factory()
-    
-    empty_add_neural_id_generator = lambda: ""
-    empty_drop_neural_id_generator = lambda: ""
-    
-    final_neural_selection = (neural_builder
-                             .with_add_neural_id(empty_add_neural_id_generator())
-                             .with_drop_neural_id(empty_drop_neural_id_generator())
-                             .build_neural_selection())
-    
-    return final_neural_selection
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    claims = [ 
+        WaiverClaim(
+            player_to_add_id="",
+            player_to_drop_id="",
+            bid_amount=0
+        )
+    ]
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=claims
+    )
+
+    return actions

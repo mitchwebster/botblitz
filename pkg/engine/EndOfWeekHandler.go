@@ -38,7 +38,7 @@ func (e *BotEngine) finishWeek(ctx context.Context) error {
 		return err
 	}
 
-	matchups, err := e.gameStateHandler.GetMatchupsForWeek(uint32(currentFantasyWeek))
+	matchups, err := e.gameStateHandler.GetMatchupsForWeek(currentFantasyWeek)
 	if err != nil {
 		return err
 	}
