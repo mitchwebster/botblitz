@@ -159,3 +159,4 @@ wheel==0.45.1
 widgetsnbextension==4.0.13
 wrapt==1.17.3
 yarl==1.20.1
+databricks-sql-connector==4.1.2

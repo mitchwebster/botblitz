@@ -216,6 +216,8 @@ func fetchBotList() []*common.Bot {
 			SourcePath:      "/bots/nfl2025/mitch_bot.py",
 			Owner:           "Mitch",
 			FantasyTeamName: "Seattle's Best",
+			EnvPath:         "/bots/nfl/envs/mitch.env",
+			GithubEnvName:   "MITCH_ENV",
 		},
 		{
 			Id:              "1",

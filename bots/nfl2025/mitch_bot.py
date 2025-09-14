@@ -1,8 +1,14 @@
 # from blitz_env.simulate_draft_sqlite import simulate_draft, visualize_draft_board
 from blitz_env import WaiverClaim, AttemptedFantasyActions
 from blitz_env.models import DatabaseManager
+from databricks import sql
 import pandas as pd
 import json
+import os
+
+def get_current_fantasy_week(db):
+    df = pd.read_sql("SELECT * FROM game_statuses", db.engine)
+    return df.iloc[0]["current_fantasy_week"]
 
 def get_player_history(db, player_id):
     history_df = pd.read_sql(f"SELECT * FROM season_stats where fantasypros_id = '{player_id}'", db.engine)
@@ -133,17 +139,48 @@ def draft_player() -> str:
     finally:
         db.close()
 
-def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    claims = [ 
-        WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=0
-        )
-    ]
 
-    actions = AttemptedFantasyActions(
-        waiver_claims=claims
+
+def fetch_add_drop_recommendations(current_week):
+    token = os.getenv("MITCH_TOKEN")
+
+    connection = sql.connect(
+        server_hostname="dbc-c877a1b9-86b4.cloud.databricks.com",
+        http_path="/sql/1.0/warehouses/a3b175012721a623",
+        access_token=token
     )
 
-    return actions
+    cursor = connection.cursor()
+    cursor.execute(f"SELECT * FROM botblitz.gs_2025.add_drop_recommendations WHERE week = {current_week} ORDER BY rank ASC")
+
+    # Get column names from cursor.description
+    columns = [desc[0] for desc in cursor.description]
+
+    # Convert results into a DataFrame
+    df = pd.DataFrame(cursor.fetchall(), columns=columns)
+
+    cursor.close()
+    connection.close()
+    return df
+
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    db = DatabaseManager()
+    try:
+        current_week = get_current_fantasy_week(db)
+        recommendations = fetch_add_drop_recommendations(current_week)
+
+        claims = []
+        for index, row in recommendations.iterrows():
+            claims.append(WaiverClaim(
+                player_to_add_id=row['playerIdToAdd'],
+                player_to_drop_id=row['playerIdToDrop'],
+                bid_amount=row['bidAmount']
+            ))
+
+        actions = AttemptedFantasyActions(
+            waiver_claims=claims
+        )
+
+        return actions
+    finally:
+        db.close()
