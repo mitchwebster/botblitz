@@ -563,3 +563,52 @@ func TestFAABWithRepeatedClaimsAndMultiplePlayers(t *testing.T) {
 		t.Error("Expected playerE to be dropped for winning playerY claim")
 	}
 }
+
+func TestBugReport(t *testing.T) {
+	bots := []gamestate.Bot{
+		{ID: "bot1", RemainingWaiverBudget: 100},
+		{ID: "bot2", RemainingWaiverBudget: 100},
+	}
+
+	botRankingMap := map[string]BotRanking{
+		"bot1": BotRanking{
+			Ranking:      1,
+			TotalPoints:  10,
+			MatchupsWon:  1,
+			MatchupsLost: 0,
+		},
+		"bot2": BotRanking{
+			Ranking:      2,
+			TotalPoints:  5,
+			MatchupsWon:  0,
+			MatchupsLost: 1,
+		},
+	}
+
+	botSelectionMap := map[string][]*common.WaiverClaim{
+		"bot1": {
+			// Multiple claims for playerX
+			{PlayerToDropId: "playerM", PlayerToAddId: "playerN", BidAmount: 0},
+			{PlayerToDropId: "playerB", PlayerToAddId: "playerA", BidAmount: 15},
+			{PlayerToDropId: "playerB", PlayerToAddId: "playerC", BidAmount: 10},
+			{PlayerToDropId: "playerB", PlayerToAddId: "playerD", BidAmount: 5},
+		},
+		"bot2": {
+			// Competing for both players
+			{PlayerToDropId: "playerG", PlayerToAddId: "playerA", BidAmount: 50},
+			{PlayerToDropId: "playerE", PlayerToAddId: "playerY", BidAmount: 60},
+		},
+	}
+
+	winningClaims := performFAABAddDropInternal(bots, botSelectionMap, botRankingMap)
+
+	// Check playerX goes to bot1 with highest bid
+	if claims, exists := winningClaims["bot1"]; !exists || len(claims) != 2 || claims[0].BidAmount != 0 || claims[1].BidAmount != 10 {
+		t.Errorf("Expected bot1 to win playerX with bid 50")
+	}
+
+	// Check playerY goes to bot2
+	if claim, exists := winningClaims["bot2"]; !exists || len(claim) != 1 || claim[0].BidAmount != 50 {
+		t.Errorf("Expected bot2 to win playerY with bid 60")
+	}
+}

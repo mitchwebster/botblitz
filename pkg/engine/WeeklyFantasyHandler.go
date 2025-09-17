@@ -287,6 +287,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 
 		for i := 0; i < MaxAddDropsPerRun; i++ {
 			foundWinner := false
+			wereEntriesRemoved := false
 
 			// go through this round of claims and see if any are winners
 			for bot, claims := range botSelectionMap {
@@ -297,6 +298,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 				// Validate this bot can actually pay for the player
 				if claims[i].BidAmount > uint32(remainingBudgetMap[bot]) {
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					wereEntriesRemoved = true
 					continue
 				}
 
@@ -304,6 +306,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 				_, exists := droppedPlayers[claims[i].PlayerToDropId]
 				if exists {
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					wereEntriesRemoved = true
 					continue
 				}
 
@@ -311,6 +314,7 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 				_, exists = playersAlreadyAdded[claims[i].PlayerToAddId]
 				if exists {
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					wereEntriesRemoved = true
 					continue
 				}
 
@@ -335,8 +339,13 @@ func performFAABAddDropInternal(bots []gamestate.Bot, originalSelectionMap map[s
 
 					winningClaims[bot] = append(winningClaims[bot], claims[i])
 					botSelectionMap[bot] = append(claims[:i], claims[i+1:]...)
+					wereEntriesRemoved = true
 					break
 				}
+			}
+
+			if wereEntriesRemoved {
+				i--
 			}
 
 			if foundWinner {
