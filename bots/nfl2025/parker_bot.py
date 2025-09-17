@@ -182,9 +182,19 @@ def draft_player() -> str:
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     claims = [ 
         WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=0
+            player_to_add_id="18232",
+            player_to_drop_id="23107",
+            bid_amount=30
+        ),
+        WaiverClaim(
+            player_to_add_id="25391",
+            player_to_drop_id="22718",
+            bid_amount=15
+        ),
+        WaiverClaim(
+            player_to_add_id="27297",
+            player_to_drop_id="27165",
+            bid_amount=10
         )
     ]
 
