@@ -156,6 +156,20 @@ def draft_player() -> str:
     
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    db = DatabaseManager()
+    current_team_id = db.get_game_status().current_bot_id
+    team_players = db.session.query(Player).filter(
+        Player.availability == 'DRAFTED',
+        Player.current_bot_id == current_team_id
+    ).order_by(Player.rank).all()
+    team_state = TeamState(team_players)
+
+    game_status = db.get_game_status()
+
+    # Avoid off by one in case I misunderstand when week 3 starts
+    if game_status.current_fantasy_week == 2 or game_status.current_fantasy_week == 3:
+        return week_3_waivers(team_state=team_state)
+    
     claims = [ 
         WaiverClaim(
             player_to_add_id="",
@@ -172,6 +186,70 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
 
 
 
+def week_3_waivers(team_state: TeamState) -> AttemptedFantasyActions:
+    """
+    We gon' drop Ekeler since he ded. RIP my RB1 prince
+    """
+    # rbs = team_state.drafted_rbs
+    ekeler_id = 16483
+    ford_id = 22921	
 
-    ### Algorithm
-    # Get players 
+    add_rbs = [
+        (25391, 11),    # Quinshon Judkins
+        (27297, 11),    # Bhayshul Tuten
+        (27166, 11),    # Cam Skattebo
+        (25388, 5),     # Trey Benson	
+        (17246, 5),     # Nick Chubb
+        (23891, 2),     # Rachaad White
+    ]
+
+    waiver_claims = []
+
+    for rb in add_rbs:
+        # Create all "drop Ekeler" claims
+        claim = WaiverClaim(
+                player_to_add_id=rb[0],
+                player_to_drop_id=ekeler_id,
+                bid_amount=rb[1]
+            )
+        waiver_claims.append(claim)
+
+    for rb in add_rbs:
+        # Create all "drop Ford" claims, after Ekeler
+        claim = WaiverClaim(
+                player_to_add_id=rb[0],
+                player_to_drop_id=ford_id,
+                bid_amount=rb[1]
+            )
+        waiver_claims.append(claim)
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=waiver_claims
+    )
+
+    return actions
+
+
+
+# My team:
+# QBs:
+# - Jalen Hurts, PHI
+# - Patrick Mahomes, KC
+#
+# WRs:
+# - Tyreek Hill, MIA
+# - DK Metcalf, PIT
+# - Zay Flowers, BAL
+# - Jerry Jeudy, CLE
+# - Deebo Samuel, WAS
+#
+# RBs:
+# - Austin Ekeler, WAS
+# - Jacory Croskey-Merrit, WAS
+# - Jerome Ford, CLE
+#
+# K
+# Wil Lutz, DEN
+#
+# DST
+# LA Rams
