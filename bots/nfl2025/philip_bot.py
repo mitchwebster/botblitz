@@ -475,7 +475,7 @@ class PhilipFantasyBot:
             print(f"AI waiver prompt sent with {len(my_team)} roster players and {len(available_players)} available")
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-5",
                 messages=[{"role": "user", "content": prompt}],
             )
             
@@ -544,7 +544,37 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                     drop_player = my_team[my_team["full_name"] == rec["drop_player"]]
                     
                     if not add_player.empty and not drop_player.empty:
-                        bid_amount = min(35, max(5, rec.get("bid_amount", 10)))  # Ensure reasonable bid
+                        # Override AI bid with our own logic based on ranks and position
+                        add_rank = add_player.iloc[0]["rank"]
+                        drop_rank = drop_player.iloc[0]["rank"]
+                        
+                        # Only make move if adding player is significantly better ranked
+                        if add_rank >= drop_rank - 10:  # Not a clear upgrade
+                            print(f"Skipping AI recommendation - not a clear upgrade: Add rank {add_rank} vs Drop rank {drop_rank}")
+                            continue
+                            
+                        # Calculate conservative bid based on rank difference
+                        rank_diff = drop_rank - add_rank
+                        if rank_diff > 50:
+                            bid_amount = 3  # Big upgrade
+                        elif rank_diff > 25:
+                            bid_amount = 2  # Good upgrade  
+                        else:
+                            bid_amount = 1  # Small upgrade
+                            
+                        # Special cases - avoid expensive D/ST and K moves
+                        add_positions = []
+                        if add_player.iloc[0]["allowed_positions"]:
+                            if isinstance(add_player.iloc[0]["allowed_positions"], str):
+                                try:
+                                    add_positions = json.loads(add_player.iloc[0]["allowed_positions"])
+                                except json.JSONDecodeError:
+                                    add_positions = []
+                            else:
+                                add_positions = add_player.iloc[0]["allowed_positions"]
+                        
+                        if add_positions and add_positions[0] in ['DST', 'K']:
+                            bid_amount = 1  # Never bid more than $1 on D/ST or K
                         
                         print(f"AI Waiver claim: Add {rec['add_player']} - Drop {rec['drop_player']}")
                         print(f"                 Bid: ${bid_amount}")
