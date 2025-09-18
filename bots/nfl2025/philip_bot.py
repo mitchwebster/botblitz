@@ -248,7 +248,7 @@ class PhilipFantasyBot:
             print(f"AI prompt sent with {len(top_players)} available players")
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4",
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -435,41 +435,44 @@ class PhilipFantasyBot:
             prompt = f"""
             You are a fantasy football expert analyzing waiver wire moves for the current NFL season.
             
-            SITUATION: Team is in LAST PLACE and needs aggressive moves to catch up.
+            CRITICAL CONTEXT:
+            - Team is in LAST PLACE but only has $20 FAAB left for ENTIRE SEASON
+            - Must be EXTREMELY selective - most weeks should make NO moves
+            - Ranks shown are preseason - lower rank number = better player
+            - Focus on OBVIOUS upgrades only (rank difference of 20+ spots)
             
             Current Roster: {', '.join(team_summary)}
             
             Available Players by Position:
             {json.dumps(available_by_pos, indent=2)}
             
-            CRITICAL: We only have $20 FAAB left for the ENTIRE REST OF THE SEASON! Be EXTREMELY selective.
+            STRICT RULES:
+            1. NEVER suggest D/ST or Kicker swaps unless current player is injured
+            2. ONLY suggest moves where add player has rank 20+ spots better than drop
+            3. AVOID lateral moves (similar ranked players)
+            4. Prioritize RB/WR with clear opportunity (starter injured, etc.)
+            5. Most weeks should return empty array [] to save budget
             
-            EMERGENCY STRATEGY:
-            1. ONLY bid on strong pickups
-            2. ONLY drop players who are worthless (injured for season, cut, etc.)
-            3. NO D/ST or Kicker moves unless $0-1 bid
+            EXAMPLES OF GOOD MOVES:
+            - Add: Rank 30 RB, Drop: Rank 80 RB (clear upgrade)
+            - Add: Rank 25 WR, Drop: Injured player (necessity)
             
-            BIDDING GUIDELINES (VERY CONSERVATIVE):
-            - League-winning pickup (new starter due to injury): 3
-            - Good breakout candidate: 2
-            - Streaming/depth: 1
-            - Defense/Kicker: 1 (shouldn't do this unless you're desperate)
+            EXAMPLES OF BAD MOVES:
+            - Add: Rank 45 player, Drop: Rank 50 player (lateral)  
+            - Any D/ST or Kicker swap unless injury
+            - Speculative adds when drop player is still useful
             
-            Return AT MOST 5 moves in this JSON format:
+            Return AT MOST 1-2 moves (usually 0!) in this JSON format:
             [
                 {{
                     "add_player": "Exact Player Name",
                     "drop_player": "Exact Player Name", 
                     "bid_amount": 1,
-                    "reasoning": "This is a must-have pickup worth spending precious FAAB"
+                    "reasoning": "Clear rank upgrade and drop player is expendable"
                 }}
             ]
             
-            Only suggest moves where:
-            1. The pickup could genuinely save our season
-            2. We're confident this is worth our limited budget
-            
-            Remember: Most weeks should return an empty array [] to preserve budget!
+            Be VERY conservative - we can't afford mistakes with only $20 left!
             """
             
             print(f"AI waiver prompt sent with {len(my_team)} roster players and {len(available_players)} available")
