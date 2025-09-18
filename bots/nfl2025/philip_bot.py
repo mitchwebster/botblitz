@@ -132,7 +132,8 @@ class PhilipFantasyBot:
             scarcity_multiplier = 1 + (scarcity_scores.get(primary_pos, 0) * 0.5)
             
             # Rank-based value (lower rank = higher value)
-            rank_value = max(0, 100 - player["rank"])
+            # Since rank 1 is best, we need to invert: better ranks get higher values
+            rank_value = max(0, 500 - player["rank"])
             
             # Tier-based value
             tier_value = max(0, 10 - player["position_tier"]) * 10
@@ -221,8 +222,8 @@ class PhilipFantasyBot:
                 pos_str = ", ".join(positions) if positions else "Unknown"
                 team_summary.append(f"{player['full_name']} ({pos_str}) - Rank {player['rank']}")
             
-            # Top available players
-            top_players = available_players.nlargest(200, "rank")["full_name"].tolist()
+            # Top available players (lowest rank numbers are best)
+            top_players = available_players.nsmallest(200, "rank")["full_name"].tolist()
             
             prompt = f"""
             You are a fantasy football expert helping with draft strategy for the 2025 NFL season.
@@ -396,19 +397,145 @@ def draft_player() -> str:
     return bot.draft_player()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    claims = [ 
-        WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=0
-        )
-    ]
-
-    actions = AttemptedFantasyActions(
-        waiver_claims=claims
-    )
-
-    return actions
+    """
+    Perform weekly add/drop actions using waiver claims
+    
+    Strategy:
+    1. Identify underperforming players on roster
+    2. Find better available players at same positions
+    3. Make strategic waiver claims with appropriate bid amounts
+    """
+    try:
+        bot = PhilipFantasyBot()
+        
+        # Get current team and available players
+        my_team = bot.get_my_team()
+        available_players = bot.get_available_players()
+        projections_df = bot.get_projections_data()
+        
+        print(f"=== Weekly Fantasy Actions ===")
+        print(f"Current roster size: {len(my_team)}")
+        print(f"Available players: {len(available_players)}")
+        
+        if my_team.empty or available_players.empty:
+            print("No team or no available players - no actions needed")
+            return AttemptedFantasyActions(waiver_claims=[])
+        
+        # Calculate position scarcity for available players
+        scarcity_scores = bot.calculate_position_scarcity(available_players)
+        
+        # Evaluate all available players
+        available_player_values = []
+        for _, player in available_players.iterrows():
+            value = bot.calculate_player_value(player, projections_df, scarcity_scores)
+            
+            # Get player position safely
+            positions = []
+            if player['allowed_positions']:
+                if isinstance(player['allowed_positions'], str):
+                    try:
+                        positions = json.loads(player['allowed_positions'])
+                    except json.JSONDecodeError:
+                        positions = []
+                else:
+                    positions = player['allowed_positions']
+            
+            if positions and value > -1000:  # Only consider valid players
+                available_player_values.append({
+                    'id': player['id'],
+                    'name': player['full_name'],
+                    'position': positions[0],
+                    'rank': player['rank'],
+                    'value': value
+                })
+        
+        # Sort available players by value
+        available_player_values.sort(key=lambda x: x['value'], reverse=True)
+        
+        # Evaluate current roster players
+        roster_player_values = []
+        for _, player in my_team.iterrows():
+            value = bot.calculate_player_value(player, projections_df, scarcity_scores)
+            
+            positions = []
+            if player['allowed_positions']:
+                if isinstance(player['allowed_positions'], str):
+                    try:
+                        positions = json.loads(player['allowed_positions'])
+                    except json.JSONDecodeError:
+                        positions = []
+                else:
+                    positions = player['allowed_positions']
+            
+            if positions:
+                roster_player_values.append({
+                    'id': player['id'],
+                    'name': player['full_name'],
+                    'position': positions[0],
+                    'rank': player['rank'],
+                    'value': value
+                })
+        
+        # Sort roster players by value (lowest first - these are drop candidates)
+        roster_player_values.sort(key=lambda x: x['value'])
+        
+        claims = []
+        
+        # Look for upgrade opportunities
+        for roster_player in roster_player_values[:5]:  # Check bottom 5 roster players
+            position = roster_player['position']
+            
+            # Find best available player at same position
+            best_available = None
+            for avail_player in available_player_values:
+                if avail_player['position'] == position:
+                    # Only consider if significantly better (value difference > 50)
+                    if avail_player['value'] - roster_player['value'] > 50:
+                        best_available = avail_player
+                        break
+            
+            if best_available:
+                # Calculate bid amount based on value difference and position scarcity
+                value_diff = best_available['value'] - roster_player['value']
+                scarcity_factor = scarcity_scores.get(position, 0)
+                
+                # Base bid: 10% of budget, increase for high value differences and scarcity
+                base_bid = 10
+                value_bonus = min(20, int(value_diff / 10))  # Up to 20 extra for value
+                scarcity_bonus = int(scarcity_factor * 15)   # Up to 15 extra for scarcity
+                
+                bid_amount = base_bid + value_bonus + scarcity_bonus
+                bid_amount = min(100, bid_amount)  # Cap at 100
+                
+                print(f"Waiver claim: Add {best_available['name']} (Rank {best_available['rank']}, Value {best_available['value']:.1f})")
+                print(f"              Drop {roster_player['name']} (Rank {roster_player['rank']}, Value {roster_player['value']:.1f})")
+                print(f"              Bid: ${bid_amount} (Value diff: {value_diff:.1f})")
+                
+                claims.append(WaiverClaim(
+                    player_to_add_id=best_available['id'],
+                    player_to_drop_id=roster_player['id'],
+                    bid_amount=bid_amount
+                ))
+                
+                # Remove claimed player from available list to avoid double-claiming
+                available_player_values = [p for p in available_player_values if p['id'] != best_available['id']]
+                
+                # Limit to 3 claims per week to avoid over-churning
+                if len(claims) >= 3:
+                    break
+        
+        if not claims:
+            print("No beneficial waiver claims identified")
+            # Return empty claims list instead of a claim with empty strings
+            return AttemptedFantasyActions(waiver_claims=[])
+        
+        print(f"Submitting {len(claims)} waiver claims")
+        return AttemptedFantasyActions(waiver_claims=claims)
+        
+    except Exception as e:
+        print(f"Error in perform_weekly_fantasy_actions: {e}")
+        # Return empty claims on error
+        return AttemptedFantasyActions(waiver_claims=[])
 
 # Test the bot if run directly
 if __name__ == "__main__":
