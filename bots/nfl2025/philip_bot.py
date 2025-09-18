@@ -226,7 +226,7 @@ class PhilipFantasyBot:
             top_players = available_players.nsmallest(200, "rank")["full_name"].tolist()
             
             prompt = f"""
-            You are a fantasy football expert helping with draft strategy for the 2025 NFL season.
+            You are a fantasy football expert helping with draft strategy for the current NFL season.
             
             Current Situation:
             - Round {current_round} of {total_rounds}
@@ -433,7 +433,7 @@ class PhilipFantasyBot:
                 available_by_pos[pos] = available_by_pos[pos][:10]
             
             prompt = f"""
-            You are a fantasy football expert analyzing waiver wire moves for the 2025 NFL season.
+            You are a fantasy football expert analyzing waiver wire moves for the current NFL season.
             
             SITUATION: Team is in LAST PLACE and needs aggressive moves to catch up.
             
@@ -445,33 +445,29 @@ class PhilipFantasyBot:
             CRITICAL: We only have $20 FAAB left for the ENTIRE REST OF THE SEASON! Be EXTREMELY selective.
             
             EMERGENCY STRATEGY:
-            1. ONLY bid on potential league-winning pickups (clear RB1/WR1 opportunities)
-            2. ONLY drop players who are completely worthless (injured for season, cut, etc.)
+            1. ONLY bid on strong pickups
+            2. ONLY drop players who are worthless (injured for season, cut, etc.)
             3. NO D/ST or Kicker moves unless $0-1 bid
-            4. Save most budget for playoffs or major injuries to stars
-            5. Most weeks should be $0 bids or no moves at all
             
             BIDDING GUIDELINES (VERY CONSERVATIVE):
-            - League-winning pickup (new starter due to injury): 8-12
-            - Good breakout candidate: 3-5
-            - Streaming/depth: 1-2
-            - Defense/Kicker: 0-1 ONLY
+            - League-winning pickup (new starter due to injury): 3
+            - Good breakout candidate: 2
+            - Streaming/depth: 1
+            - Defense/Kicker: 1 (shouldn't do this unless you're desperate)
             
-            Return AT MOST 1-2 moves (often 0!) in this JSON format:
+            Return AT MOST 5 moves in this JSON format:
             [
                 {{
                     "add_player": "Exact Player Name",
                     "drop_player": "Exact Player Name", 
-                    "bid_amount": 3,
+                    "bid_amount": 1,
                     "reasoning": "This is a must-have pickup worth spending precious FAAB"
                 }}
             ]
             
             Only suggest moves where:
             1. The pickup could genuinely save our season
-            2. The drop player has ZERO value going forward
-            3. Total bids don't exceed $8-10 per week MAX
-            4. We're confident this is worth our limited budget
+            2. We're confident this is worth our limited budget
             
             Remember: Most weeks should return an empty array [] to preserve budget!
             """
@@ -649,13 +645,13 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                     # ULTRA conservative bidding - only $20 left for entire season!
                     # Base bid: 1-6 depending on value difference (emergency mode)
                     if value_diff > 300:
-                        base_bid = 6   # Must-have pickup
+                        base_bid = 3   # Must-have pickup
                     elif value_diff > 250:
-                        base_bid = 4   # Excellent upgrade
+                        base_bid = 2   # Excellent upgrade
                     elif value_diff > 200:
-                        base_bid = 3   # Very good upgrade
+                        base_bid = 1   # Very good upgrade
                     else:
-                        base_bid = 2   # Good upgrade
+                        base_bid = 1   # Good upgrade
                     
                     # Minimal bonuses to preserve precious budget
                     value_bonus = min(2, int(value_diff / 100))  # Up to 2 extra for exceptional value
