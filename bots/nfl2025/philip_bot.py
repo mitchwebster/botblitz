@@ -481,16 +481,16 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
         
         claims = []
         
-        # Look for upgrade opportunities
-        for roster_player in roster_player_values[:5]:  # Check bottom 5 roster players
+        # Look for upgrade opportunities - check more players since we're in last place
+        for roster_player in roster_player_values[:8]:  # Check bottom 8 roster players (was 5)
             position = roster_player['position']
             
             # Find best available player at same position
             best_available = None
             for avail_player in available_player_values:
                 if avail_player['position'] == position:
-                    # Only consider if significantly better (value difference > 50)
-                    if avail_player['value'] - roster_player['value'] > 50:
+                    # Lower threshold since we need to catch up (was 50, now 30)
+                    if avail_player['value'] - roster_player['value'] > 30:
                         best_available = avail_player
                         break
             
@@ -499,13 +499,21 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                 value_diff = best_available['value'] - roster_player['value']
                 scarcity_factor = scarcity_scores.get(position, 0)
                 
-                # Base bid: 10% of budget, increase for high value differences and scarcity
-                base_bid = 10
-                value_bonus = min(20, int(value_diff / 10))  # Up to 20 extra for value
-                scarcity_bonus = int(scarcity_factor * 15)   # Up to 15 extra for scarcity
+                # Aggressive bidding strategy for last place team - need to catch up now!
+                # Base bid: 8-15 depending on value difference (higher than conservative teams)
+                if value_diff > 150:
+                    base_bid = 15  # High value upgrade - go big
+                elif value_diff > 100:
+                    base_bid = 11  # Good upgrade - be competitive
+                else:
+                    base_bid = 6   # Modest upgrade - still worth it
+                
+                # Meaningful bonuses for scarcity and value - we need wins now
+                value_bonus = min(10, int(value_diff / 25))  # Up to 10 extra for huge value
+                scarcity_bonus = int(scarcity_factor * 8)    # Up to 8 extra for scarcity
                 
                 bid_amount = base_bid + value_bonus + scarcity_bonus
-                bid_amount = min(100, bid_amount)  # Cap at 100
+                bid_amount = min(35, bid_amount)  # Cap at 35 - willing to spend big on key players
                 
                 print(f"Waiver claim: Add {best_available['name']} (Rank {best_available['rank']}, Value {best_available['value']:.1f})")
                 print(f"              Drop {roster_player['name']} (Rank {roster_player['rank']}, Value {roster_player['value']:.1f})")
@@ -520,8 +528,8 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                 # Remove claimed player from available list to avoid double-claiming
                 available_player_values = [p for p in available_player_values if p['id'] != best_available['id']]
                 
-                # Limit to 3 claims per week to avoid over-churning
-                if len(claims) >= 3:
+                # Allow more claims per week since we need to catch up (max 6 vs previous 3)
+                if len(claims) >= 6:
                     break
         
         if not claims:
