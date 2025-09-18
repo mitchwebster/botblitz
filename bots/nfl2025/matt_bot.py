@@ -208,8 +208,8 @@ def week_3_waivers(team_state: TeamState) -> AttemptedFantasyActions:
     for rb in add_rbs:
         # Create all "drop Ekeler" claims
         claim = WaiverClaim(
-                player_to_add_id=rb[0],
-                player_to_drop_id=ekeler_id,
+                player_to_add_id=str(rb[0]),
+                player_to_drop_id=str(ekeler_id),
                 bid_amount=rb[1]
             )
         waiver_claims.append(claim)
@@ -217,8 +217,8 @@ def week_3_waivers(team_state: TeamState) -> AttemptedFantasyActions:
     for rb in add_rbs:
         # Create all "drop Ford" claims, after Ekeler
         claim = WaiverClaim(
-                player_to_add_id=rb[0],
-                player_to_drop_id=ford_id,
+                player_to_add_id=str(rb[0]),
+                player_to_drop_id=str(ford_id),
                 bid_amount=rb[1]
             )
         waiver_claims.append(claim)
