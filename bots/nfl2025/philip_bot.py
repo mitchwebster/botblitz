@@ -654,11 +654,11 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                         base_bid = 1   # Good upgrade
                     
                     # Minimal bonuses to preserve precious budget
-                    value_bonus = min(2, int(value_diff / 100))  # Up to 2 extra for exceptional value
+                    value_bonus = min(1, int(value_diff / 100))  # Up to 2 extra for exceptional value
                     scarcity_bonus = int(scarcity_factor * 1)    # Up to 1 extra for scarcity
                     
                     bid_amount = base_bid + value_bonus + scarcity_bonus
-                    bid_amount = min(8, bid_amount)  # Cap at 8 to make budget last
+                    bid_amount = min(3, bid_amount) # Cap max spend
                     
                     print(f"Fallback claim: Add {best_available['name']} (Rank {best_available['rank']}, Value {best_available['value']:.1f})")
                     print(f"                Drop {roster_player['name']} (Rank {roster_player['rank']}, Value {roster_player['value']:.1f})")
