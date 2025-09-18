@@ -442,25 +442,38 @@ class PhilipFantasyBot:
             Available Players by Position:
             {json.dumps(available_by_pos, indent=2)}
             
-            STRATEGY: We need to be aggressive since we're behind. Consider:
-            1. Drop underperforming/injured players
-            2. Target breakout candidates and players with good matchups
-            3. Prioritize RB/WR depth and streaming options
-            4. Don't be afraid to churn roster spots
-            5. Focus on players with upside over safe floor plays
+            CRITICAL: We only have $20 FAAB left for the ENTIRE REST OF THE SEASON! Be EXTREMELY selective.
             
-            Return EXACTLY 3-5 waiver moves in this JSON format:
+            EMERGENCY STRATEGY:
+            1. ONLY bid on potential league-winning pickups (clear RB1/WR1 opportunities)
+            2. ONLY drop players who are completely worthless (injured for season, cut, etc.)
+            3. NO D/ST or Kicker moves unless $0-1 bid
+            4. Save most budget for playoffs or major injuries to stars
+            5. Most weeks should be $0 bids or no moves at all
+            
+            BIDDING GUIDELINES (VERY CONSERVATIVE):
+            - League-winning pickup (new starter due to injury): 8-12
+            - Good breakout candidate: 3-5
+            - Streaming/depth: 1-2
+            - Defense/Kicker: 0-1 ONLY
+            
+            Return AT MOST 1-2 moves (often 0!) in this JSON format:
             [
                 {{
                     "add_player": "Exact Player Name",
                     "drop_player": "Exact Player Name", 
-                    "bid_amount": 15,
-                    "reasoning": "Why this move makes sense"
+                    "bid_amount": 3,
+                    "reasoning": "This is a must-have pickup worth spending precious FAAB"
                 }}
             ]
             
-            Only suggest moves where both players exist in the lists above.
-            Bid amounts should be 5-25 for aggressive last-place strategy noting that we only have a budget of 100 for the whole season.
+            Only suggest moves where:
+            1. The pickup could genuinely save our season
+            2. The drop player has ZERO value going forward
+            3. Total bids don't exceed $8-10 per week MAX
+            4. We're confident this is worth our limited budget
+            
+            Remember: Most weeks should return an empty array [] to preserve budget!
             """
             
             print(f"AI waiver prompt sent with {len(my_team)} roster players and {len(available_players)} available")
@@ -615,16 +628,16 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
             # Sort roster players by value (lowest first - these are drop candidates)
             roster_player_values.sort(key=lambda x: x['value'])
             
-            # Look for upgrade opportunities - check more players since we're in last place
-            for roster_player in roster_player_values[:8]:  # Check bottom 8 roster players
+            # Look for upgrade opportunities - be more selective to preserve FAAB
+            for roster_player in roster_player_values[:5]:  # Check bottom 5 roster players (reduced from 8)
                 position = roster_player['position']
                 
                 # Find best available player at same position
                 best_available = None
                 for avail_player in available_player_values:
                     if avail_player['position'] == position:
-                        # Lower threshold since we need to catch up (was 50, now 30)
-                        if avail_player['value'] - roster_player['value'] > 30:
+                        # VERY high threshold since we only have $20 left (was 75, now 150)
+                        if avail_player['value'] - roster_player['value'] > 150:
                             best_available = avail_player
                             break
                 
@@ -633,21 +646,23 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                     value_diff = best_available['value'] - roster_player['value']
                     scarcity_factor = scarcity_scores.get(position, 0)
                     
-                    # Aggressive bidding strategy for last place team - need to catch up now!
-                    # Base bid: 6-15 depending on value difference (higher than conservative teams)
-                    if value_diff > 150:
-                        base_bid = 15  # High value upgrade - go big
-                    elif value_diff > 100:
-                        base_bid = 11  # Good upgrade - be competitive
+                    # ULTRA conservative bidding - only $20 left for entire season!
+                    # Base bid: 1-6 depending on value difference (emergency mode)
+                    if value_diff > 300:
+                        base_bid = 6   # Must-have pickup
+                    elif value_diff > 250:
+                        base_bid = 4   # Excellent upgrade
+                    elif value_diff > 200:
+                        base_bid = 3   # Very good upgrade
                     else:
-                        base_bid = 6   # Modest upgrade - still worth it
+                        base_bid = 2   # Good upgrade
                     
-                    # Meaningful bonuses for scarcity and value - we need wins now
-                    value_bonus = min(10, int(value_diff / 25))  # Up to 10 extra for huge value
-                    scarcity_bonus = int(scarcity_factor * 8)    # Up to 8 extra for scarcity
+                    # Minimal bonuses to preserve precious budget
+                    value_bonus = min(2, int(value_diff / 100))  # Up to 2 extra for exceptional value
+                    scarcity_bonus = int(scarcity_factor * 1)    # Up to 1 extra for scarcity
                     
                     bid_amount = base_bid + value_bonus + scarcity_bonus
-                    bid_amount = min(35, bid_amount)  # Cap at 35 - willing to spend big on key players
+                    bid_amount = min(8, bid_amount)  # Cap at 8 to make budget last
                     
                     print(f"Fallback claim: Add {best_available['name']} (Rank {best_available['rank']}, Value {best_available['value']:.1f})")
                     print(f"                Drop {roster_player['name']} (Rank {roster_player['rank']}, Value {roster_player['value']:.1f})")
@@ -662,8 +677,8 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                     # Remove claimed player from available list to avoid double-claiming
                     available_player_values = [p for p in available_player_values if p['id'] != best_available['id']]
                     
-                    # Allow more claims per week since we need to catch up (max 6 vs previous 3)
-                    if len(claims) >= 6:
+                    # Extremely limited claims due to low budget (max 1-2)
+                    if len(claims) >= 2:
                         break
         
         if not claims:
