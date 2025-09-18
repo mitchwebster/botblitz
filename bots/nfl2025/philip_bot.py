@@ -277,7 +277,7 @@ class PhilipFantasyBot:
             # Get current game state
             game_status = self.get_game_status()
             league_settings = self.get_league_settings()
-            current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1
+            current_round = ((game_status.current_draft_pick - 1) // league_settings.num_teams) + 1 if game_status.current_draft_pick else 1
             
             print(f"=== Draft Round {current_round} of {league_settings.total_rounds} ===")
             print(f"Current draft pick: {game_status.current_draft_pick}")
