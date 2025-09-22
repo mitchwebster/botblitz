@@ -45,23 +45,23 @@ function App() {
     loadDb();
   }, []);
 
-  const fetchCurrentWeek = () => {
-    if (!db) return null;
-    try {
-      const result = db.exec(
-        "SELECT current_fantasy_week FROM game_statuses LIMIT 1;"
-      );
-      if (result.length > 0 && result[0].values.length > 0) {
-        return result[0].values[0][0]; 
-      }
-    } catch (err) {
-      console.error("Failed to fetch current week:", err);
-    }
-    return null;
-  };
-
   useEffect(() => {
     if (!db) return;
+
+    const fetchCurrentWeek = () => {
+      if (!db) return null;
+      try {
+        const result = db.exec(
+          "SELECT current_fantasy_week FROM game_statuses LIMIT 1;"
+        );
+        if (result.length > 0 && result[0].values.length > 0) {
+          return result[0].values[0][0]; 
+        }
+      } catch (err) {
+        console.error("Failed to fetch current week:", err);
+      }
+      return null;
+    };
 
     const week = fetchCurrentWeek();
     if (week == null) return;
