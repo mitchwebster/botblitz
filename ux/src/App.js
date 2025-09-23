@@ -81,6 +81,20 @@ function App() {
         LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
         WHERE week = ${week}
       `,
+      last: `
+        SELECT
+          week, 
+          home_bot.name as home_bot_name, 
+          home_score, 
+          visitor_bot.name as visitor_bot_name,
+          visitor_score, 
+          winning_bot.name as winning_bot_name 
+        FROM matchups as m
+        LEFT JOIN bots AS home_bot ON m.home_bot_id = home_bot.id
+        LEFT JOIN bots AS visitor_bot ON m.visitor_bot_id = visitor_bot.id
+        LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
+        WHERE week = ${week - 1}
+      `,
       leaderboard: `
         WITH botScores AS (
           SELECT 
@@ -140,6 +154,7 @@ function App() {
 
   const tabs = [
     { key: "current", label: "Current Week" },
+    { key: "last", label: "Last Week" },
     { key: "leaderboard", label: "Leaderboard" },
     { key: "rosters", label: "Rosters" },
   ];
