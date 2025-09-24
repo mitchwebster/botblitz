@@ -170,6 +170,10 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     if game_status.current_fantasy_week == 2 or game_status.current_fantasy_week == 3:
         return week_3_waivers(team_state=team_state)
     
+    # I'm actually still not sure when the week moves from 3 > 4 lol so do this again for safety
+    if game_status.current_fantasy_week == 3 or game_status.current_fantasy_week == 4:
+        return week_4_waivers(team_state=team_state)
+    
     claims = [ 
         WaiverClaim(
             player_to_add_id="",
@@ -219,6 +223,32 @@ def week_3_waivers(team_state: TeamState) -> AttemptedFantasyActions:
         claim = WaiverClaim(
                 player_to_add_id=str(rb[0]),
                 player_to_drop_id=str(ford_id),
+                bid_amount=rb[1]
+            )
+        waiver_claims.append(claim)
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=waiver_claims
+    )
+
+    return actions
+
+def week_4_waivers(team_state: TeamState) -> AttemptedFantasyActions:
+    # Drop Jeudy
+    jeudy_id = 19201
+
+    # Players to add
+    add_players = [
+        (23123, 8),     # Quentin Johnston
+    ]
+
+    waiver_claims = []
+
+    for rb in add_players:
+        # Create all "drop Jeudy" claims - only one but that's fine
+        claim = WaiverClaim(
+                player_to_add_id=str(rb[0]),
+                player_to_drop_id=str(jeudy_id),
                 bid_amount=rb[1]
             )
         waiver_claims.append(claim)
