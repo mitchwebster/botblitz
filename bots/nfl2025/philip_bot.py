@@ -2,10 +2,27 @@ import os
 import pandas as pd
 import numpy as np
 import json
+import ast
 from typing import Dict, List, Tuple, Optional
 from openai import OpenAI
 from blitz_env.models import DatabaseManager
 from blitz_env import AttemptedFantasyActions, WaiverClaim
+
+def safe_positions(x):
+    """Safely parse allowed_positions field, handling various formats"""
+    if not x:
+        return []
+    if isinstance(x, list):
+        return x
+    if isinstance(x, str):
+        try:
+            return json.loads(x)
+        except json.JSONDecodeError:
+            try:
+                return ast.literal_eval(x)
+            except Exception:
+                return [p.strip() for p in x.split(",") if p.strip()]
+    return []
 
 class PhilipFantasyBot:
     """
@@ -49,12 +66,24 @@ class PhilipFantasyBot:
         """Get current team roster"""
         game_status = self.get_game_status()
         players_df = pd.read_sql("SELECT * FROM players", self.db.engine)
+        players_df["rank"] = pd.to_numeric(players_df["rank"], errors="coerce")
         return players_df[players_df["current_bot_id"] == game_status.current_bot_id]
     
     def get_available_players(self) -> pd.DataFrame:
-        """Get all available (undrafted) players"""
+        """Get all available (undrafted) players with reasonable filtering"""
         players_df = pd.read_sql("SELECT * FROM players", self.db.engine)
-        return players_df[players_df["availability"] == "AVAILABLE"]
+        players_df["rank"] = pd.to_numeric(players_df["rank"], errors="coerce")
+        available_players = players_df[players_df["availability"] == "AVAILABLE"]
+        
+        print(f"Total available players before filtering: {len(available_players)}")
+        
+        # Filter out players with very high ranks (likely not fantasy relevant)
+        # This is a heuristic - players with ranks > 300 are likely injured/out/not relevant
+        filtered_players = available_players[available_players["rank"] <= 350]
+        
+        print(f"Available players after rank filter: {len(filtered_players)}")
+        
+        return filtered_players
     
     def get_projections_data(self) -> pd.DataFrame:
         """Get preseason projections data"""
@@ -106,15 +135,7 @@ class PhilipFantasyBot:
         """Calculate comprehensive player value score"""
         try:
             # Get player's primary position
-            positions = []
-            if player["allowed_positions"]:
-                if isinstance(player["allowed_positions"], str):
-                    try:
-                        positions = json.loads(player["allowed_positions"])
-                    except json.JSONDecodeError:
-                        positions = []
-                else:
-                    positions = player["allowed_positions"]
+            positions = safe_positions(player["allowed_positions"])
             
             if not positions:
                 return -1000  # Invalid player
@@ -122,7 +143,9 @@ class PhilipFantasyBot:
             primary_pos = positions[0]
             
             # Base value from projections
-            player_projection = projections_df[projections_df["fantasypros_id"] == player["id"]]
+            player_projection = projections_df[
+                projections_df["fantasypros_id"] == player.get("fantasypros_id")
+            ]
             if player_projection.empty:
                 return -1000  # No projection data
             
@@ -174,15 +197,7 @@ class PhilipFantasyBot:
         # Count current players by position
         position_counts = {}
         for _, player in my_team.iterrows():
-            positions = []
-            if player["allowed_positions"]:
-                if isinstance(player["allowed_positions"], str):
-                    try:
-                        positions = json.loads(player["allowed_positions"])
-                    except json.JSONDecodeError:
-                        positions = []
-                else:
-                    positions = player["allowed_positions"]
+            positions = safe_positions(player["allowed_positions"])
             
             for pos in positions:
                 position_counts[pos] = position_counts.get(pos, 0) + 1
@@ -209,16 +224,7 @@ class PhilipFantasyBot:
             team_summary = []
             
             for _, player in my_team.iterrows():
-                positions = []
-                if player["allowed_positions"]:
-                    if isinstance(player["allowed_positions"], str):
-                        try:
-                            positions = json.loads(player["allowed_positions"])
-                        except json.JSONDecodeError:
-                            positions = []
-                    else:
-                        positions = player["allowed_positions"]
-                
+                positions = safe_positions(player["allowed_positions"])
                 pos_str = ", ".join(positions) if positions else "Unknown"
                 team_summary.append(f"{player['full_name']} ({pos_str}) - Rank {player['rank']}")
             
@@ -306,15 +312,7 @@ class PhilipFantasyBot:
             if not my_team.empty:
                 print("Current roster:")
                 for _, player in my_team.iterrows():
-                    positions = []
-                    if player["allowed_positions"]:
-                        if isinstance(player["allowed_positions"], str):
-                            try:
-                                positions = json.loads(player["allowed_positions"])
-                            except json.JSONDecodeError:
-                                positions = []
-                        else:
-                            positions = player["allowed_positions"]
+                    positions = safe_positions(player["allowed_positions"])
                     pos_str = ", ".join(positions) if positions else "Unknown"
                     print(f"  {player['full_name']} ({pos_str}) - Rank {player['rank']}")
             else:
@@ -340,16 +338,7 @@ class PhilipFantasyBot:
             for _, player in available_players.iterrows():
                 value = self.calculate_player_value(player, projections_df, scarcity_scores)
                 # Get player position safely
-                positions = []
-                if player['allowed_positions']:
-                    if isinstance(player['allowed_positions'], str):
-                        try:
-                            positions = json.loads(player['allowed_positions'])
-                        except json.JSONDecodeError:
-                            positions = []
-                    else:
-                        positions = player['allowed_positions']
-                
+                positions = safe_positions(player['allowed_positions'])
                 position = positions[0] if positions else 'Unknown'
                 
                 player_values.append({
@@ -409,28 +398,22 @@ class PhilipFantasyBot:
                 pos_str = ", ".join(positions) if positions else "Unknown"
                 team_summary.append(f"{player['full_name']} ({pos_str}) - Rank {player['rank']}")
             
-            # Top available players by position
+            # Top available players by position - properly sorted
             available_by_pos = {}
-            for _, player in available_players.iterrows():
-                positions = []
-                if player["allowed_positions"]:
-                    if isinstance(player["allowed_positions"], str):
-                        try:
-                            positions = json.loads(player["allowed_positions"])
-                        except json.JSONDecodeError:
-                            positions = []
-                    else:
-                        positions = player["allowed_positions"]
+            for pos in ["RB", "WR", "QB", "TE", "K", "DST"]:
+                # Filter players for this position
+                pos_players = available_players[
+                    available_players["allowed_positions"].apply(
+                        lambda x: pos in safe_positions(x)
+                    )
+                ].copy()
                 
-                if positions:
-                    pos = positions[0]
-                    if pos not in available_by_pos:
-                        available_by_pos[pos] = []
-                    available_by_pos[pos].append(f"{player['full_name']} (Rank {player['rank']})")
-            
-            # Limit to top 10 per position for prompt
-            for pos in available_by_pos:
-                available_by_pos[pos] = available_by_pos[pos][:10]
+                # Sort by rank and take top 10
+                pos_players = pos_players.sort_values("rank").head(10)
+                available_by_pos[pos] = [
+                    f"{row['full_name']} (Rank {int(row['rank'])})" 
+                    for _, row in pos_players.iterrows()
+                ]
             
             prompt = f"""
             You are a fantasy football expert analyzing waiver wire moves for the current NFL season.
@@ -440,6 +423,7 @@ class PhilipFantasyBot:
             - Must be EXTREMELY selective - most weeks should make NO moves
             - Ranks shown are preseason - lower rank number = better player
             - Focus on OBVIOUS upgrades only (rank difference of 20+ spots)
+            - ONLY suggest players who are ACTIVE and HEALTHY (not injured, out for season, or cut)
             
             Current Roster: {', '.join(team_summary)}
             
@@ -452,6 +436,10 @@ class PhilipFantasyBot:
             3. AVOID lateral moves (similar ranked players)
             4. Prioritize RB/WR with clear opportunity (starter injured, etc.)
             5. Most weeks should return empty array [] to save budget
+            6. NEVER suggest players who are injured, out for season, or cut
+            7. Only suggest players who are currently active and healthy
+            8. If you're unsure about a player's status, DON'T suggest them
+            9. Focus on players with ranks under 200 (more likely to be active)
             
             EXAMPLES OF GOOD MOVES:
             - Add: Rank 30 RB, Drop: Rank 80 RB (clear upgrade)
@@ -461,6 +449,8 @@ class PhilipFantasyBot:
             - Add: Rank 45 player, Drop: Rank 50 player (lateral)  
             - Any D/ST or Kicker swap unless injury
             - Speculative adds when drop player is still useful
+            - Adding injured players or players out for season
+            - Adding players who have been cut or retired
             
             Return AT MOST 1-2 moves (usually 0!) in this JSON format:
             [
@@ -509,217 +499,65 @@ def draft_player() -> str:
     return bot.draft_player()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    """
-    Perform weekly add/drop actions using AI-powered waiver recommendations
-    
-    Strategy:
-    1. Use AI to analyze roster and available players
-    2. Get specific add/drop recommendations with reasoning
-    3. Convert to waiver claims with appropriate bid amounts
-    """
-    try:
-        bot = PhilipFantasyBot()
-        
-        # Get current team and available players
-        my_team = bot.get_my_team()
-        available_players = bot.get_available_players()
-        
-        print(f"=== AI-Powered Weekly Fantasy Actions ===")
-        print(f"Current roster size: {len(my_team)}")
-        print(f"Available players: {len(available_players)}")
-        
-        if my_team.empty or available_players.empty:
-            print("No team or no available players - no actions needed")
-            return AttemptedFantasyActions(waiver_claims=[])
-        
-        # Try AI recommendations first
-        ai_recommendations = bot.get_ai_waiver_recommendations(my_team, available_players)
-        
-        claims = []
-        
-        if ai_recommendations:
-            print(f"AI provided {len(ai_recommendations)} waiver recommendations")
-            
-            for rec in ai_recommendations:
-                try:
-                    # Find player IDs
-                    add_player = available_players[available_players["full_name"] == rec["add_player"]]
-                    drop_player = my_team[my_team["full_name"] == rec["drop_player"]]
-                    
-                    if not add_player.empty and not drop_player.empty:
-                        # Override AI bid with our own logic based on ranks and position
-                        add_rank = add_player.iloc[0]["rank"]
-                        drop_rank = drop_player.iloc[0]["rank"]
-                        
-                        # Only make move if adding player is significantly better ranked
-                        if add_rank >= drop_rank - 10:  # Not a clear upgrade
-                            print(f"Skipping AI recommendation - not a clear upgrade: Add rank {add_rank} vs Drop rank {drop_rank}")
-                            continue
-                            
-                        # Calculate conservative bid based on rank difference
-                        rank_diff = drop_rank - add_rank
-                        if rank_diff > 50:
-                            bid_amount = 3  # Big upgrade
-                        elif rank_diff > 25:
-                            bid_amount = 2  # Good upgrade  
-                        else:
-                            bid_amount = 1  # Small upgrade
-                            
-                        # Special cases - avoid expensive D/ST and K moves
-                        add_positions = []
-                        if add_player.iloc[0]["allowed_positions"]:
-                            if isinstance(add_player.iloc[0]["allowed_positions"], str):
-                                try:
-                                    add_positions = json.loads(add_player.iloc[0]["allowed_positions"])
-                                except json.JSONDecodeError:
-                                    add_positions = []
-                            else:
-                                add_positions = add_player.iloc[0]["allowed_positions"]
-                        
-                        if add_positions and add_positions[0] in ['DST', 'K']:
-                            bid_amount = 1  # Never bid more than $1 on D/ST or K
-                        
-                        print(f"AI Waiver claim: Add {rec['add_player']} - Drop {rec['drop_player']}")
-                        print(f"                 Bid: ${bid_amount}")
-                        print(f"                 Reasoning: {rec.get('reasoning', 'AI recommendation')}")
-                        
-                        claims.append(WaiverClaim(
-                            player_to_add_id=add_player.iloc[0]["id"],
-                            player_to_drop_id=drop_player.iloc[0]["id"],
-                            bid_amount=bid_amount
-                        ))
-                    else:
-                        print(f"Could not find players for AI recommendation: {rec['add_player']} / {rec['drop_player']}")
-                        
-                except Exception as e:
-                    print(f"Error processing AI recommendation: {e}")
-        
-        # Fallback to previous sophisticated algorithmic approach if AI failed
-        if not claims:
-            print("No AI recommendations available, using sophisticated fallback logic")
-            
-            # Get projections and calculate position scarcity
-            projections_df = bot.get_projections_data()
-            scarcity_scores = bot.calculate_position_scarcity(available_players)
-            
-            # Evaluate all available players with full value calculation
-            available_player_values = []
-            for _, player in available_players.iterrows():
-                value = bot.calculate_player_value(player, projections_df, scarcity_scores)
-                
-                # Get player position safely
-                positions = []
-                if player['allowed_positions']:
-                    if isinstance(player['allowed_positions'], str):
-                        try:
-                            positions = json.loads(player['allowed_positions'])
-                        except json.JSONDecodeError:
-                            positions = []
-                    else:
-                        positions = player['allowed_positions']
-                
-                if positions and value > -1000:  # Only consider valid players
-                    available_player_values.append({
-                        'id': player['id'],
-                        'name': player['full_name'],
-                        'position': positions[0],
-                        'rank': player['rank'],
-                        'value': value
-                    })
-            
-            # Sort available players by value
-            available_player_values.sort(key=lambda x: x['value'], reverse=True)
-            
-            # Evaluate current roster players
-            roster_player_values = []
-            for _, player in my_team.iterrows():
-                value = bot.calculate_player_value(player, projections_df, scarcity_scores)
-                
-                positions = []
-                if player['allowed_positions']:
-                    if isinstance(player['allowed_positions'], str):
-                        try:
-                            positions = json.loads(player['allowed_positions'])
-                        except json.JSONDecodeError:
-                            positions = []
-                    else:
-                        positions = player['allowed_positions']
-                
-                if positions:
-                    roster_player_values.append({
-                        'id': player['id'],
-                        'name': player['full_name'],
-                        'position': positions[0],
-                        'rank': player['rank'],
-                        'value': value
-                    })
-            
-            # Sort roster players by value (lowest first - these are drop candidates)
-            roster_player_values.sort(key=lambda x: x['value'])
-            
-            # Look for upgrade opportunities - be more selective to preserve FAAB
-            for roster_player in roster_player_values[:5]:  # Check bottom 5 roster players (reduced from 8)
-                position = roster_player['position']
-                
-                # Find best available player at same position
-                best_available = None
-                for avail_player in available_player_values:
-                    if avail_player['position'] == position:
-                        # VERY high threshold since we only have $20 left (was 75, now 150)
-                        if avail_player['value'] - roster_player['value'] > 150:
-                            best_available = avail_player
-                            break
-                
-                if best_available:
-                    # Calculate bid amount based on value difference and position scarcity
-                    value_diff = best_available['value'] - roster_player['value']
-                    scarcity_factor = scarcity_scores.get(position, 0)
-                    
-                    # ULTRA conservative bidding - only $20 left for entire season!
-                    # Base bid: 1-6 depending on value difference (emergency mode)
-                    if value_diff > 300:
-                        base_bid = 3   # Must-have pickup
-                    elif value_diff > 250:
-                        base_bid = 2   # Excellent upgrade
-                    elif value_diff > 200:
-                        base_bid = 1   # Very good upgrade
-                    else:
-                        base_bid = 1   # Good upgrade
-                    
-                    # Minimal bonuses to preserve precious budget
-                    value_bonus = min(1, int(value_diff / 100))  # Up to 2 extra for exceptional value
-                    scarcity_bonus = int(scarcity_factor * 1)    # Up to 1 extra for scarcity
-                    
-                    bid_amount = base_bid + value_bonus + scarcity_bonus
-                    bid_amount = min(3, bid_amount) # Cap max spend
-                    
-                    print(f"Fallback claim: Add {best_available['name']} (Rank {best_available['rank']}, Value {best_available['value']:.1f})")
-                    print(f"                Drop {roster_player['name']} (Rank {roster_player['rank']}, Value {roster_player['value']:.1f})")
-                    print(f"                Bid: ${bid_amount} (Value diff: {value_diff:.1f})")
-                    
-                    claims.append(WaiverClaim(
-                        player_to_add_id=best_available['id'],
-                        player_to_drop_id=roster_player['id'],
-                        bid_amount=bid_amount
-                    ))
-                    
-                    # Remove claimed player from available list to avoid double-claiming
-                    available_player_values = [p for p in available_player_values if p['id'] != best_available['id']]
-                    
-                    # Extremely limited claims due to low budget (max 1-2)
-                    if len(claims) >= 2:
-                        break
-        
-        if not claims:
-            print("No beneficial waiver claims identified")
-            return AttemptedFantasyActions(waiver_claims=[])
-        
-        print(f"Submitting {len(claims)} waiver claims")
-        return AttemptedFantasyActions(waiver_claims=claims)
-        
-    except Exception as e:
-        print(f"Error in perform_weekly_fantasy_actions: {e}")
-        return AttemptedFantasyActions(waiver_claims=[])
+    claims = [ 
+        # WR upgrades
+        WaiverClaim(
+            player_to_add_id="25337",  # Tre Tucker
+            player_to_drop_id="23107", # Jordan Addison
+            bid_amount=1
+        ),
+        WaiverClaim(
+            player_to_add_id="23123",  # Quentin Johnston
+            player_to_drop_id="19398", # Gabe Davis
+            bid_amount=1
+        ),
+
+        # QB upgrade
+        WaiverClaim(
+            player_to_add_id="11687",  # Geno Smith
+            player_to_drop_id="16398", # Deshaun Watson
+            bid_amount=1
+        ),
+
+        # TE starter
+        WaiverClaim(
+            player_to_add_id="22718",  # Jake Ferguson
+            player_to_drop_id="27165", # Kaleb Johnson
+            bid_amount=1
+        ),
+
+        # RB depth
+        WaiverClaim(
+            player_to_add_id="23891",  # Rachaad White
+            player_to_drop_id="26148", # Jonathon Brooks
+            bid_amount=1
+        ),
+        WaiverClaim(
+            player_to_add_id="24172",  # Tyler Allgeier
+            player_to_drop_id="24360", # Kendre Miller
+            bid_amount=1
+        ),
+
+        # Extra WR
+        WaiverClaim(
+            player_to_add_id="22985",  # Wan'Dale Robinson
+            player_to_drop_id="23101", # Jahan Dotson
+            bid_amount=1
+        ),
+
+        # DST upgrade
+        WaiverClaim(
+            player_to_add_id="8140",   # Jacksonville Jaguars DST
+            player_to_drop_id="8030",  # Buffalo Bills DST
+            bid_amount=1
+        )
+    ]
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=claims
+    )
+
+    return actions
 
 # Test the bot if run directly
 if __name__ == "__main__":
