@@ -248,7 +248,7 @@ class PhilipFantasyBot:
             print(f"AI prompt sent with {len(top_players)} available players")
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-5",
                 messages=[{"role": "user", "content": prompt}],
             )
 
