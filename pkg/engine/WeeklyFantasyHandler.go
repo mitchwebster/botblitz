@@ -2,9 +2,11 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
@@ -456,6 +458,12 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		}
 
 		for _, selection := range selections.WaiverClaims {
+			err := validateWaiverPlayerIds(selection)
+			if err != nil {
+				fmt.Printf("Invalid selection details for bot %s\n\tPlayerToAddId:(%s)\n\tPlayerToDropId:(%s)\nError: %s", bot.ID, selection.PlayerToAddId, selection.PlayerToDropId, err)
+				continue
+			}
+
 			// validate player to drop is valid
 			dropPlayerName, err := e.validatePlayerCanBeDropped(selection.PlayerToDropId, bot.ID)
 			if err != nil {
@@ -491,6 +499,27 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 
 	fmt.Println("Finished getting all waiver claims")
 	return botSelectionMap, nil
+}
+
+func validateWaiverPlayerIds(claim *common.WaiverClaim) error {
+	// All playerIds are strings that are integers
+	if claim.PlayerToAddId == "" {
+		return errors.New("PlayerToAddId cannot be empty")
+	}
+
+	if _, err := strconv.Atoi(claim.PlayerToAddId); err != nil {
+		return errors.New("PlayerToAddId must be a valid integer")
+	}
+
+	if claim.PlayerToDropId == "" {
+		return errors.New("PlayerToDropId cannot be empty")
+	}
+
+	if _, err := strconv.Atoi(claim.PlayerToDropId); err != nil {
+		return errors.New("PlayerToDropId must be a valid integer")
+	}
+
+	return nil
 }
 
 func (e *BotEngine) saveTransactionLogToFile(transactionLogStr string) error {
