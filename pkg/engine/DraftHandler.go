@@ -224,6 +224,11 @@ func (e *BotEngine) validatePlayerCanBeDropped(playerId string, owningBotId stri
 }
 
 func (e *BotEngine) validateAndMakeDraftPick(bot *gamestate.Bot, playerId string, currentDraftPick int) (string, error) {
+	err := validatePlayerIdReturnedFromBot(playerId)
+	if err != nil {
+		return "", err
+	}
+
 	player, err := e.getPlayerAndValidateDraftEligibility(playerId)
 	if err != nil {
 		return "", err

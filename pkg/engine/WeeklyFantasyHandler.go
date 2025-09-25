@@ -458,9 +458,15 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		}
 
 		for _, selection := range selections.WaiverClaims {
-			err := validateWaiverPlayerIds(selection)
+			err := validatePlayerIdReturnedFromBot(selection.PlayerToAddId)
 			if err != nil {
-				fmt.Printf("Invalid selection details for bot %s\n\tPlayerToAddId:(%s)\n\tPlayerToDropId:(%s)\nError: %s", bot.ID, selection.PlayerToAddId, selection.PlayerToDropId, err)
+				fmt.Printf("Invalid selection details for bot %s. PlayerToAddId:(%s). Error: %s", bot.ID, selection.PlayerToAddId, err)
+				continue
+			}
+
+			err = validatePlayerIdReturnedFromBot(selection.PlayerToDropId)
+			if err != nil {
+				fmt.Printf("Invalid selection details for bot %s. PlayerToDropId:(%s). Error: %s", bot.ID, selection.PlayerToDropId, err)
 				continue
 			}
 
@@ -501,22 +507,13 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 	return botSelectionMap, nil
 }
 
-func validateWaiverPlayerIds(claim *common.WaiverClaim) error {
-	// All playerIds are strings that are integers
-	if claim.PlayerToAddId == "" {
+func validatePlayerIdReturnedFromBot(playerId string) error {
+	if playerId == "" {
 		return errors.New("PlayerToAddId cannot be empty")
 	}
 
-	if _, err := strconv.Atoi(claim.PlayerToAddId); err != nil {
+	if _, err := strconv.Atoi(playerId); err != nil {
 		return errors.New("PlayerToAddId must be a valid integer")
-	}
-
-	if claim.PlayerToDropId == "" {
-		return errors.New("PlayerToDropId cannot be empty")
-	}
-
-	if _, err := strconv.Atoi(claim.PlayerToDropId); err != nil {
-		return errors.New("PlayerToDropId must be a valid integer")
 	}
 
 	return nil
