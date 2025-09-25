@@ -460,13 +460,13 @@ func (e *BotEngine) fetchAddDropSubmissions(ctx context.Context, bots []gamestat
 		for _, selection := range selections.WaiverClaims {
 			err := validatePlayerIdReturnedFromBot(selection.PlayerToAddId)
 			if err != nil {
-				fmt.Printf("Invalid selection details for bot %s. PlayerToAddId:(%s). Error: %s", bot.ID, selection.PlayerToAddId, err)
+				fmt.Printf("Invalid selection details for bot %s. PlayerToAddId:(%s). Error: %s\n", bot.ID, selection.PlayerToAddId, err)
 				continue
 			}
 
 			err = validatePlayerIdReturnedFromBot(selection.PlayerToDropId)
 			if err != nil {
-				fmt.Printf("Invalid selection details for bot %s. PlayerToDropId:(%s). Error: %s", bot.ID, selection.PlayerToDropId, err)
+				fmt.Printf("Invalid selection details for bot %s. PlayerToDropId:(%s). Error: %s\n", bot.ID, selection.PlayerToDropId, err)
 				continue
 			}
 
