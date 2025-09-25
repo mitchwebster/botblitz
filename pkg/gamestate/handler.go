@@ -62,7 +62,7 @@ func (handler *GameStateHandler) GetDBSaveFilePath() string {
 
 func (handler *GameStateHandler) GetPlayerById(playerId string) (*Player, error) {
 	var player Player
-	result := handler.db.First(&player, playerId)
+	result := handler.db.First(&player, "id = ?", playerId)
 
 	if result.Error != nil {
 		// real DB error
