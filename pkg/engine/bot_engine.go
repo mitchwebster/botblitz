@@ -113,8 +113,12 @@ func (e *BotEngine) run(ctx context.Context) error {
 		return e.performWeeklyFantasyActions(ctx)
 	}
 
+	if e.settings.GameMode == UpdateWeeklyScores {
+		return e.updateWeeklyScores(ctx, false)
+	}
+
 	if e.settings.GameMode == FinishPreviousWeek {
-		return e.finishWeek(ctx)
+		return e.updateWeeklyScores(ctx, true)
 	}
 
 	return errors.New("Unknown game mode")

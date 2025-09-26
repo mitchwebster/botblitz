@@ -1,0 +1,104 @@
+name: BotBlitz Update Scores Workflow
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Thursday Night Football (+4h, Friday 12:15 AM ET → 05:15 UTC)
+    - cron: "15 5 * * 5"
+
+    # Sunday 1 PM Game (+4h, 5 PM ET → 22:00 UTC)
+    - cron: "0 22 * * 0"
+
+    # Sunday 4:25 PM Game (+4h, 8:25 PM ET → 01:25 UTC Monday)
+    - cron: "25 1 * * 1"
+
+    # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
+    - cron: "20 5 * * 1"
+
+jobs:
+  buildAndTest:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v5.0.0
+      with:
+        # The Go version to download (if necessary) and use. Supports semver spec and ranges. Be sure to enclose this option in single quotation marks.
+        go-version: '1.21.7'
+    
+    - name: Check starting Go version
+      run: go version
+
+    - name: Install protoc
+      run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y protobuf-compiler
+
+    - name: Install golang proto tools
+      run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+
+    - name: Install GRPC proto tools
+      run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+    - name: Install python grpc tools
+      run: pip install -r requirements.txt
+
+    - name: Check protoc version
+      run: protoc --version
+
+    - name: Docker version
+      run: docker -v
+
+    - name: Clean generated proto
+      run: make clean
+
+    - name: Generate proto
+      run: make gen
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12.x'
+    
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip3 install -r requirements.txt
+
+    - name: Calculate current week and run scripts
+      run: |
+        # Calculate the difference in seconds from September 4, 2025, 8 AM UTC
+        PAST_DATE=$(date -d '2025-09-04 08:00:00 UTC' +%s)
+        NOW=$(date +%s)
+        
+        # Calculate the number of weeks since the past date using integer division
+        SECONDS_IN_A_WEEK=$((7 * 24 * 60 * 60))
+        DIFF=$((NOW - PAST_DATE))
+        CURRENT_WEEK=$(( DIFF / SECONDS_IN_A_WEEK + 1 ))
+        
+        # Print out what will be run (just for logging)
+        echo "Running stats download for week range: $CURRENT_WEEK"
+
+        # Get weekly stats added to stats.db
+        python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
+    
+    - name: Finish previous fantasy week
+      run: make update-scores
+
+    - name: Create PR w/ new gamestate
+      id: cpr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ github.token }}
+        title: '[Automated] Weekly Score Updates'
+        commit-message: '[Automated] Weekly Score Updates'
+        sign-commits: true
+        add-paths: |
+            data/*.db
+
+    # - name: Enable Pull Request Automerge
+    #   if: steps.cpr.outputs.pull-request-operation == 'created'
+    #   uses: peter-evans/enable-pull-request-automerge@v3
+    #   with:
+    #     token: ${{ github.token }}
+    #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}

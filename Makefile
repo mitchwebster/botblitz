@@ -32,6 +32,9 @@ run-weekly-fantasy:
 run-weekly-fantasy-github:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=PerformWeeklyFantasyActions -is_running_on_github=true
 
+update-scores:
+	go run pkg/cmd/engine_bootstrap.go -game_mode=UpdateWeeklyScores
+
 run-finish-week:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=FinishPreviousWeek
 

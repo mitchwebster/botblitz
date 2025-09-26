@@ -39,7 +39,7 @@ func main() {
 		botEngine = bootstrapDraft()
 	} else if mode == engine.PerformWeeklyFantasyActions {
 		botEngine = bootstrapWeeklyFantasy(mode)
-	} else if mode == engine.FinishPreviousWeek {
+	} else if mode == engine.FinishPreviousWeek || mode == engine.UpdateWeeklyScores {
 		botEngine = bootstrapFinishWeek(mode)
 	} else {
 		fmt.Println("Invalid GameMode provided")

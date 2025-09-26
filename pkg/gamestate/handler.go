@@ -139,6 +139,19 @@ func (handler *GameStateHandler) GetMatchupsForWeek(week int) ([]Matchup, error)
 	return matchups, nil
 }
 
+func (handler *GameStateHandler) UpdateMatchScore(matchupID uint, homeScore, visitorScore float64) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]interface{}{
+			"home_score":    homeScore,
+			"visitor_score": visitorScore,
+		}
+		if err := tx.Model(&Matchup{}).Where("id = ?", matchupID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 // UpdateMatchup updates the winner and points for each team in a matchup within a transaction
 func (handler *GameStateHandler) SetMatchResult(matchupID uint, homeScore, visitorScore float64, winningBotID string) error {
 	return handler.db.Transaction(func(tx *gorm.DB) error {

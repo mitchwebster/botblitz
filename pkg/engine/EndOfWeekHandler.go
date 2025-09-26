@@ -12,7 +12,7 @@ import (
 
 const NonePlayerName = "None"
 
-func (e *BotEngine) finishWeek(ctx context.Context) error {
+func (e *BotEngine) updateWeeklyScores(ctx context.Context, finishWeek bool) error {
 	err := e.gameStateHandler.RefreshWeeklyStats()
 	if err != nil {
 		return err
@@ -43,29 +43,55 @@ func (e *BotEngine) finishWeek(ctx context.Context) error {
 		return err
 	}
 
+	err = e.updateMatchupResults(botMap, scoresPerTeam, currentFantasyWeek, matchups, finishWeek)
+	if err != nil {
+		return err
+	}
+
+	if finishWeek {
+		err = e.gameStateHandler.IncrementFantasyWeek()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *BotEngine) updateMatchupResults(botMap map[string]gamestate.Bot, scoresPerTeam map[string]float64, currentFantasyWeek int, matchups []gamestate.Matchup, finishWeek bool) error {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Fantasy Results for Week %d:\n", currentFantasyWeek))
+	var err error
+
+	if finishWeek {
+		builder.WriteString(fmt.Sprintf("Fantasy Results for Week %d:\n", currentFantasyWeek))
+	}
 
 	for _, match := range matchups {
-		homeBot := botMap[match.HomeBotID]
 		homeScore := scoresPerTeam[match.HomeBotID]
-		visitorBot := botMap[match.VisitorBotID]
 		visitorScore := scoresPerTeam[match.VisitorBotID]
 
-		var winnerName string
-		var winningBotId string
-		if homeScore >= visitorScore {
-			winnerName = homeBot.Name
-			winningBotId = match.HomeBotID
+		if finishWeek {
+			homeBot := botMap[match.HomeBotID]
+			visitorBot := botMap[match.VisitorBotID]
+
+			var winnerName string
+			var winningBotId string
+			if homeScore >= visitorScore {
+				winnerName = homeBot.Name
+				winningBotId = match.HomeBotID
+			} else {
+				winnerName = visitorBot.Name
+				winningBotId = match.VisitorBotID
+			}
+
+			builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
+				homeBot.Name, homeScore, visitorBot.Name, visitorScore, winnerName))
+
+			err = e.gameStateHandler.SetMatchResult(match.ID, homeScore, visitorScore, winningBotId)
 		} else {
-			winnerName = visitorBot.Name
-			winningBotId = match.VisitorBotID
+			err = e.gameStateHandler.UpdateMatchScore(match.ID, homeScore, visitorScore)
 		}
 
-		builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
-			homeBot.Name, homeScore, visitorBot.Name, visitorScore, winnerName))
-
-		err = e.gameStateHandler.SetMatchResult(match.ID, homeScore, visitorScore, winningBotId)
 		if err != nil {
 			return err
 		}
@@ -78,7 +104,7 @@ func (e *BotEngine) finishWeek(ctx context.Context) error {
 		return err
 	}
 
-	return e.gameStateHandler.IncrementFantasyWeek()
+	return nil
 }
 
 func (e *BotEngine) getScoresPerTeam(scores []gamestate.PlayerWeeklyScore, dbBotMap map[string]gamestate.Bot) (map[string]float64, error) {

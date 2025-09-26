@@ -14,7 +14,8 @@ import argparse
 from pathlib import Path
 from typing import List
 import pandas as pd
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, MetaData, Table, text
+from sqlalchemy.dialects.sqlite import insert
 import os
 
 # --- Adjust these imports to your project structure if needed ---
@@ -46,7 +47,28 @@ def main():
     insp = inspect(engine)
     if insp.has_table(table_name):
         # Table exists → append
-        df.to_sql(table_name, con=engine, if_exists="append", index=False)
+        # df.to_sql(table_name, con=engine, if_exists="append", index=False)
+
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique
+                ON {table_name}(year, week, fantasypros_id, position)
+            """))
+
+        records = df.to_dict(orient="records")
+
+        metadata = MetaData()
+        weekly_table = Table(table_name, metadata, autoload_with=engine)
+        stmt = insert(weekly_table).values(records)
+
+        upsert_stmt = stmt.on_conflict_do_update(
+            index_elements=["year", "week", "fantasypros_id", "position"],
+            set_={c.key: c for c in stmt.excluded if c.key not in ["year", "week", "fantasypros_id", "position"]}
+        )
+
+        with engine.begin() as conn:
+            conn.execute(upsert_stmt)
+
     else:
         # Table does not exist → create it
         df.to_sql(table_name, con=engine, if_exists="replace", index=False)
