@@ -82,7 +82,7 @@ jobs:
         # Get weekly stats added to stats.db
         python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
     
-    - name: Finish previous fantasy week
+    - name: Update fantasy week scores
       run: make update-scores
 
     - name: Create PR w/ new gamestate
@@ -92,13 +92,7 @@ jobs:
         token: ${{ github.token }}
         title: '[Automated] Weekly Score Updates'
         commit-message: '[Automated] Weekly Score Updates'
-        sign-commits: true
         add-paths: |
             data/*.db
-
-    # - name: Enable Pull Request Automerge
-    #   if: steps.cpr.outputs.pull-request-operation == 'created'
-    #   uses: peter-evans/enable-pull-request-automerge@v3
-    #   with:
-    #     token: ${{ github.token }}
-    #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+        branch: update-weekly-scores
+        auto-merge-method: squash
