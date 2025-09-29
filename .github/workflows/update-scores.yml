@@ -15,6 +15,9 @@ on:
     # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
     - cron: "20 5 * * 1"
 
+    # Monday Night Football (+4h, 12:20 AM ET Tuesday → 05:20 UTC Tuesday)
+    - cron: "20 5 * * 2"
+
 jobs:
   buildAndTest:
 
