@@ -80,19 +80,17 @@ jobs:
       uses: peter-evans/create-pull-request@v7
       with:
         token: ${{ github.token }}
-        title: '[Automated] End of week updates'
-        commit-message: '[Automated] End of week updates'
-        sign-commits: true
+        title: '[Automated] Finish previous fantasy week'
+        commit-message: '[Automated] Finish previous fantasy week'
         add-paths: |
             data/*.db
-        body-path: '/tmp/weekly_transaction_log.txt'
-
-    # - name: Enable Pull Request Automerge
-    #   if: steps.cpr.outputs.pull-request-operation == 'created'
-    #   uses: peter-evans/enable-pull-request-automerge@v3
-    #   with:
-    #     token: ${{ github.token }}
-    #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-
-    # - name: Run Engine
-    #   run: make run-engine
+        branch: finish-weekly-fantasy
+        auto-merge-method: squash
+    
+    - name: Enable auto-merge
+      if: steps.cpr.outputs.pull-request-number != ''
+      uses: peter-evans/enable-pull-request-automerge@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+        merge-method: squash
