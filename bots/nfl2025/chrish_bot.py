@@ -290,12 +290,12 @@ def draft_player() -> str:
         db.close()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    claims = [ 
+    claims = [
         WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=0
-        )
+            player_to_add_id="26434",  # Tyler Warren
+            player_to_drop_id="25247", # Dalton Kincaid
+            bid_amount=5
+        ),
     ]
 
     actions = AttemptedFantasyActions(
