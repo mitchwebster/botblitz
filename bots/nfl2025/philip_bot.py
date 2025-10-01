@@ -386,59 +386,71 @@ def draft_player() -> str:
     return bot.draft_player()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    claims = [ 
-        # WR upgrades
+    claims = [
+        # QB upgrade
         WaiverClaim(
-            player_to_add_id="25337",  # Tre Tucker
-            player_to_drop_id="23107", # Jordan Addison
+            player_to_add_id="9451",   # Matthew Stafford
+            player_to_drop_id="23018", # J.J. McCarthy
             bid_amount=1
         ),
+
+        # WR upgrades
         WaiverClaim(
-            player_to_add_id="23123",  # Quentin Johnston
+            player_to_add_id="23794",  # Romeo Doubs
             player_to_drop_id="19398", # Gabe Davis
             bid_amount=1
         ),
-
-        # QB upgrade
         WaiverClaim(
-            player_to_add_id="11687",  # Geno Smith
-            player_to_drop_id="16398", # Deshaun Watson
-            bid_amount=1
-        ),
-
-        # TE starter
-        WaiverClaim(
-            player_to_add_id="22718",  # Jake Ferguson
-            player_to_drop_id="27165", # Kaleb Johnson
-            bid_amount=1
-        ),
-
-        # RB depth
-        WaiverClaim(
-            player_to_add_id="23891",  # Rachaad White
-            player_to_drop_id="26148", # Jonathon Brooks
-            bid_amount=1
+            player_to_add_id="18226",  # Marquise Brown
+            player_to_drop_id="23107", # Jordan Addison
+            bid_amount=0
         ),
         WaiverClaim(
-            player_to_add_id="24172",  # Tyler Allgeier
-            player_to_drop_id="24360", # Kendre Miller
-            bid_amount=1
+            player_to_add_id="22913",  # Tyquan Thornton
+            player_to_drop_id="26019", # Keon Coleman
+            bid_amount=0
         ),
 
-        # Extra WR
         WaiverClaim(
-            player_to_add_id="22985",  # Wan'Dale Robinson
-            player_to_drop_id="23101", # Jahan Dotson
-            bid_amount=1
+            player_to_add_id="23310",  # Kenneth Gainwell
+            player_to_drop_id="24172", # Tyler Allgeier
+            bid_amount=0
+        ),
+        WaiverClaim(
+            player_to_add_id="18256",  # Justice Hill
+            player_to_drop_id="23891", # Rachaad White
+            bid_amount=0
         ),
 
-        # DST upgrade
+        # TE depth
         WaiverClaim(
-            player_to_add_id="8140",   # Jacksonville Jaguars DST
+            player_to_add_id="26434",  # Tyler Warren
+            player_to_drop_id="22985", # Wan'Dale Robinson
+            bid_amount=0
+        ),
+
+        # Backup QB
+        WaiverClaim(
+            player_to_add_id="23081",  # Spencer Rattler
+            player_to_drop_id="11687", # Geno Smith (move Geno if Stafford hits)
+            bid_amount=0
+        ),
+
+        # Kicker upgrade
+        WaiverClaim(
+            player_to_add_id="14003",  # Jason Myers
+            player_to_drop_id="16910", # Younghoe Koo
+            bid_amount=0
+        ),
+
+        # DST depth
+        WaiverClaim(
+            player_to_add_id="8130",   # Indianapolis Colts DST
             player_to_drop_id="8030",  # Buffalo Bills DST
-            bid_amount=1
+            bid_amount=0
         )
     ]
+
 
     actions = AttemptedFantasyActions(
         waiver_claims=claims
