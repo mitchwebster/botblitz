@@ -424,11 +424,10 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
 
         # TE depth
         WaiverClaim(
-            player_to_add_id="26434",  # Tyler Warren
-            player_to_drop_id="22985", # Wan'Dale Robinson
+            player_to_add_id="19562",  # Juwan Johnson
+            player_to_drop_id="22985", # Gabe Davis (0 pts, expendable)
             bid_amount=0
         ),
-
         # Backup QB
         WaiverClaim(
             player_to_add_id="23081",  # Spencer Rattler
