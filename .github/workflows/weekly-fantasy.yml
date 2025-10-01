@@ -73,6 +73,7 @@ jobs:
             data/*.db
         branch: run-weekly-fantasy
         auto-merge-method: squash
+        body-path: '/tmp/weekly_transaction_log.txt'
     
     - name: Enable auto-merge
       if: steps.cpr.outputs.pull-request-number != ''
