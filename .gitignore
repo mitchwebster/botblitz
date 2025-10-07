@@ -23,6 +23,7 @@ ux/node_modules
 # Python Section
 __pycache__/
 nba-bets/create-env.sh
+venv/
 
 # Ignore bot.py in py_grpc_server as it is a temporary file
 py_grpc_server/bot.py
