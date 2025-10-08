@@ -1,7 +1,7 @@
 from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
 import pandas as pd
-import json
+import json, os
 
 def get_positions_to_fill(db):
     df = pd.read_sql("SELECT * FROM league_settings", db.engine)
@@ -106,13 +106,22 @@ def draft_player() -> str:
         db.close()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    db = DatabaseManager()
     # add top available player, drop worst player
-    df = load_available_players(DatabaseManager())
-    top_player = df.sort_values(by="rank", ascending=True).iloc[0]
-    print(f"Top available player is {top_player['full_name']} with rank {top_player['rank']}")
-    top_player_id = top_player["id"]
+    POSITION_FILTER = '["QB"]'  # Configurable position filter for weekly actions
+    query = f'''
+        SELECT w.fantasypros_id, w.player_name, p.current_bot_id, sum(w.FPTS) as FPTS
+        FROM players AS p
+        INNER JOIN weekly_stats AS w ON p.id = w.fantasypros_id
+        WHERE p.current_bot_id IS NULL AND p.allowed_positions = '{POSITION_FILTER}'
+        GROUP BY w.fantasypros_id
+        ORDER BY FPTS desc
+        LIMIT 10
+    '''
+    top_player = pd.read_sql(query, db.engine).iloc[0]
+    top_player_id = top_player["fantasypros_id"]
     worst_player_id = "19590"  # TODO: implement logic to drop worst player from my team
-    bid = 0  # TODO: implement logic to determine bid amount
+    bid = int(os.getenv("BID_AMOUNT", "0"))
     
     claims = [ 
         WaiverClaim(
