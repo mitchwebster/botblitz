@@ -387,65 +387,62 @@ def draft_player() -> str:
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     claims = [
-        # QB upgrade
         WaiverClaim(
-            player_to_add_id="9451",   # Matthew Stafford
+            player_to_add_id="17236",  # Sam Darnold
             player_to_drop_id="23018", # J.J. McCarthy
-            bid_amount=1
-        ),
-
-        # WR upgrades
-        WaiverClaim(
-            player_to_add_id="23794",  # Romeo Doubs
-            player_to_drop_id="19398", # Gabe Davis
-            bid_amount=1
-        ),
-        WaiverClaim(
-            player_to_add_id="18226",  # Marquise Brown
-            player_to_drop_id="23107", # Jordan Addison
             bid_amount=0
         ),
         WaiverClaim(
-            player_to_add_id="22913",  # Tyquan Thornton
-            player_to_drop_id="26019", # Keon Coleman
-            bid_amount=0
-        ),
-
-        WaiverClaim(
-            player_to_add_id="23310",  # Kenneth Gainwell
-            player_to_drop_id="24172", # Tyler Allgeier
+            player_to_add_id="11687",  # Geno Smith
+            player_to_drop_id="23018", # fallback if Darnold taken
             bid_amount=0
         ),
         WaiverClaim(
-            player_to_add_id="18256",  # Justice Hill
-            player_to_drop_id="23891", # Rachaad White
+            player_to_add_id="22973",  # Michael Penix Jr.
+            player_to_drop_id="23018", # tertiary QB fallback
             bid_amount=0
         ),
-
-        # TE depth
+        # --- Tight End Reinforcements ---
         WaiverClaim(
-            player_to_add_id="19562",  # Juwan Johnson
-            player_to_drop_id="22985", # Gabe Davis (0 pts, expendable)
+            player_to_add_id="25247",  # Dalton Kincaid
+            player_to_drop_id="19562", # replace Juwan Johnson
             bid_amount=0
         ),
-        # Backup QB
         WaiverClaim(
-            player_to_add_id="23081",  # Spencer Rattler
-            player_to_drop_id="11687", # Geno Smith (move Geno if Stafford hits)
+            player_to_add_id="17270",  # Dallas Goedert
+            player_to_drop_id="19562", # fallback if Kincaid taken
             bid_amount=0
         ),
-
-        # Kicker upgrade
+        # --- RB / Flex Depth ---
         WaiverClaim(
-            player_to_add_id="14003",  # Jason Myers
+            player_to_add_id="19647",  # Rico Dowdle
+            player_to_drop_id="18256", # swap Justice Hill
+            bid_amount=0
+        ),
+        WaiverClaim(
+            player_to_add_id="23891",  # Rachaad White
+            player_to_drop_id="18256", # fallback if Dowdle taken
+            bid_amount=0
+        ),
+        # --- Kicker / DST Upgrades ---
+        WaiverClaim(
+            player_to_add_id="15756",  # Ka'imi Fairbairn
             player_to_drop_id="16910", # Younghoe Koo
             bid_amount=0
         ),
-
-        # DST depth
         WaiverClaim(
-            player_to_add_id="8130",   # Indianapolis Colts DST
-            player_to_drop_id="8030",  # Buffalo Bills DST
+            player_to_add_id="9443",   # Matt Prater
+            player_to_drop_id="16910", # backup kicker pickup
+            bid_amount=0
+        ),
+        WaiverClaim(
+            player_to_add_id="26475",  # Cam Little
+            player_to_drop_id="16910", # tertiary kicker backup
+            bid_amount=0
+        ),
+        WaiverClaim(
+            player_to_add_id="8180",   # New England Patriots DST
+            player_to_drop_id="8140",  # rotate vs Jacksonville bye/bad matchup
             bid_amount=0
         )
     ]
