@@ -37,6 +37,10 @@ def adjust_available_positions(remaining_positions_to_fill):
     remaining_positions_to_fill -= special_positions
     return remaining_positions_to_fill
 
+def load_available_players(db):
+    df = pd.read_sql("SELECT * FROM players where availability = 'AVAILABLE'", db.engine)
+    return df
+
 def draft_player() -> str:
     """
     Selects a player to draft based on the highest rank.
@@ -102,11 +106,19 @@ def draft_player() -> str:
         db.close()
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    # add top available player, drop worst player
+    df = load_available_players(DatabaseManager())
+    top_player = df.sort_values(by="rank", ascending=True).iloc[0]
+    print(f"Top available player is {top_player['full_name']} with rank {top_player['rank']}")
+    top_player_id = top_player["id"]
+    worst_player_id = "19590"  # TODO: implement logic to drop worst player from my team
+    bid = 0  # TODO: implement logic to determine bid amount
+    
     claims = [ 
         WaiverClaim(
-            player_to_add_id="",
-            player_to_drop_id="",
-            bid_amount=0
+            player_to_add_id=top_player_id,
+            player_to_drop_id=worst_player_id,
+            bid_amount=bid
         )
     ]
 
