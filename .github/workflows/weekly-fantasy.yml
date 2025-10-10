@@ -61,6 +61,7 @@ jobs:
           TYLER_ENV: ${{ secrets.TYLER_ENV }}
           PHILIP_ENV: ${{ secrets.PHILIP_ENV }}
           MITCH_ENV: ${{ secrets.MITCH_ENV }}
+          JACK_ENV: ${{ secrets.JACK_ENV }}
 
     - name: Create PR w/ new gamestate
       id: cpr
