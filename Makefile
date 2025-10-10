@@ -64,3 +64,11 @@ launch-simulator:
 	datasette gamestate.db --host 127.0.0.1 --port 8001 &
 	python3 -m webbrowser http://127.0.0.1:8001/
 	jupyter lab SimulateDraft.ipynb
+
+launch-in-season-datasette:
+	pip3 install -r requirements.txt
+	$(MAKE) gen-python-only
+	$(MAKE) build-py-module
+	pip3 install dist/blitz_env-0.1.0-py3-none-any.whl
+	python3 -m webbrowser http://127.0.0.1:8001/
+	datasette data/game_states/2025/gs-season.db --host 127.0.0.1 --port 8001
