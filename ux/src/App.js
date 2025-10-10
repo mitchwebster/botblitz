@@ -9,6 +9,21 @@ function App() {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterText, setFilterText] = useState("");
+  // Theme: 'light' | 'dark' | 'system'
+  const [themePref, setThemePref] = useState(() => {
+    try {
+      return localStorage.getItem("themePref") || "system";
+    } catch (e) {
+      return "system";
+    }
+  });
+  const [systemDark, setSystemDark] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  // effective theme is what we actually apply
+  const effectiveTheme = themePref === "system" ? (systemDark ? "dark" : "light") : themePref;
 
   useEffect(() => {
     const loadDb = async () => {
@@ -150,6 +165,37 @@ function App() {
     }
   }, [db, activeTab]);
 
+  // Listen to system theme changes
+  useEffect(() => {
+    if (!window || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e) => setSystemDark(e.matches);
+    try {
+      if (mq.addEventListener) mq.addEventListener("change", handler);
+      else mq.addListener(handler);
+    } catch (e) {
+      // ignore
+    }
+    return () => {
+      try {
+        if (mq.removeEventListener) mq.removeEventListener("change", handler);
+        else mq.removeListener(handler);
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const next = effectiveTheme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem("themePref", next);
+    } catch (e) {
+      // ignore
+    }
+    setThemePref(next);
+  };
+
   if (loading) return <p>Loading database...</p>;
 
   const tabs = [
@@ -214,7 +260,7 @@ function App() {
       style={{
         width: "100%",
         borderCollapse: "collapse",
-        border: "1px solid #ccc",
+        border: `1px solid ${vars.border}`,
         marginBottom: "2rem",
       }}
     >
@@ -224,7 +270,7 @@ function App() {
             <th
               key={col}
               style={{
-                border: "1px solid #ccc",
+                border: `1px solid ${vars.border}`,
                 padding: "0.5rem",
                 cursor: "pointer",
               }}
@@ -239,7 +285,7 @@ function App() {
         {tableData.map((row, idx) => (
           <tr key={idx}>
             {tableColumns.map((col) => (
-              <td key={col} style={{ border: "1px solid #ccc", padding: "0.5rem" }}>
+              <td key={col} style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>
                 {row[col]}
               </td>
             ))}
@@ -249,9 +295,69 @@ function App() {
     </table>
   );
 
+  const lightVars = {
+    background: "#ffffff",
+    foreground: "#111827",
+    primary: "#007bff",
+    muted: "#eee",
+    border: "#ccc",
+  };
+
+  const darkVars = {
+    background: "#0b1220",
+    foreground: "#e6eef8",
+    primary: "#3b82f6",
+    muted: "#1f2937",
+    border: "#263244",
+  };
+
+  const vars = effectiveTheme === "dark" ? darkVars : lightVars;
+
   return (
-    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>Botblitz 2025</h1>
+    <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+        <h1 style={{ margin: 0 }}>Botblitz 2025</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <button
+            onClick={toggleTheme}
+            aria-label={effectiveTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={effectiveTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              padding: 6,
+              background: vars.muted,
+              color: vars.foreground,
+              border: `1px solid ${vars.border}`,
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            {effectiveTheme === "dark" ? (
+              // sun icon to indicate switching to light
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <path d="M12 4V2" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 22v-2" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4 12H2" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M22 12h-2" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5 5L3.5 3.5" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20.5 20.5L19 19" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M19 5l1.5-1.5" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.5 19.5L6 18" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="4" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              // moon icon to indicate switching to dark
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke={vars.foreground} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Tabs */}
       <div style={{ marginBottom: "1rem" }}>
@@ -262,9 +368,9 @@ function App() {
             style={{
               padding: "0.5rem 1rem",
               marginRight: "0.5rem",
-              backgroundColor: activeTab === tab.key ? "#007bff" : "#eee",
-              color: activeTab === tab.key ? "#fff" : "#000",
-              border: "none",
+              backgroundColor: activeTab === tab.key ? vars.primary : vars.muted,
+              color: activeTab === tab.key ? "#fff" : vars.foreground,
+              border: `1px solid ${vars.border}`,
               borderRadius: "4px",
               cursor: "pointer",
             }}
@@ -281,7 +387,7 @@ function App() {
           placeholder="Search players..."
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
-          style={{ marginBottom: "1rem", padding: "0.5rem", width: "100%" }}
+          style={{ marginBottom: "1rem", padding: "0.5rem", width: "100%", background: vars.background, color: vars.foreground, border: `1px solid ${vars.border}` }}
         />
       )}
 
