@@ -165,6 +165,24 @@ function App() {
     }
   }, [db, activeTab]);
 
+  const lightVars = {
+    background: "#ffffff",
+    foreground: "#111827",
+    primary: "#007bff",
+    muted: "#eee",
+    border: "#ccc",
+  };
+
+  const darkVars = {
+    background: "#0b1220",
+    foreground: "#e6eef8",
+    primary: "#3b82f6",
+    muted: "#1f2937",
+    border: "#263244",
+  };
+
+  const vars = effectiveTheme === "dark" ? darkVars : lightVars;
+
   // Listen to system theme changes
   useEffect(() => {
     if (!window || !window.matchMedia) return;
@@ -185,6 +203,11 @@ function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    document.body.style.backgroundColor = vars.background;
+    document.body.style.color = vars.foreground;
+  }, [effectiveTheme]);
 
   const toggleTheme = () => {
     const next = effectiveTheme === "dark" ? "light" : "dark";
@@ -295,26 +318,8 @@ function App() {
     </table>
   );
 
-  const lightVars = {
-    background: "#ffffff",
-    foreground: "#111827",
-    primary: "#007bff",
-    muted: "#eee",
-    border: "#ccc",
-  };
-
-  const darkVars = {
-    background: "#0b1220",
-    foreground: "#e6eef8",
-    primary: "#3b82f6",
-    muted: "#1f2937",
-    border: "#263244",
-  };
-
-  const vars = effectiveTheme === "dark" ? darkVars : lightVars;
-
   return (
-    <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh" }}>
+    <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh", overflowX: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
         <h1 style={{ margin: 0 }}>Botblitz 2025</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
