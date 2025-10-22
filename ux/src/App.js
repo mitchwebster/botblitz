@@ -204,10 +204,12 @@ function App() {
     };
   }, []);
 
+  const { background: bodyBackground, foreground: bodyForeground } = vars;
+
   useEffect(() => {
-    document.body.style.backgroundColor = vars.background;
-    document.body.style.color = vars.foreground;
-  }, [effectiveTheme]);
+    document.body.style.backgroundColor = bodyBackground;
+    document.body.style.color = bodyForeground;
+  }, [bodyBackground, bodyForeground]);
 
   const toggleTheme = () => {
     const next = effectiveTheme === "dark" ? "light" : "dark";
@@ -319,7 +321,7 @@ function App() {
   );
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh", overflowX: "auto" }}>
+    <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh", overflowX: "auto"}}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
         <h1 style={{ margin: 0 }}>Botblitz 2025</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
