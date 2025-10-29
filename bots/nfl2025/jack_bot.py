@@ -107,32 +107,45 @@ def draft_player() -> str:
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     db = DatabaseManager()
-    # add top available player, drop worst player
-    POSITION_FILTER = '["QB"]'  # Configurable position filter for weekly actions
-    query = f'''
-        SELECT w.fantasypros_id, w.player_name, p.current_bot_id, sum(w.FPTS) as FPTS
-        FROM players AS p
-        INNER JOIN weekly_stats AS w ON p.id = w.fantasypros_id
-        WHERE p.current_bot_id IS NULL AND p.allowed_positions = '{POSITION_FILTER}'
-        GROUP BY w.fantasypros_id
-        ORDER BY FPTS desc
-        LIMIT 10
-    '''
-    top_player = pd.read_sql(query, db.engine).iloc[0]
-    top_player_id = top_player["fantasypros_id"]
-    worst_player_id = "19590"  # TODO: implement logic to drop worst player from my team
-    bid = int(os.getenv("BID_AMOUNT", "0"))
-    
-    claims = [ 
-        WaiverClaim(
-            player_to_add_id=top_player_id,
-            player_to_drop_id=worst_player_id,
-            bid_amount=bid
+
+    try:
+        bot_id = 8
+        gs = pd.read_sql("SELECT * FROM game_statuses", db.engine)
+        current_week = gs.iloc[0]["current_fantasy_week"]
+
+        # List my players on bye this week
+        my_team_df = pd.read_sql(f"SELECT * FROM players WHERE current_bot_id = {bot_id} order by rank", db.engine)
+        bye_players_df = my_team_df[my_team_df["player_bye_week"] == current_week]
+
+        # For each player on bye above tier threshold, try to replace with best available player at that position
+        claims = []
+        bid = 1
+        tier_threshold = 3 # Keep this around 8 so that you don't drop good players
+        for _, bye_player in bye_players_df.iterrows():
+            position = bye_player["allowed_positions"].split(",")[0]
+            print(f"Finding replacements for {bye_player['full_name']} {position}")
+            replacement = pd.read_sql(f"SELECT * FROM players WHERE availability = 'AVAILABLE' AND allowed_positions = '{position}' AND player_bye_week != {current_week} ORDER BY rank LIMIT 1", db.engine)
+            if bye_player["tier"] < tier_threshold:
+                print(f"Keep {bye_player['full_name']}")
+                # TODO drop worst player with same position
+            else:
+                # Add WaiverClaim to claims array
+                if not replacement.empty:
+                    add = replacement.iloc[0]["id"]
+                    drop = bye_player["id"]
+                    print(f"Claiming {replacement.iloc[0]['full_name']} to replace {bye_player['full_name']}")
+                    claims.append(
+                        WaiverClaim(
+                            player_to_add_id=add,
+                            player_to_drop_id=drop,
+                            bid_amount=bid
+                        )
+                    )
+                    print(claims)
+        actions = AttemptedFantasyActions(
+            waiver_claims=claims
         )
-    ]
-
-    actions = AttemptedFantasyActions(
-        waiver_claims=claims
-    )
-
-    return actions
+        return actions
+    
+    finally:
+        db.close()
