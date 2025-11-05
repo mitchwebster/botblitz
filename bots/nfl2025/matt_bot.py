@@ -173,6 +173,10 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     # I'm actually still not sure when the week moves from 3 > 4 lol so do this again for safety
     if game_status.current_fantasy_week == 3 or game_status.current_fantasy_week == 4:
         return week_4_waivers(team_state=team_state)
+
+    # One of these days I'll figure out how to compute this logic
+    if game_status.current_fantasy_week == 9 or game_status.current_fantasy_week == 10:
+        return week_10_waivers(team_state=team_state)
     
     claims = [ 
         WaiverClaim(
@@ -259,6 +263,82 @@ def week_4_waivers(team_state: TeamState) -> AttemptedFantasyActions:
 
     return actions
 
+
+def week_10_waivers(team_state: TeamState) -> AttemptedFantasyActions:
+    thill_id = 15802
+    skattebo_id = 27166
+    jjeudy_id = 19201
+
+    add_players = [
+        (22985, 4),    # wr
+        (23891, 3),    # rw
+        (23092, 3),    # tf
+        (22989, 2),    # kb
+        (16425, 2),    # kh
+        (27520, 3),    # wm
+        (27131, 2),    # km
+        (26355, 2),    # kv
+    ]
+
+    waiver_claims = [
+        WaiverClaim(
+            player_to_add_id=str(add_players[0][0]),
+            player_to_drop_id=str(thill_id),
+            bid_amount=add_players[0][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[5][0]),
+            player_to_drop_id=str(skattebo_id),
+            bid_amount=add_players[5][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[6][0]),
+            player_to_drop_id=str(skattebo_id),
+            bid_amount=add_players[6][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[7][0]),
+            player_to_drop_id=str(skattebo_id),
+            bid_amount=add_players[7][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[1][0]),
+            player_to_drop_id=str(skattebo_id),
+            bid_amount=add_players[1][1]
+        ),
+
+        WaiverClaim(
+            player_to_add_id=str(add_players[2][0]),
+            player_to_drop_id=str(thill_id),
+            bid_amount=add_players[2][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[2][0]),
+            player_to_drop_id=str(jjeudy_id),
+            bid_amount=add_players[2][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[3][0]),
+            player_to_drop_id=str(thill_id),
+            bid_amount=add_players[3][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[3][0]),
+            player_to_drop_id=str(jjeudy_id),
+            bid_amount=add_players[3][1]
+        ),
+        WaiverClaim(
+            player_to_add_id=str(add_players[4][0]),
+            player_to_drop_id=str(skattebo_id),
+            bid_amount=add_players[4][1]
+        ),
+    ]
+
+    actions = AttemptedFantasyActions(
+        waiver_claims=waiver_claims
+    )
+
+    return actions
 
 
 # My team:
