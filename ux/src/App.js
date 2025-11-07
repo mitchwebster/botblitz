@@ -9,6 +9,8 @@ function App() {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterText, setFilterText] = useState("");
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [currentWeek, setCurrentWeek] = useState(null);
   // Theme: 'light' | 'dark' | 'system'
   const [themePref, setThemePref] = useState(() => {
     try {
@@ -60,70 +62,72 @@ function App() {
     loadDb();
   }, []);
 
+  // Fetch and initialize current week
   useEffect(() => {
     if (!db) return;
 
-    const fetchCurrentWeek = () => {
-      if (!db) return null;
-      try {
-        const result = db.exec(
-          "SELECT current_fantasy_week FROM game_statuses LIMIT 1;"
-        );
-        if (result.length > 0 && result[0].values.length > 0) {
-          return result[0].values[0][0]; 
+    try {
+      const result = db.exec(
+        "SELECT current_fantasy_week FROM game_statuses LIMIT 1;"
+      );
+      if (result.length > 0 && result[0].values.length > 0) {
+        const week = result[0].values[0][0];
+        setCurrentWeek(week);
+        if (selectedWeek === null) {
+          setSelectedWeek(week);
         }
-      } catch (err) {
-        console.error("Failed to fetch current week:", err);
       }
-      return null;
-    };
+    } catch (err) {
+      console.error("Failed to fetch current week:", err);
+    }
+  }, [db, selectedWeek]);
 
-    const week = fetchCurrentWeek();
-    if (week == null) return;
+  useEffect(() => {
+    if (!db || selectedWeek === null) return;
 
     const queries = {
       current: `
         SELECT
-          week, 
-          home_bot.name as home_bot_name, 
-          home_score, 
+          week,
+          home_bot.name as home_bot_name,
+          home_score,
           visitor_bot.name as visitor_bot_name,
-          visitor_score, 
-          winning_bot.name as winning_bot_name 
+          visitor_score,
+          winning_bot.name as winning_bot_name
         FROM matchups as m
         LEFT JOIN bots AS home_bot ON m.home_bot_id = home_bot.id
         LEFT JOIN bots AS visitor_bot ON m.visitor_bot_id = visitor_bot.id
         LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
-        WHERE week = ${week}
+        WHERE week = ${selectedWeek}
       `,
       last: `
         SELECT
-          week, 
-          home_bot.name as home_bot_name, 
-          home_score, 
+          week,
+          home_bot.name as home_bot_name,
+          home_score,
           visitor_bot.name as visitor_bot_name,
-          visitor_score, 
-          winning_bot.name as winning_bot_name 
+          visitor_score,
+          winning_bot.name as winning_bot_name
         FROM matchups as m
         LEFT JOIN bots AS home_bot ON m.home_bot_id = home_bot.id
         LEFT JOIN bots AS visitor_bot ON m.visitor_bot_id = visitor_bot.id
         LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
-        WHERE week = ${week - 1}
+        WHERE week = ${selectedWeek - 1}
       `,
       leaderboard: `
         WITH botScores AS (
-          SELECT 
+          SELECT
             b.Name,
             SUM(IIF(b.id = m.home_bot_id, home_score, 0) + IIF(b.id = m.visitor_bot_id, visitor_score, 0)) AS totalPoints,
             SUM(IIF(b.id = m.winning_bot_id, 1, 0)) AS numWins,
             SUM(IIF(b.id != m.winning_bot_id, 1, 0)) AS numLosses
           FROM bots AS b
           INNER JOIN matchups AS m
-          ON (b.id = m.visitor_bot_id OR b.id = m.home_bot_id) 
-          WHERE week < ${week}
+          ON (b.id = m.visitor_bot_id OR b.id = m.home_bot_id)
+          WHERE week < ${selectedWeek}
           GROUP BY 1
         )
-        SELECT  
+        SELECT
           ROW_NUMBER() OVER (ORDER BY numWins DESC, totalPoints DESC) AS rank,
           *
         FROM botScores
@@ -136,9 +140,18 @@ function App() {
           INNER JOIN weekly_stats AS wk ON p.id = wk.fantasypros_id
           GROUP BY 1,2,3,4
         )
-        SELECT p.id, p.full_name, p.allowed_positions, b.name AS teamName, totalPoints
+        SELECT
+          p.id,
+          p.full_name,
+          p.allowed_positions,
+          b.name AS teamName,
+          totalPoints,
+          wi.game_status AS injury_status,
+          wp.FPTS AS projected_points
         FROM playerPoints AS p
         LEFT JOIN bots AS b ON p.current_bot_id = b.id
+        LEFT JOIN weekly_injuries AS wi ON p.id = wi.fantasypros_id AND wi.week = ${selectedWeek}
+        LEFT JOIN weekly_projections AS wp ON p.id = wp.fantasypros_id AND wp.week = ${selectedWeek}
         ORDER BY b.name, p.full_name
       `,
     };
@@ -163,7 +176,7 @@ function App() {
       setColumns([]);
       setData([]);
     }
-  }, [db, activeTab]);
+  }, [db, activeTab, selectedWeek]);
 
   const lightVars = {
     background: "#ffffff",
@@ -325,6 +338,29 @@ function App() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
         <h1 style={{ margin: 0 }}>Botblitz 2025</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label htmlFor="week-select" style={{ fontSize: "0.9rem" }}>Week:</label>
+            <select
+              id="week-select"
+              value={selectedWeek || ""}
+              onChange={(e) => setSelectedWeek(Number(e.target.value))}
+              style={{
+                padding: "0.4rem 0.6rem",
+                background: vars.muted,
+                color: vars.foreground,
+                border: `1px solid ${vars.border}`,
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+              }}
+            >
+              {currentWeek && Array.from({ length: currentWeek }, (_, i) => i + 1).map(week => (
+                <option key={week} value={week}>
+                  {week}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={toggleTheme}
             aria-label={effectiveTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
