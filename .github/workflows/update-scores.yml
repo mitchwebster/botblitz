@@ -73,17 +73,33 @@ jobs:
         # Calculate the difference in seconds from September 4, 2025, 8 AM UTC
         PAST_DATE=$(date -d '2025-09-04 08:00:00 UTC' +%s)
         NOW=$(date +%s)
-        
+
         # Calculate the number of weeks since the past date using integer division
         SECONDS_IN_A_WEEK=$((7 * 24 * 60 * 60))
         DIFF=$((NOW - PAST_DATE))
         CURRENT_WEEK=$(( DIFF / SECONDS_IN_A_WEEK + 1 ))
-        
-        # Print out what will be run (just for logging)
-        echo "Running stats download for week range: $CURRENT_WEEK"
 
-        # Get weekly stats added to stats.db
+        # Print out what will be run (just for logging)
+        echo "Running weekly data collection for week: $CURRENT_WEEK"
+
+        # Get weekly stats added to stats.db (mission critical - must succeed)
         python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
+
+        # Get weekly projections added to stats.db (important but not critical - continue on failure)
+        echo "Collecting weekly projections..."
+        if python3 -m blitz_env.collect_weekly_projections --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db; then
+          echo "✓ Weekly projections collected successfully"
+        else
+          echo "⚠ Warning: Failed to collect weekly projections (non-critical, continuing)"
+        fi
+
+        # Get weekly injuries added to stats.db (important but not critical - continue on failure)
+        echo "Collecting weekly injuries..."
+        if python3 -m blitz_env.collect_weekly_injuries --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db; then
+          echo "✓ Weekly injuries collected successfully"
+        else
+          echo "⚠ Warning: Failed to collect weekly injuries (non-critical, continuing)"
+        fi
     
     - name: Update fantasy week scores
       run: make update-scores
