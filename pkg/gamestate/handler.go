@@ -581,6 +581,16 @@ func (handler *GameStateHandler) RefreshWeeklyStats() error {
 		return err
 	}
 
+	// Remove the weekly projections table from the game state
+	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_projections;`).Error; err != nil {
+		return err
+	}
+
+	// Remove the weekly injuries table from the game state
+	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_injuries;`).Error; err != nil {
+		return err
+	}
+
 	// Attach the other DB
 	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
 	println(attachQuery)
@@ -589,6 +599,14 @@ func (handler *GameStateHandler) RefreshWeeklyStats() error {
 	}
 
 	if err := handler.db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
+		return err
+	}
+
+	if err := handler.db.Exec(`CREATE TABLE weekly_projections AS SELECT * FROM other.weekly_projections;`).Error; err != nil {
+		return err
+	}
+
+	if err := handler.db.Exec(`CREATE TABLE weekly_injuries AS SELECT * FROM other.weekly_injuries;`).Error; err != nil {
 		return err
 	}
 
