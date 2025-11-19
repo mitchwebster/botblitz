@@ -108,32 +108,84 @@ def draft_player() -> str:
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     db = DatabaseManager()
 
+    def find_replacements(position, current_week: int, league_year: int, exclude_players: set = None) -> pd.DataFrame:
+        """
+        Find available replacement players for a given position that are not on bye during the current week.
+        Uses season_stats table for better ranking based on current season performance.
+        
+        Args:
+            position: The position to find replacements for
+            current_week: The current fantasy week
+            league_year: The current league year
+            exclude_players: Set of fantasypros_ids to exclude from the search
+        
+        Returns:
+            A DataFrame containing the best available player at that position
+        """
+
+        exclude_clause = ""
+        if exclude_players:
+            excluded_ids = ", ".join(f"'{pid}'" for pid in exclude_players)
+            exclude_clause = f"AND ss.fantasypros_id NOT IN ({excluded_ids})"
+        
+        replacement = pd.read_sql(
+            f"""
+            SELECT
+            ss.fantasypros_id, ss.player_name, ss.position, ss.FPTS, p.availability, p.player_bye_week, ws.FPTS AS 'pFTPS'
+            FROM
+            season_stats ss
+            JOIN players p ON ss.fantasypros_id = p.id
+            JOIN weekly_stats ws ON ss.fantasypros_id = ws.fantasypros_id AND ws.week = {current_week - 1}
+            WHERE
+            p.availability = 'AVAILABLE' AND
+            ss.position = '{position}'
+            AND ss.year = {league_year}
+            AND p.player_bye_week != {current_week}
+            AND ws.FPTS > 0
+            {exclude_clause}
+            ORDER BY
+            ss.FPTS desc
+            LIMIT
+            1
+            """,
+            db.engine
+        )
+        return replacement
+
     try:
         bot_id = 8
+        league_year = db.get_league_settings().year
         gs = pd.read_sql("SELECT * FROM game_statuses", db.engine)
         current_week = gs.iloc[0]["current_fantasy_week"]
 
         # List my players on bye this week
         my_team_df = pd.read_sql(f"SELECT * FROM players WHERE current_bot_id = {bot_id} order by rank", db.engine)
         bye_players_df = my_team_df[my_team_df["player_bye_week"] == current_week]
+        if bye_players_df.empty:
+            print("No players on bye this week.")
+        else:
+            print(bye_players_df[["full_name", "player_bye_week", "tier"]])
 
         # For each player on bye above tier threshold, try to replace with best available player at that position
         claims = []
+        claimed_players = set()
         bid = 1
         tier_threshold = 3 # Keep this around 8 so that you don't drop good players
         for _, bye_player in bye_players_df.iterrows():
-            position = bye_player["allowed_positions"].split(",")[0]
-            print(f"Finding replacements for {bye_player['full_name']} {position}")
-            replacement = pd.read_sql(f"SELECT * FROM players WHERE availability = 'AVAILABLE' AND allowed_positions = '{position}' AND player_bye_week != {current_week} ORDER BY rank LIMIT 1", db.engine)
+            # Get primary position
+            position = json.loads(bye_player["allowed_positions"])[0]
+            print(f"Finding replacements for {bye_player['full_name']} - {position}")
+            
+            # Find replacement excluding already claimed players
+            replacement = find_replacements(position, current_week, league_year, exclude_players=claimed_players)
             if bye_player["tier"] < tier_threshold:
                 print(f"Keep {bye_player['full_name']}")
-                # TODO drop worst player with same position
             else:
-                # Add WaiverClaim to claims array
+                # Add WaiverClaim to claims array, tracking claimed players
                 if not replacement.empty:
-                    add = replacement.iloc[0]["id"]
+                    add = replacement.iloc[0]["fantasypros_id"]
                     drop = bye_player["id"]
-                    print(f"Claiming {replacement.iloc[0]['full_name']} to replace {bye_player['full_name']}")
+                    print(f"Claiming {replacement.iloc[0]['player_name']} to replace {bye_player['full_name']}")
                     claims.append(
                         WaiverClaim(
                             player_to_add_id=add,
@@ -141,7 +193,8 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                             bid_amount=bid
                         )
                     )
-                    print(claims)
+                    claimed_players.add(add)
+                print(claims)
         actions = AttemptedFantasyActions(
             waiver_claims=claims
         )
