@@ -49,7 +49,12 @@ func (e *BotEngine) updateWeeklyScores(ctx context.Context, finishWeek bool) err
 	}
 
 	if finishWeek {
-		err = e.gameStateHandler.IncrementFantasyWeek()
+		nextWeek, err := e.gameStateHandler.IncrementFantasyWeek()
+		if err != nil {
+			return err
+		}
+
+		err = e.handlePlayoffsIfNeeded(nextWeek)
 		if err != nil {
 			return err
 		}
@@ -67,31 +72,74 @@ func (e *BotEngine) updateMatchupResults(botMap map[string]gamestate.Bot, scores
 	}
 
 	for _, match := range matchups {
-		homeScore := scoresPerTeam[match.HomeBotID]
-		visitorScore := scoresPerTeam[match.VisitorBotID]
-
-		if finishWeek {
-			homeBot := botMap[match.HomeBotID]
-			visitorBot := botMap[match.VisitorBotID]
-
-			var winnerName string
-			var winningBotId string
-			if homeScore >= visitorScore {
-				winnerName = homeBot.Name
-				winningBotId = match.HomeBotID
-			} else {
-				winnerName = visitorBot.Name
-				winningBotId = match.VisitorBotID
-			}
-
-			builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
-				homeBot.Name, homeScore, visitorBot.Name, visitorScore, winnerName))
-
-			err = e.gameStateHandler.SetMatchResult(match.ID, homeScore, visitorScore, winningBotId)
+		var homeScore float64
+		if match.HomeBotID == gamestate.ByeId {
+			homeScore = 0
 		} else {
-			err = e.gameStateHandler.UpdateMatchScore(match.ID, homeScore, visitorScore)
+			homeScore = scoresPerTeam[match.HomeBotID]
 		}
 
+		var visitorScore float64
+		if match.VisitorBotID == gamestate.ByeId {
+			visitorScore = 0
+		} else {
+			visitorScore = scoresPerTeam[match.VisitorBotID]
+		}
+
+		// Update scores only if not finishing week
+		if !finishWeek {
+			err := e.gameStateHandler.UpdateMatchScore(match.ID, homeScore, visitorScore)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		// Handle bye weeks
+		if (match.VisitorBotID == gamestate.ByeId) || (match.HomeBotID == gamestate.ByeId) {
+			var winningBotId string
+			if match.VisitorBotID == gamestate.ByeId {
+				winningBotId = match.HomeBotID
+				homeBot := botMap[match.HomeBotID]
+
+				builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
+					homeBot.Name, homeScore, gamestate.ByeId, visitorScore, homeBot.Name))
+
+			} else {
+				winningBotId = match.VisitorBotID
+				visitorBot := botMap[match.VisitorBotID]
+
+				builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
+					gamestate.ByeId, homeScore, visitorBot.Name, visitorScore, visitorBot.Name))
+			}
+
+			err := e.gameStateHandler.SetMatchResult(match.ID, homeScore, visitorScore, winningBotId)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		// Regular matchup handling
+		homeBot := botMap[match.HomeBotID]
+		visitorBot := botMap[match.VisitorBotID]
+
+		var winnerName string
+		var winningBotId string
+		if homeScore >= visitorScore {
+			winnerName = homeBot.Name
+			winningBotId = match.HomeBotID
+		} else {
+			winnerName = visitorBot.Name
+			winningBotId = match.VisitorBotID
+		}
+
+		builder.WriteString(fmt.Sprintf("Matchup: %-20s (%.2f) vs %-20s (%.2f) | Winner: %s\n",
+			homeBot.Name, homeScore, visitorBot.Name, visitorScore, winnerName))
+
+		err := e.gameStateHandler.SetMatchResult(match.ID, homeScore, visitorScore, winningBotId)
 		if err != nil {
 			return err
 		}

@@ -23,6 +23,7 @@ const seasonDesc = "season"
 const fileSuffix = ".db"
 const statsDatabaseFileName = "stats.db"
 const singleRowTableId = 1
+const ByeId = "BYE"
 
 // GameStateDatabase encapsulates the SQLite database operations
 type GameStateHandler struct {
@@ -139,11 +140,35 @@ func (handler *GameStateHandler) GetMatchupsForWeek(week int) ([]Matchup, error)
 	return matchups, nil
 }
 
+func (handler *GameStateHandler) GetMatchupById(matchupId *uint) (*Matchup, error) {
+	var matchup Matchup
+	result := handler.db.First(&matchup, "id = ?", matchupId)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get matchup from DB: %w", result.Error)
+	}
+
+	return &matchup, nil
+}
+
 func (handler *GameStateHandler) UpdateMatchScore(matchupID uint, homeScore, visitorScore float64) error {
 	return handler.db.Transaction(func(tx *gorm.DB) error {
 		updates := map[string]interface{}{
 			"home_score":    homeScore,
 			"visitor_score": visitorScore,
+		}
+		if err := tx.Model(&Matchup{}).Where("id = ?", matchupID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (handler *GameStateHandler) UpdateMatchupBots(matchupID uint, homeBotId, visitorBotId string) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]interface{}{
+			"home_bot_id":    homeBotId,
+			"visitor_bot_id": visitorBotId,
 		}
 		if err := tx.Model(&Matchup{}).Where("id = ?", matchupID).Updates(updates).Error; err != nil {
 			return err
@@ -247,22 +272,22 @@ func (handler *GameStateHandler) IncrementDraftPick() error {
 	return nil
 }
 
-func (handler *GameStateHandler) IncrementFantasyWeek() error {
+func (handler *GameStateHandler) IncrementFantasyWeek() (int, error) {
 	var gameStatus gameStatus
 	result := handler.db.First(&gameStatus, singleRowTableId)
 
 	if result.Error != nil {
-		return result.Error
+		return -1, result.Error
 	}
 
 	nextWeek := gameStatus.CurrentFantasyWeek + 1
 
 	result = handler.db.Model(&gameStatus).Update("CurrentFantasyWeek", nextWeek)
 	if result.Error != nil {
-		return result.Error
+		return -1, result.Error
 	}
 
-	return nil
+	return nextWeek, nil
 }
 
 func (handler *GameStateHandler) GetCurrentFantasyWeek() (int, error) {
@@ -302,6 +327,17 @@ func (handler *GameStateHandler) UpdatePlayer(playerID string, availability *str
 	}
 
 	return handler.db.Model(&Player{}).Where("id = ?", playerID).Updates(updates).Error
+}
+
+func (handler *GameStateHandler) AddMatchups(matchups []Matchup) error {
+	for _, matchup := range matchups {
+		result := handler.db.Create(&matchup)
+		if result.Error != nil {
+			return fmt.Errorf("failed to insert matchup %v", result.Error)
+		}
+	}
+
+	return nil
 }
 
 func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
@@ -378,7 +414,7 @@ func generateSchedule(botIds []string, weeks int) [][]Matchup {
 	n := len(botIds)
 
 	if n%2 != 0 {
-		botIds = append(botIds, "BYE")
+		botIds = append(botIds, ByeId)
 		n++
 	}
 
@@ -391,7 +427,7 @@ func generateSchedule(botIds []string, weeks int) [][]Matchup {
 			home := botIds[i]
 			away := botIds[n-1-i]
 
-			if home != "BYE" && home != "BYE" {
+			if home != ByeId && away != ByeId {
 				weekMatchups = append(weekMatchups, Matchup{
 					Week:         w + 1,
 					HomeBotID:    home,
@@ -869,9 +905,18 @@ type Matchup struct {
 	VisitorScore float64 `gorm:"column:visitor_score"`
 	WinningBotID *string `gorm:"column:winning_bot_id"`
 
+	// Playoff fields
+	IsPlayoffMatchup       bool  `gorm:"column:is_playoff_matchup;default:false"`
+	HomePlayInMatchupID    *uint `gorm:"column:home_play_in_matchup_id"`
+	VisitorPlayInMatchupID *uint `gorm:"column:visitor_play_in_matchup_id"`
+
 	HomeBot    Bot  `gorm:"foreignKey:HomeBotID;references:ID"`
 	VisitorBot Bot  `gorm:"foreignKey:VisitorBotID;references:ID"`
 	WinningBot *Bot `gorm:"foreignKey:WinningBotID;references:ID"`
+
+	// Playoff relations
+	HomePlayInMatchup    *Matchup `gorm:"foreignKey:HomePlayInMatchupID;references:ID"`
+	VisitorPlayInMatchup *Matchup `gorm:"foreignKey:VisitorPlayInMatchupID;references:ID"`
 }
 
 // NOT A TABLE - just a query result
