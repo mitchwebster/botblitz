@@ -158,34 +158,62 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
         gs = pd.read_sql("SELECT * FROM game_statuses", db.engine)
         current_week = gs.iloc[0]["current_fantasy_week"]
 
-        # List my players on bye this week
-        my_team_df = pd.read_sql(f"SELECT * FROM players WHERE current_bot_id = {bot_id} order by rank", db.engine)
+        # Get my team data and last week's points
+        my_team_df = pd.read_sql(
+            f"""
+            SELECT p.*, ws.FPTS
+            FROM players p
+            JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = {current_week - 1}
+            WHERE p.current_bot_id = {bot_id}
+            """,
+            db.engine
+        )
+
+        # Identify players on bye
         bye_players_df = my_team_df[my_team_df["player_bye_week"] == current_week]
         if bye_players_df.empty:
             print("No players on bye this week.")
         else:
+            print("Players on bye:")
             print(bye_players_df[["full_name", "player_bye_week", "tier"]])
 
-        # For each player on bye above tier threshold, try to replace with best available player at that position
+        # Identify players who scored 0 points last week and are not on bye
+        zero_score_df = my_team_df[
+            (my_team_df["player_bye_week"] != current_week - 1) & 
+            (my_team_df["FPTS"] == 0)
+        ]
+        if zero_score_df.empty:
+            print("No players scored 0 points this week (excluding bye).")
+        else:
+            print("\nPlayers who scored 0 points (not on bye):")
+            print(zero_score_df[["full_name", "player_bye_week", "tier", "FPTS"]])
+
+        # Combine into trading_block (distinct players)
+        trading_block = pd.concat([bye_players_df, zero_score_df]).drop_duplicates(subset=["id"])
+        print(f"\nTrading block ({len(trading_block)} players):")
+        print(trading_block[["full_name", "player_bye_week", "tier", "FPTS"]])
+
+        # For each player in the trading block, try to replace with best available player at that position
         claims = []
         claimed_players = set()
         bid = 1
         tier_threshold = 3 # Keep this around 8 so that you don't drop good players
-        for _, bye_player in bye_players_df.iterrows():
+        print("\nTier threshold for replacement:", tier_threshold)
+        for _, player in trading_block.iterrows():
             # Get primary position
-            position = json.loads(bye_player["allowed_positions"])[0]
-            print(f"Finding replacements for {bye_player['full_name']} - {position}")
+            position = json.loads(player["allowed_positions"])[0]
+            print(f"Finding replacements for {player['full_name']} - {position}")
             
             # Find replacement excluding already claimed players
             replacement = find_replacements(position, current_week, league_year, exclude_players=claimed_players)
-            if bye_player["tier"] < tier_threshold:
-                print(f"Keep {bye_player['full_name']}")
+            if player["tier"] < tier_threshold and player["FPTS"] > 0:
+                print(f"Keep {player['full_name']}")
             else:
                 # Add WaiverClaim to claims array, tracking claimed players
                 if not replacement.empty:
                     add = replacement.iloc[0]["fantasypros_id"]
-                    drop = bye_player["id"]
-                    print(f"Claiming {replacement.iloc[0]['player_name']} to replace {bye_player['full_name']}")
+                    drop = player["id"]
+                    print(f"Claiming {replacement.iloc[0]['player_name']} to replace {player['full_name']}")
                     claims.append(
                         WaiverClaim(
                             player_to_add_id=add,
@@ -194,7 +222,7 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
                         )
                     )
                     claimed_players.add(add)
-                print(claims)
+        print(claims)
         actions = AttemptedFantasyActions(
             waiver_claims=claims
         )
