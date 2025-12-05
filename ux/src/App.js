@@ -119,6 +119,7 @@ function App() {
           SELECT
             b.Name,
             SUM(IIF(b.id = m.home_bot_id, home_score, 0) + IIF(b.id = m.visitor_bot_id, visitor_score, 0)) AS totalPoints,
+            SUM(IIF(b.id = m.home_bot_id, visitor_score, 0) + IIF(b.id = m.visitor_bot_id, home_score, 0)) AS pointsAgainst,
             SUM(IIF(b.id = m.winning_bot_id, 1, 0)) AS numWins,
             SUM(IIF(b.id != m.winning_bot_id, 1, 0)) AS numLosses
           FROM bots AS b
