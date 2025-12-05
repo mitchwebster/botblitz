@@ -86,8 +86,8 @@ jobs:
         python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
 
         # Get weekly projections added to stats.db (important but not critical - continue on failure)
-        echo "Collecting weekly projections..."
-        if python3 -m blitz_env.collect_weekly_projections --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db; then
+        echo "Collecting weekly projections for week $(( CURRENT_WEEK + 1 ))..."
+        if python3 -m blitz_env.collect_weekly_projections --year 2025 --week $(( CURRENT_WEEK + 1 )) --db data/stats/2025/stats.db; then
           echo "✓ Weekly projections collected successfully"
         else
           echo "⚠ Warning: Failed to collect weekly projections (non-critical, continuing)"
