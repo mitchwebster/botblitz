@@ -9,7 +9,7 @@ The backfill process reconstructs historical weekly rosters by working backwards
 ## Files
 
 - `backfill_transactions.sql` - SQL script containing all historical waiver transactions from weeks 3-14
-- `../../pkg/cmd/backfill_lineups.go` - Go script that reconstructs weekly rosters and populates weekly_lineups table
+- `../../pkg/cmd/backfill_lineups/main.go` - Go script that reconstructs weekly rosters and populates weekly_lineups table
 
 ## Steps to Run Backfill
 
@@ -33,7 +33,7 @@ sqlite3 data/game_states/2025/gs-season.db "SELECT COUNT(*) FROM transactions"
 Execute the backfill script to reconstruct historical rosters and populate weekly_lineups:
 
 ```bash
-go run pkg/cmd/backfill_lineups.go
+go run pkg/cmd/backfill_lineups
 ```
 
 This script will:
