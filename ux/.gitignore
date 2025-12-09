@@ -18,6 +18,9 @@
 .env.test.local
 .env.production.local
 
+# local database copy
+/public/gs-season.db
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

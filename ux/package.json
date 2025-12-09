@@ -15,7 +15,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "start:local": "REACT_APP_USE_LOCAL_DB=true react-scripts start",
+    "start:local": "cp ../data/game_states/2025/gs-season.db public/gs-season.db && REACT_APP_USE_LOCAL_DB=true react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
