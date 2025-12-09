@@ -1,0 +1,126 @@
+2025-09-17T17:36:13.7421347Z --- Current Leaderboard ---
+2025-09-17T17:36:13.7421930Z Name             Rank       TotalPoints  Won          Lost        
+2025-09-17T17:36:13.7422565Z Chris H's team   1          291.70       2            0           
+2025-09-17T17:36:13.7423206Z Seattle's Best   2          268.60       2            0           
+2025-09-17T17:36:13.7423832Z Chris's team     3          263.80       2            0           
+2025-09-17T17:36:13.7424418Z Ryan's team      4          257.10       2            0           
+2025-09-17T17:36:13.7425203Z Harry's team     5          242.60       2            0           
+2025-09-17T17:36:13.7425782Z Matt's team      6          265.80       1            1           
+2025-09-17T17:36:13.7426223Z Justin's team    7          264.40       1            1           
+2025-09-17T17:36:13.7426581Z AVOCADOTOAST4U   8          258.50       1            1           
+2025-09-17T17:36:13.7427097Z Ben's bread      9          222.10       1            1           
+2025-09-17T17:36:13.7427438Z Standard Bot     10         218.30       0            2           
+2025-09-17T17:36:13.7427775Z Parker's team    11         213.20       0            2           
+2025-09-17T17:36:13.7428165Z Tyler's team     12         208.20       0            2           
+2025-09-17T17:36:13.7428560Z Jon's team       13         207.80       0            2           
+2025-09-17T17:36:13.7428984Z Philip's team    14         57.60        0            2           
+2025-09-17T17:36:13.7429269Z --------------------------
+2025-09-17T17:36:13.7429405Z 
+2025-09-17T17:36:13.7429527Z --- Matchups for Fantasy Week 3  ---
+2025-09-17T17:36:13.7429785Z Ryan's team (#4) vs. Chris H's team (#1)
+2025-09-17T17:36:13.7430049Z Matt's team (#6) vs. Justin's team (#7)
+2025-09-17T17:36:13.7430474Z Philip's team (#14) vs. Ben's bread (#9)
+2025-09-17T17:36:13.7430729Z Standard Bot (#10) vs. Jon's team (#13)
+2025-09-17T17:36:13.7430993Z AVOCADOTOAST4U (#8) vs. Harry's team (#5)
+2025-09-17T17:36:13.7431270Z Chris's team (#3) vs. Tyler's team (#12)
+2025-09-17T17:36:13.7431535Z Parker's team (#11) vs. Seattle's Best (#2)
+2025-09-17T17:36:13.7431787Z --------------------------
+2025-09-17T17:36:13.7431923Z 
+2025-09-17T17:36:13.7432022Z Fetching waiver claims from all bots...
+2025-09-17T17:36:35.9979464Z Recieved add drop from bot 0 -> Add Green Bay Packers , Drop Kansas City Chiefs. Bid: 0
+2025-09-17T17:36:35.9980379Z Recieved add drop from bot 0 -> Add Daniel Jones , Drop Chris Godwin Jr.. Bid: 15
+2025-09-17T17:36:35.9982102Z Recieved add drop from bot 0 -> Add Keenan Allen , Drop Chris Godwin Jr.. Bid: 10
+2025-09-17T17:36:35.9983589Z Recieved add drop from bot 0 -> Add Zach Ertz , Drop Chris Godwin Jr.. Bid: 5
+2025-09-17T17:36:39.8625781Z Recieved add drop from bot 1 -> Add Atlanta Falcons , Drop Buffalo Bills. Bid: 0
+2025-09-17T17:36:39.8626708Z Recieved add drop from bot 1 -> Add Daniel Jones , Drop J.J. McCarthy. Bid: 5
+2025-09-17T17:36:39.8628000Z Recieved add drop from bot 1 -> Add Aaron Rodgers , Drop J.J. McCarthy. Bid: 10
+2025-09-17T17:36:39.8628900Z Invalid player (11180) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-17T17:36:39.8630733Z Recieved add drop from bot 1 -> Add Keenan Allen , Drop Sam LaPorta. Bid: 0
+2025-09-17T17:36:44.3381572Z Invalid player () to drop for bot 10: Cannot drop an empty player
+2025-09-17T17:36:47.9154063Z Failed calling bot
+2025-09-17T17:36:47.9156042Z Failed to get selections for bot 11: rpc error: code = Unknown desc = Exception calling application: No response from bot: Traceback (most recent call last):
+2025-09-17T17:36:47.9157244Z   File "/app/py_grpc_server/isolate_action.py", line 16, in <module>
+2025-09-17T17:36:47.9157952Z     response = perform_weekly_fantasy_actions()
+2025-09-17T17:36:47.9158712Z   File "/app/py_grpc_server/bot.py", line 171, in perform_weekly_fantasy_actions
+2025-09-17T17:36:47.9159515Z     return week_3_waivers(team_state=team_state)
+2025-09-17T17:36:47.9160162Z   File "/app/py_grpc_server/bot.py", line 210, in week_3_waivers
+2025-09-17T17:36:47.9160728Z     claim = WaiverClaim(
+2025-09-17T17:36:47.9161172Z TypeError: bad argument type for built-in operation
+2025-09-17T17:36:47.9161528Z 
+2025-09-17T17:36:51.4072157Z Invalid player () to drop for bot 12: Cannot drop an empty player
+2025-09-17T17:36:54.9202499Z Invalid player () to drop for bot 13: Cannot drop an empty player
+2025-09-17T17:36:58.9213019Z Invalid player () to drop for bot 2: Cannot drop an empty player
+2025-09-17T17:37:02.9796628Z Invalid player () to drop for bot 3: Cannot drop an empty player
+2025-09-17T17:37:07.4183826Z Invalid player () to drop for bot 4: Cannot drop an empty player
+2025-09-17T17:37:11.4752431Z Invalid player () to drop for bot 5: Cannot drop an empty player
+2025-09-17T17:37:15.5910188Z Recieved add drop from bot 6 -> Add Daniel Jones , Drop Jordan Addison. Bid: 30
+2025-09-17T17:37:15.5911186Z Recieved add drop from bot 6 -> Add Quinshon Judkins , Drop Jake Ferguson. Bid: 15
+2025-09-17T17:37:15.5912446Z Recieved add drop from bot 6 -> Add Bhayshul Tuten , Drop Kaleb Johnson. Bid: 10
+2025-09-17T17:37:19.6509266Z Invalid player () to drop for bot 7: Cannot drop an empty player
+2025-09-17T17:37:23.5735515Z Invalid player () to drop for bot 8: Cannot drop an empty player
+2025-09-17T17:37:27.6103740Z Invalid player () to drop for bot 9: Cannot drop an empty player
+2025-09-17T17:37:27.6104573Z Finished getting all waiver claims
+2025-09-17T17:37:27.6105954Z Validated claim successfully player_to_drop_id:"8150"  player_to_add_id:"8110"
+2025-09-17T17:37:27.6106887Z Found the winning bot! 0 with a bid of 0
+2025-09-17T17:37:27.6107806Z Validated claim successfully player_to_drop_id:"16406"  player_to_add_id:"18232"  bid_amount:15
+2025-09-17T17:37:27.6108850Z Validated claim successfully player_to_drop_id:"8030"  player_to_add_id:"8010"
+2025-09-17T17:37:27.6110001Z Found the winning bot! 1 with a bid of 0
+2025-09-17T17:37:27.6110818Z Validated claim successfully player_to_drop_id:"16406"  player_to_add_id:"18232"  bid_amount:15
+2025-09-17T17:37:27.6111950Z Validated claim successfully player_to_drop_id:"23018"  player_to_add_id:"18232"  bid_amount:5
+2025-09-17T17:37:27.6113159Z Validated claim successfully player_to_drop_id:"23107"  player_to_add_id:"18232"  bid_amount:30
+2025-09-17T17:37:27.6113979Z Found the winning bot! 6 with a bid of 30
+2025-09-17T17:37:27.6115154Z Validated claim successfully player_to_drop_id:"22718"  player_to_add_id:"25391"  bid_amount:15
+2025-09-17T17:37:27.6115800Z Found the winning bot! 6 with a bid of 15
+2025-09-17T17:37:27.6116504Z Validated claim successfully player_to_drop_id:"27165"  player_to_add_id:"27297"  bid_amount:10
+2025-09-17T17:37:27.6117104Z Found the winning bot! 6 with a bid of 10
+2025-09-17T17:37:27.6117789Z Validated claim successfully player_to_drop_id:"16406"  player_to_add_id:"11616"  bid_amount:10
+2025-09-17T17:37:27.6118552Z Found the winning bot! 0 with a bid of 10
+2025-09-17T17:37:27.6119282Z Validated claim successfully player_to_drop_id:"23018"  player_to_add_id:"9001"  bid_amount:10
+2025-09-17T17:37:27.6119923Z Found the winning bot! 1 with a bid of 10
+2025-09-17T17:37:27.6120444Z Winning bot for this player is  0  with bid  0
+2025-09-17T17:37:27.6121005Z Winning bot for this player is  6  with bid  30
+2025-09-17T17:37:27.6121592Z Winning bot for this player is  1  with bid  0
+2025-09-17T17:37:27.6122211Z Winning bot for this player is  6  with bid  30
+2025-09-17T17:37:27.6122830Z Winning bot for this player is  6  with bid  30
+2025-09-17T17:37:27.6123450Z Winning bot for this player is  6  with bid  30
+2025-09-17T17:37:27.6124075Z Winning bot for this player is  6  with bid  15
+2025-09-17T17:37:27.6124685Z Winning bot for this player is  6  with bid  10
+2025-09-17T17:37:27.6125495Z Winning bot for this player is  0  with bid  10
+2025-09-17T17:37:27.6126028Z Winning bot for this player is  1  with bid  10
+2025-09-17T17:37:27.6126427Z Bot 0 won claim for player 8110 with bid 0
+2025-09-17T17:37:27.6126811Z Bot 0 won claim for player 11616 with bid 10
+2025-09-17T17:37:27.6136153Z Bot 1 won claim for player 8010 with bid 0
+2025-09-17T17:37:27.6146693Z Bot 1 won claim for player 9001 with bid 10
+2025-09-17T17:37:27.6156643Z Bot 6 won claim for player 18232 with bid 30
+2025-09-17T17:37:27.6167119Z Bot 6 won claim for player 25391 with bid 15
+2025-09-17T17:37:27.6176552Z Bot 6 won claim for player 27297 with bid 10
+2025-09-17T17:37:27.6201237Z --- Add/Drop Summary --- 
+2025-09-17T17:37:27.6201713Z --- Valid claims submitted --- 
+2025-09-17T17:37:27.6202194Z Bot Parker's team (Parker):
+2025-09-17T17:37:27.6202747Z 	- Add: Daniel Jones , Drop: Jordan Addison, Bid: 30
+2025-09-17T17:37:27.6203245Z 	- Add: Quinshon Judkins , Drop: Jake Ferguson, Bid: 15
+2025-09-17T17:37:27.6203866Z 	- Add: Bhayshul Tuten , Drop: Kaleb Johnson, Bid: 10
+2025-09-17T17:37:27.6204382Z Bot Seattle's Best (Mitch):
+2025-09-17T17:37:27.6204838Z 	- Add: Green Bay Packers , Drop: Kansas City Chiefs, Bid: 0
+2025-09-17T17:37:27.6205667Z 	- Add: Daniel Jones , Drop: Chris Godwin Jr., Bid: 15
+2025-09-17T17:37:27.6206579Z 	- Add: Keenan Allen , Drop: Chris Godwin Jr., Bid: 10
+2025-09-17T17:37:27.6207258Z 	- Add: Zach Ertz , Drop: Chris Godwin Jr., Bid: 5
+2025-09-17T17:37:27.6207709Z Bot Chris's team (Chris A):
+2025-09-17T17:37:27.6208102Z 	- Add: Atlanta Falcons , Drop: Buffalo Bills, Bid: 0
+2025-09-17T17:37:27.6208717Z 	- Add: Daniel Jones , Drop: J.J. McCarthy, Bid: 5
+2025-09-17T17:37:27.6209229Z 	- Add: Aaron Rodgers , Drop: J.J. McCarthy, Bid: 10
+2025-09-17T17:37:27.6209672Z 	- Add: Keenan Allen , Drop: Sam LaPorta, Bid: 0
+2025-09-17T17:37:27.6210164Z ------ 
+2025-09-17T17:37:27.6210517Z --- Winning Claims --- 
+2025-09-17T17:37:27.6210962Z Bot Seattle's Best (Mitch):
+2025-09-17T17:37:27.6211571Z 	- Added: Green Bay Packers , Dropped: Kansas City Chiefs, Bid: 0
+2025-09-17T17:37:27.6212324Z 	- Added: Keenan Allen , Dropped: Chris Godwin Jr., Bid: 10
+2025-09-17T17:37:27.6213075Z Bot Chris's team (Chris A):
+2025-09-17T17:37:27.6213674Z 	- Added: Atlanta Falcons , Dropped: Buffalo Bills, Bid: 0
+2025-09-17T17:37:27.6214392Z 	- Added: Aaron Rodgers , Dropped: J.J. McCarthy, Bid: 10
+2025-09-17T17:37:27.6215264Z Bot Parker's team (Parker):
+2025-09-17T17:37:27.6215853Z 	- Added: Daniel Jones , Dropped: Jordan Addison, Bid: 30
+2025-09-17T17:37:27.6216628Z 	- Added: Quinshon Judkins , Dropped: Jake Ferguson, Bid: 15
+2025-09-17T17:37:27.6217348Z 	- Added: Bhayshul Tuten , Dropped: Kaleb Johnson, Bid: 10
+2025-09-17T17:37:27.6217899Z ------ 
+2025-09-17T17:37:27.6218088Z 

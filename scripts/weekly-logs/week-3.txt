@@ -1,0 +1,122 @@
+2025-09-18T05:37:21.9959215Z --- Current Leaderboard ---
+2025-09-18T05:37:21.9959715Z Name             Rank       TotalPoints  Won          Lost        
+2025-09-18T05:37:21.9960274Z Chris H's team   1          291.70       2            0           
+2025-09-18T05:37:21.9960840Z Seattle's Best   2          268.60       2            0           
+2025-09-18T05:37:21.9961389Z Chris's team     3          263.80       2            0           
+2025-09-18T05:37:21.9961910Z Ryan's team      4          257.10       2            0           
+2025-09-18T05:37:21.9962591Z Harry's team     5          242.60       2            0           
+2025-09-18T05:37:21.9963140Z Matt's team      6          265.80       1            1           
+2025-09-18T05:37:21.9963678Z Justin's team    7          264.40       1            1           
+2025-09-18T05:37:21.9964235Z AVOCADOTOAST4U   8          258.50       1            1           
+2025-09-18T05:37:21.9964932Z Ben's bread      9          222.10       1            1           
+2025-09-18T05:37:21.9965266Z Standard Bot     10         218.30       0            2           
+2025-09-18T05:37:21.9965600Z Parker's team    11         213.20       0            2           
+2025-09-18T05:37:21.9965940Z Tyler's team     12         208.20       0            2           
+2025-09-18T05:37:21.9966253Z Jon's team       13         207.80       0            2           
+2025-09-18T05:37:21.9966560Z Philip's team    14         57.60        0            2           
+2025-09-18T05:37:21.9966839Z --------------------------
+2025-09-18T05:37:21.9966971Z 
+2025-09-18T05:37:21.9967085Z --- Matchups for Fantasy Week 3  ---
+2025-09-18T05:37:21.9967343Z Ryan's team (#4) vs. Chris H's team (#1)
+2025-09-18T05:37:21.9967598Z Matt's team (#6) vs. Justin's team (#7)
+2025-09-18T05:37:21.9967908Z Philip's team (#14) vs. Ben's bread (#9)
+2025-09-18T05:37:21.9968342Z Standard Bot (#10) vs. Jon's team (#13)
+2025-09-18T05:37:21.9968781Z AVOCADOTOAST4U (#8) vs. Harry's team (#5)
+2025-09-18T05:37:21.9969212Z Chris's team (#3) vs. Tyler's team (#12)
+2025-09-18T05:37:21.9969643Z Parker's team (#11) vs. Seattle's Best (#2)
+2025-09-18T05:37:21.9970047Z --------------------------
+2025-09-18T05:37:21.9970254Z 
+2025-09-18T05:37:21.9970424Z Fetching waiver claims from all bots...
+2025-09-18T05:37:48.3925932Z Invalid player (8150) to drop for bot 0: A player must be drafted before they can be dropped
+2025-09-18T05:37:48.3926884Z Invalid player (16406) to drop for bot 0: A player must be drafted before they can be dropped
+2025-09-18T05:37:48.3927762Z Invalid player (16406) to drop for bot 0: A player must be drafted before they can be dropped
+2025-09-18T05:37:48.3928573Z Invalid player (16406) to drop for bot 0: A player must be drafted before they can be dropped
+2025-09-18T05:37:52.2236865Z Invalid player (8030) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-18T05:37:52.2238304Z Invalid player (23018) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-18T05:37:52.2239163Z Invalid player (23018) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-18T05:37:52.2240145Z Invalid player (11180) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-18T05:37:52.2241790Z Invalid player (11616) to add for bot 1: Cannot draft player again
+2025-09-18T05:37:56.6932951Z Invalid player () to drop for bot 10: Cannot drop an empty player
+2025-09-18T05:38:00.4052394Z WARNING: bot (11) submitted 12 waiver claims, only considering first 10
+2025-09-18T05:38:00.4055188Z Invalid player (25391) to add for bot 11: Cannot draft player again
+2025-09-18T05:38:00.4056692Z Invalid player (27297) to add for bot 11: Cannot draft player again
+2025-09-18T05:38:00.4058387Z Recieved add drop from bot 11 -> Add Cam Skattebo , Drop Austin Ekeler. Bid: 11
+2025-09-18T05:38:00.4060020Z Recieved add drop from bot 11 -> Add Trey Benson , Drop Austin Ekeler. Bid: 5
+2025-09-18T05:38:00.4068291Z Recieved add drop from bot 11 -> Add Nick Chubb , Drop Austin Ekeler. Bid: 5
+2025-09-18T05:38:00.4070453Z Recieved add drop from bot 11 -> Add Rachaad White , Drop Austin Ekeler. Bid: 2
+2025-09-18T05:38:00.4071641Z Invalid player (25391) to add for bot 11: Cannot draft player again
+2025-09-18T05:38:00.4073279Z Invalid player (27297) to add for bot 11: Cannot draft player again
+2025-09-18T05:38:00.4074628Z Recieved add drop from bot 11 -> Add Cam Skattebo , Drop Jerome Ford. Bid: 11
+2025-09-18T05:38:00.4076320Z Recieved add drop from bot 11 -> Add Trey Benson , Drop Jerome Ford. Bid: 5
+2025-09-18T05:38:04.3352292Z Invalid player () to drop for bot 12: Cannot drop an empty player
+2025-09-18T05:38:08.2055972Z Invalid player () to drop for bot 13: Cannot drop an empty player
+2025-09-18T05:38:12.3710320Z Invalid player () to drop for bot 2: Cannot drop an empty player
+2025-09-18T05:38:16.7610856Z Invalid player () to drop for bot 3: Cannot drop an empty player
+2025-09-18T05:38:34.0192058Z Recieved add drop from bot 4 -> Add Kaleb Johnson , Drop Zamir White. Bid: 20
+2025-09-18T05:38:34.0193489Z Recieved add drop from bot 4 -> Add Jordan Addison , Drop Tank Dell. Bid: 20
+2025-09-18T05:38:34.0194428Z Recieved add drop from bot 4 -> Add J.J. McCarthy , Drop Kirk Cousins. Bid: 15
+2025-09-18T05:38:34.0196307Z Recieved add drop from bot 4 -> Add Buffalo Bills , Drop Miami Dolphins. Bid: 15
+2025-09-18T05:38:34.0197706Z Recieved add drop from bot 4 -> Add Younghoe Koo , Drop Justin Tucker. Bid: 10
+2025-09-18T05:38:37.6241621Z Invalid player () to drop for bot 5: Cannot drop an empty player
+2025-09-18T05:38:41.7280228Z Invalid player (23107) to drop for bot 6: A player must be drafted before they can be dropped
+2025-09-18T05:38:41.7281091Z Invalid player (22718) to drop for bot 6: A player must be drafted before they can be dropped
+2025-09-18T05:38:41.7281939Z Invalid player (27165) to drop for bot 6: A player must be drafted before they can be dropped
+2025-09-18T05:38:45.7493103Z Invalid player () to drop for bot 7: Cannot drop an empty player
+2025-09-18T05:38:49.4534839Z Invalid player () to drop for bot 8: Cannot drop an empty player
+2025-09-18T05:38:53.4377480Z Winning bot for this player is  11  with bid  11
+2025-09-18T05:38:53.4378148Z Invalid player () to drop for bot 9: Cannot drop an empty player
+2025-09-18T05:38:53.4379154Z Finished getting all waiver claims
+2025-09-18T05:38:53.4380306Z Validated claim successfully player_to_drop_id:"16483"  player_to_add_id:"27166"  bid_amount:11
+2025-09-18T05:38:53.4380965Z Found the winning bot! 11 with a bid of 11
+2025-09-18T05:38:53.4381716Z Validated claim successfully player_to_drop_id:"20095"  player_to_add_id:"27165"  bid_amount:20
+2025-09-18T05:38:53.4382686Z Found the winning bot! 4 with a bid of 20
+2025-09-18T05:38:53.4383463Z Validated claim successfully player_to_drop_id:"25361"  player_to_add_id:"23107"  bid_amount:20
+2025-09-18T05:38:53.4384222Z Found the winning bot! 4 with a bid of 20
+2025-09-18T05:38:53.4385296Z Validated claim successfully player_to_drop_id:"11177"  player_to_add_id:"23018"  bid_amount:15
+2025-09-18T05:38:53.4386279Z Found the winning bot! 4 with a bid of 15
+2025-09-18T05:38:53.4387000Z Validated claim successfully player_to_drop_id:"8160"  player_to_add_id:"8030"  bid_amount:15
+2025-09-18T05:38:53.4387478Z Found the winning bot! 4 with a bid of 15
+2025-09-18T05:38:53.4387902Z Validated claim successfully player_to_drop_id:"22921"  player_to_add_id:"25388"  bid_amount:5
+2025-09-18T05:38:53.4388505Z Found the winning bot! 11 with a bid of 5
+2025-09-18T05:38:53.4388934Z Validated claim successfully player_to_drop_id:"11465"  player_to_add_id:"16910"  bid_amount:10
+2025-09-18T05:38:53.4389423Z Found the winning bot! 4 with a bid of 10
+2025-09-18T05:38:53.4389879Z Bot 11 won claim for player 27166 with bid 11
+2025-09-18T05:38:53.4390343Z Winning bot for this player is  4  with bid  20
+2025-09-18T05:38:53.4390652Z Winning bot for this player is  4  with bid  20
+2025-09-18T05:38:53.4391202Z Winning bot for this player is  4  with bid  15
+2025-09-18T05:38:53.4391505Z Winning bot for this player is  4  with bid  15
+2025-09-18T05:38:53.4391886Z Winning bot for this player is  11  with bid  5
+2025-09-18T05:38:53.4392170Z Winning bot for this player is  4  with bid  10
+2025-09-18T05:38:53.4397068Z Bot 11 won claim for player 25388 with bid 5
+2025-09-18T05:38:53.4407409Z Bot 4 won claim for player 27165 with bid 20
+2025-09-18T05:38:53.4418138Z Bot 4 won claim for player 23107 with bid 20
+2025-09-18T05:38:53.4428499Z Bot 4 won claim for player 23018 with bid 15
+2025-09-18T05:38:53.4439752Z Bot 4 won claim for player 8030 with bid 15
+2025-09-18T05:38:53.4451367Z Bot 4 won claim for player 16910 with bid 10
+2025-09-18T05:38:53.4470562Z --- Add/Drop Summary --- 
+2025-09-18T05:38:53.4470944Z --- Valid claims submitted --- 
+2025-09-18T05:38:53.4471336Z Bot Matt's team (Matt):
+2025-09-18T05:38:53.4471776Z 	- Add: Cam Skattebo , Drop: Austin Ekeler, Bid: 11
+2025-09-18T05:38:53.4472329Z 	- Add: Trey Benson , Drop: Austin Ekeler, Bid: 5
+2025-09-18T05:38:53.4473304Z 	- Add: Nick Chubb , Drop: Austin Ekeler, Bid: 5
+2025-09-18T05:38:53.4473995Z 	- Add: Rachaad White , Drop: Austin Ekeler, Bid: 2
+2025-09-18T05:38:53.4474557Z 	- Add: Cam Skattebo , Drop: Jerome Ford, Bid: 11
+2025-09-18T05:38:53.4475085Z 	- Add: Trey Benson , Drop: Jerome Ford, Bid: 5
+2025-09-18T05:38:53.4475586Z Bot Philip's team (Philip):
+2025-09-18T05:38:53.4475987Z 	- Add: Kaleb Johnson , Drop: Zamir White, Bid: 20
+2025-09-18T05:38:53.4476334Z 	- Add: Jordan Addison , Drop: Tank Dell, Bid: 20
+2025-09-18T05:38:53.4476796Z 	- Add: J.J. McCarthy , Drop: Kirk Cousins, Bid: 15
+2025-09-18T05:38:53.4477152Z 	- Add: Buffalo Bills , Drop: Miami Dolphins, Bid: 15
+2025-09-18T05:38:53.4477491Z 	- Add: Younghoe Koo , Drop: Justin Tucker, Bid: 10
+2025-09-18T05:38:53.4477745Z ------ 
+2025-09-18T05:38:53.4477917Z --- Winning Claims --- 
+2025-09-18T05:38:53.4478145Z Bot Matt's team (Matt):
+2025-09-18T05:38:53.4478606Z 	- Added: Cam Skattebo , Dropped: Austin Ekeler, Bid: 11
+2025-09-18T05:38:53.4479211Z 	- Added: Trey Benson , Dropped: Jerome Ford, Bid: 5
+2025-09-18T05:38:53.4479714Z Bot Philip's team (Philip):
+2025-09-18T05:38:53.4480194Z 	- Added: Kaleb Johnson , Dropped: Zamir White, Bid: 20
+2025-09-18T05:38:53.4480775Z 	- Added: Jordan Addison , Dropped: Tank Dell, Bid: 20
+2025-09-18T05:38:53.4481361Z 	- Added: J.J. McCarthy , Dropped: Kirk Cousins, Bid: 15
+2025-09-18T05:38:53.4481960Z 	- Added: Buffalo Bills , Dropped: Miami Dolphins, Bid: 15
+2025-09-18T05:38:53.4482875Z 	- Added: Younghoe Koo , Dropped: Justin Tucker, Bid: 10
+2025-09-18T05:38:53.4483368Z ------

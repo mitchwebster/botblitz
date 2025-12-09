@@ -1,0 +1,101 @@
+2025-10-15T17:37:19.2165863Z --- Current Leaderboard ---
+2025-10-15T17:37:19.2166370Z Name             Rank       TotalPoints  Won          Lost        
+2025-10-15T17:37:19.2166961Z Chris H's team   1          891.60       6            0           
+2025-10-15T17:37:19.2167604Z Matt's team      2          823.80       5            1           
+2025-10-15T17:37:19.2168162Z Seattle's Best   3          773.10       5            1           
+2025-10-15T17:37:19.2168722Z Chris's team     4          722.80       4            2           
+2025-10-15T17:37:19.2169446Z Harry's team     5          721.10       4            2           
+2025-10-15T17:37:19.2169988Z Ryan's team      6          615.70       4            2           
+2025-10-15T17:37:19.2170827Z AVOCADOTOAST4U   7          763.60       3            3           
+2025-10-15T17:37:19.2171425Z Standard Bot     8          732.10       3            3           
+2025-10-15T17:37:19.2171992Z Justin's team    9          715.30       3            3           
+2025-10-15T17:37:19.2172548Z Ben's bread      10         698.80       2            4           
+2025-10-15T17:37:19.2173100Z Tyler's team     11         683.70       2            4           
+2025-10-15T17:37:19.2173648Z Jon's team       12         568.20       1            5           
+2025-10-15T17:37:19.2174193Z Parker's team    13         622.40       0            6           
+2025-10-15T17:37:19.2174767Z Philip's team    14         357.30       0            6           
+2025-10-15T17:37:19.2175246Z --------------------------
+2025-10-15T17:37:19.2175476Z 
+2025-10-15T17:37:19.2175647Z --- Matchups for Fantasy Week 7  ---
+2025-10-15T17:37:19.2176097Z Ryan's team (#6) vs. Harry's team (#5)
+2025-10-15T17:37:19.2176540Z Jon's team (#12) vs. Tyler's team (#11)
+2025-10-15T17:37:19.2176990Z Ben's bread (#10) vs. Seattle's Best (#3)
+2025-10-15T17:37:19.2177462Z Justin's team (#9) vs. Parker's team (#13)
+2025-10-15T17:37:19.2177924Z Chris H's team (#1) vs. Chris's team (#4)
+2025-10-15T17:37:19.2178376Z Matt's team (#2) vs. AVOCADOTOAST4U (#7)
+2025-10-15T17:37:19.2178829Z Philip's team (#14) vs. Standard Bot (#8)
+2025-10-15T17:37:19.2179447Z --------------------------
+2025-10-15T17:37:19.2179666Z 
+2025-10-15T17:37:19.2179849Z Fetching waiver claims from all bots...
+2025-10-15T17:37:43.9383832Z No add drop selections submitted for bot: 0
+2025-10-15T17:37:47.5891372Z Invalid player (8030) to drop for bot 1: A player must be drafted before they can be dropped
+2025-10-15T17:37:47.5892173Z Invalid player (23018) to drop for bot 1: A player must be drafted before they can be dropped
+2025-10-15T17:37:47.5892947Z Invalid player (23018) to drop for bot 1: A player must be drafted before they can be dropped
+2025-10-15T17:37:47.5893604Z Invalid player (11180) to drop for bot 1: A player must be drafted before they can be dropped
+2025-10-15T17:37:47.5894347Z Invalid player (11616) to add for bot 1: Cannot draft player again
+2025-10-15T17:37:52.2107453Z Invalid selection details for bot 10. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:37:56.1667196Z Invalid selection details for bot 11. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:00.1691867Z Invalid selection details for bot 12. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:03.9955058Z Invalid selection details for bot 13. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:08.2219433Z Invalid selection details for bot 2. PlayerToAddId:(false; UPDATE `bots` SET name='⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣤⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2220640Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⠀⠀⠀⢀⣴⠟⠉⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2221068Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣷⣀⢀⣾⠿⠻⢶⣄⠀⠀⣠⣶⡿⠶⣄⣠⣾⣿⠗⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2221623Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⢻⣿⣿⡿⣿⠿⣿⡿⢼⣿⣿⡿⣿⣎⡟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2222260Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡟⠉⢻⢛⣛⡉⠀⠀⠙⠛⠻⠛⠑⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2222845Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣧⣤⣼⠿⠿⣷⣤⡤⠴⠖⠳⣄⣀⣹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2223553Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣀⣟⠻⣦⣀⡀⠀⠀⠀⠀⣀⡈⠻⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2224192Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⡿⠉⡇⠀⠈⠛⠛⠛⠋⠉⠉⠀⠀⠀⠹⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2224806Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⡟⠀⢦⡀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠃⠀⠈⠑⠪⠷⠤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2225149Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣾⣿⣿⣿⣦⣼⠛⢦⣤⣄⡀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠑⠢⡀⠀⠀⠀⠀⠀
+2025-10-15T17:38:08.2225505Z ⠀⠀⠀⠀⠀⠀⠀⢀⣠⠴⠲⠖⠛⠻⣿⡿⠛⠉⠉⠻⠷⣦⣽⠿⠿⠒⠚⠋⠉⠁⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢦⠀⠀⠀⠀
+2025-10-15T17:38:08.2225832Z ⠀⠀⠀⠀⠀⢀⣾⠛⠁⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠤⠒⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢣⠀⠀⠀
+2025-10-15T17:38:08.2226532Z ⠀⠀⠀⠀⣰⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣑⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡇⠀⠀
+2025-10-15T17:38:08.2226951Z ⠀⠀⠀⣰⣿⣁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣧⣄⠀⠀⠀⠀⠀⠀⢳⡀⠀
+2025-10-15T17:38:08.2227492Z ⠀⠀⠀⣿⡾⢿⣀⢀⣀⣦⣾⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⣫⣿⡿⠟⠻⠶⠀⠀⠀⠀⠀⢳⠀
+2025-10-15T17:38:08.2227961Z ⠀⠀⢀⣿⣧⡾⣿⣿⣿⣿⣿⡷⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⢀⡴⢿⣿⣧⠀⡀⠀⢀⣀⣀⢒⣤⣶⣿⣿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-10-15T17:38:08.2228401Z ⠀⠀⡾⠁⠙⣿⡈⠉⠙⣿⣿⣷⣬⡛⢿⣶⣶⣴⣶⣶⣶⣤⣤⠤⠾⣿⣿⣿⡿⠿⣿⠿⢿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-10-15T17:38:08.2229421Z ⠀⣸⠃⠀⠀⢸⠃⠀⠀⢸⣿⣿⣿⣿⣿⣿⣷⣾⣿⣿⠟⡉⠀⠀⠀⠈⠙⠛⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-10-15T17:38:08.2229987Z ⠀⣿⠀⠀⢀⡏⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⠿⠿⠛⠛⠉⠁⠀⠀⠀⠀⠀⠉⠠⠿⠟⠻⠟⠋⠉⢿⣿⣦⡀⢰⡀⠀⠀⠀⠀⠀⠀⠁
+2025-10-15T17:38:08.2230574Z ⢀⣿⡆⢀⡾⠀⠀⠀⠀⣾⠏⢿⣿⣿⣿⣯⣙⢷⡄⠀⠀⠀⠀⠀⢸⡄⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣿⣻⢿⣷⣀⣷⣄⠀⠀⠀⠀⢸⠀
+2025-10-15T17:38:08.2231099Z ⢸⠃⠠⣼⠃⠀⠀⣠⣾⡟⠀⠈⢿⣿⡿⠿⣿⣿⡿⠿⠿⠿⠷⣄⠈⠿⠛⠻⠶⢶⣄⣀⣀⡠⠈⢛⡿⠃⠈⢿⣿⣿⡿⠀⠀⠀⠀⠀⡀
+2025-10-15T17:38:08.2231787Z ⠟⠀⠀⢻⣶⣶⣾⣿⡟⠁⠀⠀⢸⣿⢅⠀⠈⣿⡇⠀⠀⠀⠀⠀⣷⠂⠀⠀⠀⠀⠐⠋⠉⠉⠀⢸⠁⠀⠀⠀⢻⣿⠛⠀⠀⠀⠀⢀⠇
+2025-10-15T17:38:08.2232121Z ⠀⠀⠀⠀⠹⣿⣿⠋⠀⠀⠀⠀⢸⣧⠀⠰⡀⢸⣷⣤⣤⡄⠀⠀⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡆⠀⠀⠀⠀⡾⠀⠀⠀⠀⠀⠀⢼⡇
+2025-10-15T17:38:08.2233046Z ⠀⠀⠀⠀⠀⠙⢻⠄⠀⠀⠀⠀⣿⠉⠀⠀⠈⠓⢯⡉⠉⠉⢱⣶⠏⠙⠛⠚⠁⠀⠀⠀⠀⠀⣼⠇⠀⠀⠀⢀⡇⠀⠀⠀⠀⠀⠀⠀⡇
+2025-10-15T17:38:08.2233692Z ⠀⠀⠀⠀⠀⠀⠻⠄⠀⠀⠀⢀⣿⠀⢠⡄⠀⠀⠀⣁⠁⡀⠀⢠⠀⠀⠀⠀⠀⠀⠀⠀⢀⣐⡟⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⢠⡇' WHERE id=0 --). Error: PlayerToAddId must be a valid integer
+2025-10-15T17:38:08.2234636Z Invalid selection details for bot 2. PlayerToAddId:(false; UPDATE `bots` SET remaining_waiver_budget=1000000 WHERE id=2 --). Error: PlayerToAddId must be a valid integer
+2025-10-15T17:38:08.2236537Z Invalid selection details for bot 2. PlayerToAddId:(false; UPDATE `players` SET current_bot_id=2, availability='DRAFTED' --). Error: PlayerToAddId must be a valid integer
+2025-10-15T17:38:08.2238168Z Invalid selection details for bot 2. PlayerToAddId:(false; UPDATE `matchups` SET winning_bot_id=2, home_score=1000000 WHERE home_bot_id=2 --). Error: PlayerToAddId must be a valid integer
+2025-10-15T17:38:08.2240139Z Invalid selection details for bot 2. PlayerToAddId:(false; UPDATE `matchups` SET winning_bot_id=2, visitor_score=1000000 WHERE visitor_bot_id=2 --). Error: PlayerToAddId must be a valid integer
+2025-10-15T17:38:12.7862726Z Invalid selection details for bot 3. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:17.2647713Z WARNING: bot (4) submitted 11 waiver claims, only considering first 10
+2025-10-15T17:38:17.2648582Z Invalid player (23018) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2650029Z Invalid player (23018) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2651330Z Invalid player (23018) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2652311Z Invalid player (19562) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2653246Z Invalid player (19562) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2654148Z Invalid player (18256) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2655098Z Invalid player (18256) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2656003Z Invalid player (16910) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2656937Z Invalid player (16910) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:17.2657664Z Invalid player (16910) to drop for bot 4: A player must be drafted before they can be dropped
+2025-10-15T17:38:21.0903007Z Invalid player (25247) to drop for bot 5: A player can only be dropped by their owning team
+2025-10-15T17:38:25.1781001Z Invalid player (17258) to drop for bot 6: A player must be drafted before they can be dropped
+2025-10-15T17:38:25.1781881Z Invalid player (19196) to drop for bot 6: A player must be drafted before they can be dropped
+2025-10-15T17:38:25.1782835Z Invalid player (15756) to drop for bot 6: A player can only be dropped by their owning team
+2025-10-15T17:38:29.3309300Z Invalid selection details for bot 7. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:33.0373464Z Recieved add drop from bot 8 -> Add Geno Smith , Drop Jauan Jennings. Bid: 10
+2025-10-15T17:38:36.7604285Z Invalid selection details for bot 9. PlayerToAddId:(). Error: PlayerToAddId cannot be empty
+2025-10-15T17:38:36.7605117Z Finished getting all waiver claims
+2025-10-15T17:38:36.7605619Z Winning bot for this player is  8  with bid  10
+2025-10-15T17:38:36.7606460Z Validated claim successfully player_to_drop_id:"19590"  player_to_add_id:"11687"  bid_amount:10
+2025-10-15T17:38:36.7607297Z Found the winning bot! 8 with a bid of 10
+2025-10-15T17:38:36.7607808Z Bot 8 won claim for player 11687 with bid 10
+2025-10-15T17:38:36.7623651Z --- Add/Drop Summary --- 
+2025-10-15T17:38:36.7624115Z --- Valid claims submitted --- 
+2025-10-15T17:38:36.7624548Z Bot AVOCADOTOAST4U (Jack):
+2025-10-15T17:38:36.7625168Z 	- Add: Geno Smith , Drop: Jauan Jennings, Bid: 10
+2025-10-15T17:38:36.7625643Z ------ 
+2025-10-15T17:38:36.7625955Z --- Winning Claims --- 
+2025-10-15T17:38:36.7626355Z Bot AVOCADOTOAST4U (Jack):
+2025-10-15T17:38:36.7626870Z 	- Added: Geno Smith , Dropped: Jauan Jennings, Bid: 10
+2025-10-15T17:38:36.7627305Z ------ 

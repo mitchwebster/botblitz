@@ -1,0 +1,190 @@
+2025-09-25T03:15:54.6620988Z --- Current Leaderboard ---
+2025-09-25T03:15:54.6621347Z Name             Rank       TotalPoints  Won          Lost        
+2025-09-25T03:15:54.6621911Z Chris H's team   1          428.70       3            0           
+2025-09-25T03:15:54.6622444Z Seattle's Best   2          414.90       3            0           
+2025-09-25T03:15:54.6623875Z AVOCADOTOAST4U   3          394.00       2            1           
+2025-09-25T03:15:54.6624481Z Matt's team      4          393.40       2            1           
+2025-09-25T03:15:54.6625010Z Ben's bread      5          381.90       2            1           
+2025-09-25T03:15:54.6625553Z Harry's team     6          372.30       2            1           
+2025-09-25T03:15:54.6626078Z Chris's team     7          347.60       2            1           
+2025-09-25T03:15:54.6626596Z Ryan's team      8          345.40       2            1           
+2025-09-25T03:15:54.6627424Z Justin's team    9          383.20       1            2           
+2025-09-25T03:15:54.6628014Z Standard Bot     10         354.20       1            2           
+2025-09-25T03:15:54.6628584Z Tyler's team     11         317.10       1            2           
+2025-09-25T03:15:54.6629121Z Jon's team       12         310.00       0            3           
+2025-09-25T03:15:54.6629438Z Parker's team    13         307.80       0            3           
+2025-09-25T03:15:54.6629757Z Philip's team    14         71.90        0            3           
+2025-09-25T03:15:54.6630186Z --------------------------
+2025-09-25T03:15:54.6630320Z 
+2025-09-25T03:15:54.6630445Z --- Matchups for Fantasy Week 4  ---
+2025-09-25T03:15:54.6630713Z Ryan's team (#8) vs. Justin's team (#9)
+2025-09-25T03:15:54.6630972Z Chris H's team (#1) vs. Ben's bread (#5)
+2025-09-25T03:15:54.6631227Z Matt's team (#4) vs. Jon's team (#12)
+2025-09-25T03:15:54.6631487Z Philip's team (#14) vs. Harry's team (#6)
+2025-09-25T03:15:54.6631749Z Standard Bot (#10) vs. Tyler's team (#11)
+2025-09-25T03:15:54.6632025Z AVOCADOTOAST4U (#3) vs. Seattle's Best (#2)
+2025-09-25T03:15:54.6632295Z Chris's team (#7) vs. Parker's team (#13)
+2025-09-25T03:15:54.6632712Z --------------------------
+2025-09-25T03:15:54.6632856Z 
+2025-09-25T03:15:54.6632966Z Fetching waiver claims from all bots...
+2025-09-25T03:16:00.2785202Z Recieved add drop from bot 0 -> Add Quentin Johnston , Drop Tyler Warren. Bid: 12
+2025-09-25T03:16:04.0209040Z Invalid player (8030) to drop for bot 1: A player can only be dropped by their owning team
+2025-09-25T03:16:04.0210018Z Invalid player (23018) to drop for bot 1: A player can only be dropped by their owning team
+2025-09-25T03:16:04.0210534Z Invalid player (23018) to drop for bot 1: A player can only be dropped by their owning team
+2025-09-25T03:16:04.0211327Z Invalid player (11180) to drop for bot 1: A player must be drafted before they can be dropped
+2025-09-25T03:16:04.0211785Z Invalid player (11616) to add for bot 1: Cannot draft player again
+2025-09-25T03:16:08.2547983Z Invalid selection details for bot 10
+2025-09-25T03:16:08.2548907Z 	PlayerToAddId:()
+2025-09-25T03:16:08.2549439Z 	PlayerToDropId:()
+2025-09-25T03:16:11.7715081Z Error: PlayerToAddId cannot be emptyRecieved add drop from bot 11 -> Add Quentin Johnston , Drop Jerry Jeudy. Bid: 8
+2025-09-25T03:16:15.5988149Z Invalid selection details for bot 12
+2025-09-25T03:16:15.5989705Z 	PlayerToAddId:()
+2025-09-25T03:16:15.5990050Z 	PlayerToDropId:()
+2025-09-25T03:16:19.5115909Z Error: PlayerToAddId cannot be emptyInvalid selection details for bot 13
+2025-09-25T03:16:19.5116745Z 	PlayerToAddId:()
+2025-09-25T03:16:19.5117099Z 	PlayerToDropId:()
+2025-09-25T03:16:23.6396690Z Error: PlayerToAddId cannot be emptyInvalid selection details for bot 2
+2025-09-25T03:16:23.6397907Z 	PlayerToAddId:(false; UPDATE `bots` SET name='⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣤⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6398754Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⠀⠀⠀⢀⣴⠟⠉⠀⠀⠀⠈⠻⣦⡀⠀⠀⠀⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6399323Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣷⣀⢀⣾⠿⠻⢶⣄⠀⠀⣠⣶⡿⠶⣄⣠⣾⣿⠗⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6399946Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⢻⣿⣿⡿⣿⠿⣿⡿⢼⣿⣿⡿⣿⣎⡟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6400478Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡟⠉⢻⢛⣛⡉⠀⠀⠙⠛⠻⠛⠑⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6400799Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣧⣤⣼⠿⠿⣷⣤⡤⠴⠖⠳⣄⣀⣹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6401198Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣀⣟⠻⣦⣀⡀⠀⠀⠀⠀⣀⡈⠻⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6401535Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⡿⠉⡇⠀⠈⠛⠛⠛⠋⠉⠉⠀⠀⠀⠹⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6401863Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⡟⠀⢦⡀⠀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠃⠀⠈⠑⠪⠷⠤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6402265Z ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣾⣿⣿⣿⣦⣼⠛⢦⣤⣄⡀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠑⠢⡀⠀⠀⠀⠀⠀
+2025-09-25T03:16:23.6403061Z ⠀⠀⠀⠀⠀⠀⠀⢀⣠⠴⠲⠖⠛⠻⣿⡿⠛⠉⠉⠻⠷⣦⣽⠿⠿⠒⠚⠋⠉⠁⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢦⠀⠀⠀⠀
+2025-09-25T03:16:23.6403401Z ⠀⠀⠀⠀⠀⢀⣾⠛⠁⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠤⠒⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢣⠀⠀⠀
+2025-09-25T03:16:23.6403784Z ⠀⠀⠀⠀⣰⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣑⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡇⠀⠀
+2025-09-25T03:16:23.6404124Z ⠀⠀⠀⣰⣿⣁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣧⣄⠀⠀⠀⠀⠀⠀⢳⡀⠀
+2025-09-25T03:16:23.6404533Z ⠀⠀⠀⣿⡾⢿⣀⢀⣀⣦⣾⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡰⣫⣿⡿⠟⠻⠶⠀⠀⠀⠀⠀⢳⠀
+2025-09-25T03:16:23.6405010Z ⠀⠀⢀⣿⣧⡾⣿⣿⣿⣿⣿⡷⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⢀⡴⢿⣿⣧⠀⡀⠀⢀⣀⣀⢒⣤⣶⣿⣿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-09-25T03:16:23.6405567Z ⠀⠀⡾⠁⠙⣿⡈⠉⠙⣿⣿⣷⣬⡛⢿⣶⣶⣴⣶⣶⣶⣤⣤⠤⠾⣿⣿⣿⡿⠿⣿⠿⢿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-09-25T03:16:23.6405975Z ⠀⣸⠃⠀⠀⢸⠃⠀⠀⢸⣿⣿⣿⣿⣿⣿⣷⣾⣿⣿⠟⡉⠀⠀⠀⠈⠙⠛⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇
+2025-09-25T03:16:23.6406302Z ⠀⣿⠀⠀⢀⡏⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⠿⠿⠛⠛⠉⠁⠀⠀⠀⠀⠀⠉⠠⠿⠟⠻⠟⠋⠉⢿⣿⣦⡀⢰⡀⠀⠀⠀⠀⠀⠀⠁
+2025-09-25T03:16:23.6406778Z ⢀⣿⡆⢀⡾⠀⠀⠀⠀⣾⠏⢿⣿⣿⣿⣯⣙⢷⡄⠀⠀⠀⠀⠀⢸⡄⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣿⣻⢿⣷⣀⣷⣄⠀⠀⠀⠀⢸⠀
+2025-09-25T03:16:23.6407209Z ⢸⠃⠠⣼⠃⠀⠀⣠⣾⡟⠀⠈⢿⣿⡿⠿⣿⣿⡿⠿⠿⠿⠷⣄⠈⠿⠛⠻⠶⢶⣄⣀⣀⡠⠈⢛⡿⠃⠈⢿⣿⣿⡿⠀⠀⠀⠀⠀⡀
+2025-09-25T03:16:23.6407529Z ⠟⠀⠀⢻⣶⣶⣾⣿⡟⠁⠀⠀⢸⣿⢅⠀⠈⣿⡇⠀⠀⠀⠀⠀⣷⠂⠀⠀⠀⠀⠐⠋⠉⠉⠀⢸⠁⠀⠀⠀⢻⣿⠛⠀⠀⠀⠀⢀⠇
+2025-09-25T03:16:23.6407922Z ⠀⠀⠀⠀⠹⣿⣿⠋⠀⠀⠀⠀⢸⣧⠀⠰⡀⢸⣷⣤⣤⡄⠀⠀⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡆⠀⠀⠀⠀⡾⠀⠀⠀⠀⠀⠀⢼⡇
+2025-09-25T03:16:23.6408272Z ⠀⠀⠀⠀⠀⠙⢻⠄⠀⠀⠀⠀⣿⠉⠀⠀⠈⠓⢯⡉⠉⠉⢱⣶⠏⠙⠛⠚⠁⠀⠀⠀⠀⠀⣼⠇⠀⠀⠀⢀⡇⠀⠀⠀⠀⠀⠀⠀⡇
+2025-09-25T03:16:23.6408635Z ⠀⠀⠀⠀⠀⠀⠻⠄⠀⠀⠀⢀⣿⠀⢠⡄⠀⠀⠀⣁⠁⡀⠀⢠⠀⠀⠀⠀⠀⠀⠀⠀⢀⣐⡟⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⢠⡇' WHERE id=0 --)
+2025-09-25T03:16:23.6408925Z 	PlayerToDropId:(19788)
+2025-09-25T03:16:23.6409280Z Error: PlayerToAddId must be a valid integerInvalid selection details for bot 2
+2025-09-25T03:16:23.6410073Z 	PlayerToAddId:(false; UPDATE `bots` SET remaining_waiver_budget=1000000 WHERE id=2 --)
+2025-09-25T03:16:23.6410616Z 	PlayerToDropId:(19788)
+2025-09-25T03:16:23.6411183Z Error: PlayerToAddId must be a valid integerInvalid selection details for bot 2
+2025-09-25T03:16:23.6411977Z 	PlayerToAddId:(false; UPDATE `players` SET current_bot_id=2, availability='DRAFTED' --)
+2025-09-25T03:16:23.6412685Z 	PlayerToDropId:(19788)
+2025-09-25T03:16:23.6413199Z Error: PlayerToAddId must be a valid integerInvalid selection details for bot 2
+2025-09-25T03:16:23.6413964Z 	PlayerToAddId:(false; UPDATE `matchups` SET winning_bot_id=2, home_score=1000000 WHERE home_bot_id=2 --)
+2025-09-25T03:16:23.6414531Z 	PlayerToDropId:(19788)
+2025-09-25T03:16:23.6414867Z Error: PlayerToAddId must be a valid integerInvalid selection details for bot 2
+2025-09-25T03:16:23.6415687Z 	PlayerToAddId:(false; UPDATE `matchups` SET winning_bot_id=2, visitor_score=1000000 WHERE visitor_bot_id=2 --)
+2025-09-25T03:16:23.6416229Z 	PlayerToDropId:(19788)
+2025-09-25T03:16:27.6593403Z Error: PlayerToAddId must be a valid integerInvalid selection details for bot 3
+2025-09-25T03:16:27.6594375Z 	PlayerToAddId:()
+2025-09-25T03:16:27.6594694Z 	PlayerToDropId:()
+2025-09-25T03:16:32.1030636Z Error: PlayerToAddId cannot be emptyRecieved add drop from bot 4 -> Add Tre Tucker , Drop Jordan Addison. Bid: 1
+2025-09-25T03:16:32.1031563Z Recieved add drop from bot 4 -> Add Quentin Johnston , Drop Gabe Davis. Bid: 1
+2025-09-25T03:16:32.1032917Z Recieved add drop from bot 4 -> Add Geno Smith , Drop Deshaun Watson. Bid: 1
+2025-09-25T03:16:32.1035048Z Recieved add drop from bot 4 -> Add Jake Ferguson , Drop Kaleb Johnson. Bid: 1
+2025-09-25T03:16:32.1036254Z Recieved add drop from bot 4 -> Add Rachaad White , Drop Jonathon Brooks. Bid: 1
+2025-09-25T03:16:32.1037509Z Recieved add drop from bot 4 -> Add Tyler Allgeier , Drop Kendre Miller. Bid: 1
+2025-09-25T03:16:32.1038797Z Recieved add drop from bot 4 -> Add Wan'Dale Robinson , Drop Jahan Dotson. Bid: 1
+2025-09-25T03:16:32.1040178Z Recieved add drop from bot 4 -> Add Jacksonville Jaguars , Drop Buffalo Bills. Bid: 1
+2025-09-25T03:16:35.6804172Z Invalid selection details for bot 5
+2025-09-25T03:16:35.6804643Z 	PlayerToAddId:()
+2025-09-25T03:16:35.6804963Z 	PlayerToDropId:()
+2025-09-25T03:16:39.4932659Z Error: PlayerToAddId cannot be emptyRecieved add drop from bot 6 -> Add Tre Tucker , Drop Calvin Ridley. Bid: 7
+2025-09-25T03:16:39.4933790Z Recieved add drop from bot 6 -> Add Hunter Henry , Drop Joe Burrow. Bid: 3
+2025-09-25T03:16:39.4934470Z Recieved add drop from bot 6 -> Add Tyler Loop , Drop Ka'imi Fairbairn. Bid: 0
+2025-09-25T03:16:43.0996072Z Invalid selection details for bot 7
+2025-09-25T03:16:43.0996557Z 	PlayerToAddId:()
+2025-09-25T03:16:43.0996884Z 	PlayerToDropId:()
+2025-09-25T03:16:46.6708985Z Error: PlayerToAddId cannot be emptyInvalid selection details for bot 8
+2025-09-25T03:16:46.6711688Z 	PlayerToAddId:()
+2025-09-25T03:16:46.6712873Z 	PlayerToDropId:()
+2025-09-25T03:16:50.6843776Z Error: PlayerToAddId cannot be emptyInvalid selection details for bot 9
+2025-09-25T03:16:50.6844482Z Winning bot for this player is  0  with bid  12
+2025-09-25T03:16:50.6844995Z Winning bot for this player is  6  with bid  7
+2025-09-25T03:16:50.6845428Z Winning bot for this player is  6  with bid  7
+2025-09-25T03:16:50.6845793Z Winning bot for this player is  6  with bid  3
+2025-09-25T03:16:50.6846235Z Winning bot for this player is  0  with bid  12
+2025-09-25T03:16:50.6846525Z Winning bot for this player is  6  with bid  0
+2025-09-25T03:16:50.6846871Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6847162Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6847457Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6847811Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6848093Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6848433Z Winning bot for this player is  4  with bid  1
+2025-09-25T03:16:50.6848742Z 	PlayerToAddId:()
+2025-09-25T03:16:50.6848991Z 	PlayerToDropId:()
+2025-09-25T03:16:50.6849461Z Error: PlayerToAddId cannot be emptyFinished getting all waiver claims
+2025-09-25T03:16:50.6850041Z Validated claim successfully player_to_drop_id:"19201" player_to_add_id:"23123" bid_amount:8
+2025-09-25T03:16:50.6850651Z Validated claim successfully player_to_drop_id:"23107" player_to_add_id:"25337" bid_amount:1
+2025-09-25T03:16:50.6851301Z Validated claim successfully player_to_drop_id:"17258" player_to_add_id:"25337" bid_amount:7
+2025-09-25T03:16:50.6851732Z Found the winning bot! 6 with a bid of 7
+2025-09-25T03:16:50.6852158Z Validated claim successfully player_to_drop_id:"19196" player_to_add_id:"15561" bid_amount:3
+2025-09-25T03:16:50.6852787Z Found the winning bot! 6 with a bid of 3
+2025-09-25T03:16:50.6853199Z Validated claim successfully player_to_drop_id:"26434" player_to_add_id:"23123" bid_amount:12
+2025-09-25T03:16:50.6853671Z Found the winning bot! 0 with a bid of 12
+2025-09-25T03:16:50.6854047Z Validated claim successfully player_to_drop_id:"15756" player_to_add_id:"27534"
+2025-09-25T03:16:50.6854610Z Found the winning bot! 6 with a bid of 0
+2025-09-25T03:16:50.6855375Z Validated claim successfully player_to_drop_id:"16398" player_to_add_id:"11687" bid_amount:1
+2025-09-25T03:16:50.6855849Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6856320Z Validated claim successfully player_to_drop_id:"27165" player_to_add_id:"22718" bid_amount:1
+2025-09-25T03:16:50.6856714Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6857110Z Validated claim successfully player_to_drop_id:"26148" player_to_add_id:"23891" bid_amount:1
+2025-09-25T03:16:50.6857816Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6858426Z Validated claim successfully player_to_drop_id:"24360" player_to_add_id:"24172" bid_amount:1
+2025-09-25T03:16:50.6859069Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6859720Z Validated claim successfully player_to_drop_id:"23101" player_to_add_id:"22985" bid_amount:1
+2025-09-25T03:16:50.6860386Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6861093Z Validated claim successfully player_to_drop_id:"8030" player_to_add_id:"8140" bid_amount:1
+2025-09-25T03:16:50.6861783Z Found the winning bot! 4 with a bid of 1
+2025-09-25T03:16:50.6862069Z Bot 6 won claim for player 25337 with bid 7
+2025-09-25T03:16:50.6864306Z Bot 6 won claim for player 15561 with bid 3
+2025-09-25T03:16:50.6869821Z Bot 6 won claim for player 27534 with bid 0
+2025-09-25T03:16:50.6878008Z Bot 0 won claim for player 23123 with bid 12
+2025-09-25T03:16:50.6888455Z Bot 4 won claim for player 11687 with bid 1
+2025-09-25T03:16:50.6900449Z Bot 4 won claim for player 22718 with bid 1
+2025-09-25T03:16:50.6909072Z Bot 4 won claim for player 23891 with bid 1
+2025-09-25T03:16:50.6919734Z Bot 4 won claim for player 24172 with bid 1
+2025-09-25T03:16:50.6929651Z Bot 4 won claim for player 22985 with bid 1
+2025-09-25T03:16:50.6939290Z Bot 4 won claim for player 8140 with bid 1
+2025-09-25T03:16:50.6959920Z --- Add/Drop Summary --- 
+2025-09-25T03:16:50.6960337Z --- Valid claims submitted --- 
+2025-09-25T03:16:50.6960610Z Bot Seattle's Best (Mitch):
+2025-09-25T03:16:50.6961021Z 	- Add: Quentin Johnston , Drop: Tyler Warren, Bid: 12
+2025-09-25T03:16:50.6961517Z Bot Matt's team (Matt):
+2025-09-25T03:16:50.6961908Z 	- Add: Quentin Johnston , Drop: Jerry Jeudy, Bid: 8
+2025-09-25T03:16:50.6962393Z Bot Philip's team (Philip):
+2025-09-25T03:16:50.6962817Z 	- Add: Tre Tucker , Drop: Jordan Addison, Bid: 1
+2025-09-25T03:16:50.6963254Z 	- Add: Quentin Johnston , Drop: Gabe Davis, Bid: 1
+2025-09-25T03:16:50.6963645Z 	- Add: Geno Smith , Drop: Deshaun Watson, Bid: 1
+2025-09-25T03:16:50.6964125Z 	- Add: Jake Ferguson , Drop: Kaleb Johnson, Bid: 1
+2025-09-25T03:16:50.6964614Z 	- Add: Rachaad White , Drop: Jonathon Brooks, Bid: 1
+2025-09-25T03:16:50.6965102Z 	- Add: Tyler Allgeier , Drop: Kendre Miller, Bid: 1
+2025-09-25T03:16:50.6965585Z 	- Add: Wan'Dale Robinson , Drop: Jahan Dotson, Bid: 1
+2025-09-25T03:16:50.6966092Z 	- Add: Jacksonville Jaguars , Drop: Buffalo Bills, Bid: 1
+2025-09-25T03:16:50.6966538Z Bot Parker's team (Parker):
+2025-09-25T03:16:50.6966947Z 	- Add: Tre Tucker , Drop: Calvin Ridley, Bid: 7
+2025-09-25T03:16:50.6967418Z 	- Add: Hunter Henry , Drop: Joe Burrow, Bid: 3
+2025-09-25T03:16:50.6967904Z 	- Add: Tyler Loop , Drop: Ka'imi Fairbairn, Bid: 0
+2025-09-25T03:16:50.6968398Z ------ 
+2025-09-25T03:16:50.6968662Z --- Winning Claims --- 
+2025-09-25T03:16:50.6968976Z Bot Seattle's Best (Mitch):
+2025-09-25T03:16:50.6969481Z 	- Added: Quentin Johnston , Dropped: Tyler Warren, Bid: 12
+2025-09-25T03:16:50.6969975Z Bot Philip's team (Philip):
+2025-09-25T03:16:50.6970468Z 	- Added: Geno Smith , Dropped: Deshaun Watson, Bid: 1
+2025-09-25T03:16:50.6971021Z 	- Added: Jake Ferguson , Dropped: Kaleb Johnson, Bid: 1
+2025-09-25T03:16:50.6971424Z 	- Added: Rachaad White , Dropped: Jonathon Brooks, Bid: 1
+2025-09-25T03:16:50.6972045Z 	- Added: Tyler Allgeier , Dropped: Kendre Miller, Bid: 1
+2025-09-25T03:16:50.6972902Z 	- Added: Wan'Dale Robinson , Dropped: Jahan Dotson, Bid: 1
+2025-09-25T03:16:50.6973579Z 	- Added: Jacksonville Jaguars , Dropped: Buffalo Bills, Bid: 1
+2025-09-25T03:16:50.6974473Z Bot Parker's team (Parker):
+2025-09-25T03:16:50.6974968Z 	- Added: Tre Tucker , Dropped: Calvin Ridley, Bid: 7
+2025-09-25T03:16:50.6975594Z 	- Added: Hunter Henry , Dropped: Joe Burrow, Bid: 3
+2025-09-25T03:16:50.6976228Z 	- Added: Tyler Loop , Dropped: Ka'imi Fairbairn, Bid: 0
+2025-09-25T03:16:50.6976691Z ------ 

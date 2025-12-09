@@ -33,7 +33,7 @@ func (e *BotEngine) updateWeeklyScores(ctx context.Context, finishWeek bool) err
 		botMap[bot.ID] = bot
 	}
 
-	scoresPerTeam, err := e.getScoresPerTeam(playerScores, botMap)
+	scoresPerTeam, err := e.getScoresPerTeam(playerScores, botMap, currentFantasyWeek, finishWeek)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (e *BotEngine) updateMatchupResults(botMap map[string]gamestate.Bot, scores
 	return nil
 }
 
-func (e *BotEngine) getScoresPerTeam(scores []gamestate.PlayerWeeklyScore, dbBotMap map[string]gamestate.Bot) (map[string]float64, error) {
+func (e *BotEngine) getScoresPerTeam(scores []gamestate.PlayerWeeklyScore, dbBotMap map[string]gamestate.Bot, currentWeek int, finishWeek bool) (map[string]float64, error) {
 	botMap := make(map[string][]gamestate.PlayerWeeklyScore)
 	leagueSettings, err := e.gameStateHandler.GetLeagueSettings()
 	if err != nil {
@@ -188,6 +188,20 @@ func (e *BotEngine) getScoresPerTeam(scores []gamestate.PlayerWeeklyScore, dbBot
 		botScoreMap[botId] = totalScore
 		if err != nil {
 			return nil, err
+		}
+
+		// Save weekly lineup data when finishing the week
+		if finishWeek {
+			// Convert slotNames (Position enum) to strings
+			slotNamesStr := make([]string, len(slotNames))
+			for i, slot := range slotNames {
+				slotNamesStr[i] = slot.String()
+			}
+
+			err = e.gameStateHandler.SaveWeeklyLineup(currentWeek, botId, bestPossibleTeam, slotNamesStr, scores)
+			if err != nil {
+				return nil, fmt.Errorf("failed to save weekly lineup for bot %s: %w", botId, err)
+			}
 		}
 
 		fmt.Printf("\n%-20s scored %-8.2f last week:\n", dbBotMap[botId].Name, totalScore)
