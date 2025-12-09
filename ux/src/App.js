@@ -11,6 +11,7 @@ function App() {
   const [filterText, setFilterText] = useState("");
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
+  const [error, setError] = useState(null);
   // Theme: 'light' | 'dark' | 'system'
   const [themePref, setThemePref] = useState(() => {
     try {
@@ -46,9 +47,22 @@ function App() {
             `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/${file}`,
         });
 
-        const response = await fetch(
-          "https://raw.githubusercontent.com/mitchwebster/botblitz/main/data/game_states/2025/gs-season.db"
-        );
+        // Check if we should use local database (set via REACT_APP_USE_LOCAL_DB env var)
+        const useLocalDb = process.env.REACT_APP_USE_LOCAL_DB === 'true';
+        
+        let dbUrl;
+        if (useLocalDb) {
+          // Use local database from public folder
+          dbUrl = '/gs-season.db';
+        } else {
+          // Get branch from URL parameter (e.g., ?branch=chris-bot-add-drop)
+          // Defaults to 'main' if not specified
+          const urlParams = new URLSearchParams(window.location.search);
+          const branch = urlParams.get('branch') || 'main';
+          dbUrl = `https://raw.githubusercontent.com/mitchwebster/botblitz/${branch}/data/game_states/2025/gs-season.db`;
+        }
+
+        const response = await fetch(dbUrl);
         const buffer = await response.arrayBuffer();
         const dbInstance = new SQL.Database(new Uint8Array(buffer));
         setDb(dbInstance);
@@ -85,6 +99,24 @@ function App() {
   useEffect(() => {
     if (!db || selectedWeek === null) return;
 
+    // Check if weekly_lineups table exists (needed for matchupDetails)
+    let weeklyLineupsExists = false;
+    if (activeTab === "matchupDetails") {
+      try {
+        const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_lineups';");
+        weeklyLineupsExists = tableCheck.length > 0 && tableCheck[0].values.length > 0;
+      } catch (e) {
+        weeklyLineupsExists = false;
+      }
+      
+      if (!weeklyLineupsExists) {
+        setError("The weekly_lineups table is not available in this database. This feature requires a database with lineup data. The table may need to be created using the backfill_lineups command.");
+        setColumns([]);
+        setData([]);
+        return;
+      }
+    }
+
     const queries = {
       current: `
         SELECT
@@ -113,6 +145,45 @@ function App() {
         LEFT JOIN bots AS visitor_bot ON m.visitor_bot_id = visitor_bot.id
         LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
         WHERE week = ${selectedWeek - 1}
+      `,
+      matchupDetails: `
+        SELECT
+          m.id as matchup_id,
+          m.home_bot_id,
+          m.visitor_bot_id,
+          home_bot.name as home_team,
+          visitor_bot.name as visitor_team,
+          m.home_score,
+          m.visitor_score,
+          p.id as player_id,
+          p.full_name,
+          p.allowed_positions,
+          wl.bot_id,
+          CASE WHEN wl.bot_id = m.home_bot_id THEN 'home' ELSE 'visitor' END as side,
+          ws.FPTS as actual_points,
+          wp.FPTS as projected_points,
+          wl.slot as slot
+        FROM matchups m
+        INNER JOIN bots as home_bot ON m.home_bot_id = home_bot.id
+        INNER JOIN bots as visitor_bot ON m.visitor_bot_id = visitor_bot.id
+        INNER JOIN weekly_lineups wl ON wl.week = m.week AND (wl.bot_id = m.home_bot_id OR wl.bot_id = m.visitor_bot_id)
+        INNER JOIN players p ON p.id = wl.player_id
+        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week
+        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week
+        WHERE m.week = ${selectedWeek}
+        ORDER BY m.id, side,
+          CASE wl.slot
+            WHEN 'QB' THEN 1
+            WHEN 'RB' THEN 2
+            WHEN 'WR' THEN 3
+            WHEN 'SUPERFLEX' THEN 4
+            WHEN 'FLEX' THEN 5
+            WHEN 'K' THEN 6
+            WHEN 'DST' THEN 7
+            WHEN 'BENCH' THEN 8
+            ELSE 9
+          END,
+          p.full_name
       `,
       leaderboard: `
         WITH botScores AS (
@@ -161,6 +232,7 @@ function App() {
     if (!query) return;
 
     try {
+      setError(null);
       const result = db.exec(query);
       if (result.length > 0) {
         setColumns(result[0].columns);
@@ -176,6 +248,16 @@ function App() {
       console.error("Query failed:", err);
       setColumns([]);
       setData([]);
+      // Check if it's a missing table error
+      if (err.message && err.message.includes("no such table")) {
+        if (err.message.includes("weekly_lineups")) {
+          setError("The weekly_lineups table is not available in this database. This feature requires a database with lineup data.");
+        } else {
+          setError(`Database error: ${err.message}`);
+        }
+      } else {
+        setError(`Query failed: ${err.message || err}`);
+      }
     }
   }, [db, activeTab, selectedWeek]);
 
@@ -240,6 +322,7 @@ function App() {
   const tabs = [
     { key: "current", label: "Current Week" },
     { key: "last", label: "Last Week" },
+    { key: "matchupDetails", label: "Matchup Details" },
     { key: "leaderboard", label: "Leaderboard" },
     { key: "rosters", label: "Rosters" },
   ];
@@ -293,6 +376,52 @@ function App() {
   };
 
   const groupedData = activeTab === "rosters" ? getGroupedData() : null;
+
+  const getMatchupData = () => {
+    // Group players by matchup
+    const matchups = {};
+    data.forEach((row) => {
+      const matchupId = row.matchup_id;
+      if (!matchups[matchupId]) {
+        matchups[matchupId] = {
+          id: matchupId,
+          homeTeam: row.home_team,
+          homeBotId: row.home_bot_id,
+          visitorTeam: row.visitor_team,
+          visitorBotId: row.visitor_bot_id,
+          homeScore: row.home_score || 0,
+          visitorScore: row.visitor_score || 0,
+          homePlayers: [],
+          visitorPlayers: [],
+        };
+      }
+
+      // Parse allowed_positions to get primary position
+      let position = '';
+      try {
+        const positions = JSON.parse(row.allowed_positions || '[]');
+        position = positions[0] || '';
+      } catch (e) {
+        position = '';
+      }
+
+      const player = {
+        name: row.full_name,
+        position: position,
+        slot: row.slot,
+        projected: row.projected_points || 0,
+        actual: row.actual_points || 0,
+      };
+
+      if (row.side === 'home') {
+        matchups[matchupId].homePlayers.push(player);
+      } else {
+        matchups[matchupId].visitorPlayers.push(player);
+      }
+    });
+
+    return Object.values(matchups);
+  };
 
   const renderTable = (tableData, tableColumns) => (
     <table
@@ -435,6 +564,20 @@ function App() {
         />
       )}
 
+      {/* Error message */}
+      {error && (
+        <div style={{
+          padding: "1rem",
+          marginBottom: "1rem",
+          background: effectiveTheme === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+          border: `1px solid ${effectiveTheme === "dark" ? "#ef4444" : "#dc2626"}`,
+          borderRadius: "4px",
+          color: effectiveTheme === "dark" ? "#fca5a5" : "#991b1b",
+        }}>
+          {error}
+        </div>
+      )}
+
       {/* Render tables */}
       {activeTab === "rosters" ? (
         // Sort teams alphabetically and place "Undrafted" last
@@ -450,6 +593,139 @@ function App() {
               {renderTable(players, columns)}
             </div>
           ))
+      ) : activeTab === "matchupDetails" ? (
+        data.length === 0 ? (
+          <div style={{ padding: "2rem", textAlign: "center", color: vars.foreground }}>
+            No matchup data available for this week.
+          </div>
+        ) : (
+          getMatchupData().map((matchup) => {
+            // Determine winner
+          const homeWon = matchup.homeScore > matchup.visitorScore;
+          const visitorWon = matchup.visitorScore > matchup.homeScore;
+          const homeScoreColor = homeWon ? "#22c55e" : (visitorWon ? "#ef4444" : vars.primary);
+          const visitorScoreColor = visitorWon ? "#22c55e" : (homeWon ? "#ef4444" : vars.primary);
+
+          return (
+            <div
+              key={matchup.id}
+              style={{
+                marginBottom: "2rem",
+                border: `2px solid ${vars.border}`,
+                borderRadius: "8px",
+                overflow: "hidden",
+              }}
+            >
+              {/* Matchup Header */}
+              <div
+                style={{
+                  background: vars.muted,
+                  padding: "1rem",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "1rem",
+                  fontWeight: "bold",
+                  fontSize: "1.1rem",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>
+                    {matchup.homeTeam}
+                    <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "0.5rem" }}>
+                      (ID: {matchup.homeBotId})
+                    </span>
+                  </span>
+                  <span style={{ color: homeScoreColor }}>
+                    {matchup.homeScore.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: visitorScoreColor }}>
+                    {matchup.visitorScore.toFixed(2)}
+                  </span>
+                  <span>
+                    {matchup.visitorTeam}
+                    <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "0.5rem" }}>
+                      (ID: {matchup.visitorBotId})
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Two-column layout for rosters */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                {/* Home Team */}
+                <div style={{ borderRight: `1px solid ${vars.border}`, padding: "1rem" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${vars.border}` }}>
+                        <th style={{ textAlign: "left", padding: "0.5rem", fontSize: "0.9rem" }}>Player</th>
+                        <th style={{ textAlign: "left", padding: "0.5rem", fontSize: "0.9rem" }}>Slot</th>
+                        <th style={{ textAlign: "right", padding: "0.5rem", fontSize: "0.9rem" }}>Actual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matchup.homePlayers.map((player, idx) => {
+                        const isBench = player.slot === 'BENCH';
+                        return (
+                          <tr key={idx} style={{
+                            borderBottom: `1px solid ${vars.border}`,
+                            opacity: isBench ? 0.5 : 1,
+                            background: isBench ? vars.muted : 'transparent'
+                          }}>
+                            <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
+                              {player.name}
+                              {player.position && <span style={{ opacity: 0.6 }}> ({player.position})</span>}
+                            </td>
+                            <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>{player.slot}</td>
+                            <td style={{ padding: "0.5rem", textAlign: "right", fontSize: "0.85rem", fontWeight: isBench ? "normal" : "bold" }}>
+                              {player.actual ? player.actual.toFixed(1) : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Visitor Team */}
+                <div style={{ padding: "1rem" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${vars.border}` }}>
+                        <th style={{ textAlign: "left", padding: "0.5rem", fontSize: "0.9rem" }}>Player</th>
+                        <th style={{ textAlign: "left", padding: "0.5rem", fontSize: "0.9rem" }}>Slot</th>
+                        <th style={{ textAlign: "right", padding: "0.5rem", fontSize: "0.9rem" }}>Actual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matchup.visitorPlayers.map((player, idx) => {
+                        const isBench = player.slot === 'BENCH';
+                        return (
+                          <tr key={idx} style={{
+                            borderBottom: `1px solid ${vars.border}`,
+                            opacity: isBench ? 0.5 : 1,
+                            background: isBench ? vars.muted : 'transparent'
+                          }}>
+                            <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>
+                              {player.name}
+                              {player.position && <span style={{ opacity: 0.6 }}> ({player.position})</span>}
+                            </td>
+                            <td style={{ padding: "0.5rem", fontSize: "0.85rem" }}>{player.slot}</td>
+                            <td style={{ padding: "0.5rem", textAlign: "right", fontSize: "0.85rem", fontWeight: isBench ? "normal" : "bold" }}>
+                              {player.actual ? player.actual.toFixed(1) : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })
+        )
       ) : (
         renderTable(sortData(data), columns)
       )}

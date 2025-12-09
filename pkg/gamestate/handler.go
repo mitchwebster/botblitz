@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	common "github.com/mitchwebster/botblitz/pkg/common"
 	"gorm.io/driver/sqlite"
@@ -59,6 +60,10 @@ func (s PlayerStatus) String() string {
 
 func (handler *GameStateHandler) GetDBSaveFilePath() string {
 	return handler.dbSaveFilePath
+}
+
+func (handler *GameStateHandler) GetDB() *gorm.DB {
+	return handler.db
 }
 
 func (handler *GameStateHandler) GetPlayerById(playerId string) (*Player, error) {
@@ -192,6 +197,66 @@ func (handler *GameStateHandler) SetMatchResult(matchupID uint, homeScore, visit
 	})
 }
 
+// SaveWeeklyLineup saves which slot each player was in for a team in a given week (started and benched)
+func (handler *GameStateHandler) SaveWeeklyLineup(week int, botID string, startedPlayers []PlayerWeeklyScore, slotNames []string, allRosterPlayers []PlayerWeeklyScore) error {
+	return handler.db.Transaction(func(tx *gorm.DB) error {
+		// Delete any existing lineup data for this week/bot combination
+		if err := tx.Where("week = ? AND bot_id = ?", week, botID).Delete(&WeeklyLineup{}).Error; err != nil {
+			return err
+		}
+
+		// Create a map of started player IDs for quick lookup
+		startedPlayerIDs := make(map[string]bool)
+		for _, player := range startedPlayers {
+			if player.ID != "1" && player.FullName != "None" {
+				startedPlayerIDs[player.ID] = true
+			}
+		}
+
+		// Insert lineup records for started players
+		for i, player := range startedPlayers {
+			if player.ID == "1" || player.FullName == "None" {
+				// Skip "None" placeholder players (unfilled slots)
+				continue
+			}
+
+			lineup := WeeklyLineup{
+				Week:     week,
+				BotID:    botID,
+				PlayerID: player.ID,
+				Points:   player.FPTS,
+				Slot:     slotNames[i],
+			}
+
+			if err := tx.Create(&lineup).Error; err != nil {
+				return err
+			}
+		}
+
+		// Insert lineup records for benched players
+		for _, player := range allRosterPlayers {
+			// Skip if this player was already saved as a starter
+			if startedPlayerIDs[player.ID] {
+				continue
+			}
+
+			lineup := WeeklyLineup{
+				Week:     week,
+				BotID:    botID,
+				PlayerID: player.ID,
+				Points:   player.FPTS,
+				Slot:     "BENCH",
+			}
+
+			if err := tx.Create(&lineup).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (handler *GameStateHandler) GetLeagueSettings() (*LeagueSettings, error) {
 	if handler.cachedLeagueSettings != nil {
 		return handler.cachedLeagueSettings, nil
@@ -232,6 +297,25 @@ func (handler *GameStateHandler) PerformAddDrop(botId string, playerToAdd string
 		result := tx.Model(&Bot{}).Where("id = ?", botId).Update("RemainingWaiverBudget", gorm.Expr("remaining_waiver_budget - ?", budgetReduction))
 		if result.Error != nil {
 			return result.Error
+		}
+
+		// Record the transaction
+		var gameStatus gameStatus
+		if err := tx.First(&gameStatus, singleRowTableId).Error; err != nil {
+			return err // rollback
+		}
+
+		transaction := Transaction{
+			BotID:   botId,
+			Added:   playerToAdd,
+			Dropped: playerToDrop,
+			Bid:     budgetReduction,
+			Week:    gameStatus.CurrentFantasyWeek,
+			Date:    time.Now().UTC().Format(time.RFC3339),
+		}
+
+		if err := tx.Create(&transaction).Error; err != nil {
+			return err // rollback
 		}
 
 		return nil // commit
@@ -351,6 +435,22 @@ func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
 		return nil, err
 	}
 
+	// Ensure weekly_lineups table exists (for both new and existing databases)
+	if !db.Migrator().HasTable(&WeeklyLineup{}) {
+		err := db.AutoMigrate(&WeeklyLineup{})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Ensure transactions table exists
+	if !db.Migrator().HasTable(&Transaction{}) {
+		err := db.AutoMigrate(&Transaction{})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var gameStatus gameStatus
 	result := db.First(&gameStatus, gameStatus)
 	if result.Error != nil {
@@ -373,6 +473,22 @@ func initSeason(db *gorm.DB) error {
 	exists := db.Migrator().HasTable(&Matchup{})
 	if !exists {
 		err := db.AutoMigrate(&Matchup{})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Create weekly_lineups table if it doesn't exist
+	if !db.Migrator().HasTable(&WeeklyLineup{}) {
+		err := db.AutoMigrate(&WeeklyLineup{})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Create transactions table if it doesn't exist
+	if !db.Migrator().HasTable(&Transaction{}) {
+		err := db.AutoMigrate(&Transaction{})
 		if err != nil {
 			return err
 		}
@@ -467,7 +583,7 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 	}
 
 	// Auto migrate the database tables
-	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &Player{})
+	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &Player{}, &WeeklyLineup{}, &Transaction{})
 	if err != nil {
 		return nil, err
 	}
@@ -917,6 +1033,40 @@ type Matchup struct {
 	// Playoff relations
 	HomePlayInMatchup    *Matchup `gorm:"foreignKey:HomePlayInMatchupID;references:ID"`
 	VisitorPlayInMatchup *Matchup `gorm:"foreignKey:VisitorPlayInMatchupID;references:ID"`
+}
+
+// --------------------
+// Table: weekly_lineups
+// --------------------
+type WeeklyLineup struct {
+	ID       uint    `gorm:"primaryKey;autoIncrement;column:id"`
+	Week     int     `gorm:"column:week;not null;index:idx_week_bot_player,priority:1"`
+	BotID    string  `gorm:"column:bot_id;not null;index:idx_week_bot_player,priority:2"`
+	PlayerID string  `gorm:"column:player_id;not null;index:idx_week_bot_player,priority:3"`
+	Points   float64 `gorm:"column:points"`
+	Slot     string  `gorm:"column:slot;not null"` // e.g., "QB", "RB", "FLEX", "BENCH"
+
+	// Relations
+	Bot    Bot    `gorm:"foreignKey:BotID;references:ID"`
+	Player Player `gorm:"foreignKey:PlayerID;references:ID"`
+}
+
+// --------------------
+// Table: transactions
+// --------------------
+type Transaction struct {
+	ID      uint   `gorm:"primaryKey;autoIncrement;column:id"`
+	BotID   string `gorm:"column:bot_id;not null"`
+	Added   string `gorm:"column:added;not null"`
+	Dropped string `gorm:"column:dropped;not null"`
+	Bid     int    `gorm:"column:bid;not null"`
+	Week    int    `gorm:"column:week;not null"`
+	Date    string `gorm:"column:date;not null"`
+
+	// Relations
+	Bot           Bot    `gorm:"foreignKey:BotID;references:ID"`
+	AddedPlayer   Player `gorm:"foreignKey:Added;references:ID"`
+	DroppedPlayer Player `gorm:"foreignKey:Dropped;references:ID"`
 }
 
 // NOT A TABLE - just a query result

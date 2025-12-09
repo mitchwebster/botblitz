@@ -38,6 +38,9 @@ update-scores:
 run-finish-week:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=FinishPreviousWeek
 
+backfill-lineups:
+	go run pkg/cmd/backfill_lineups.go -year=2025
+
 # must be run after make gen 
 build-py-module:
 	 cp -f py_grpc_server/loadPlayers.py blitz_env/loadPlayers.py
