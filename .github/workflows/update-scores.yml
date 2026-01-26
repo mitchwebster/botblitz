@@ -2,21 +2,21 @@ name: BotBlitz Update Scores Workflow
 
 on:
   workflow_dispatch:
-  schedule:
-    # Thursday Night Football (+4h, Friday 12:15 AM ET → 05:15 UTC)
-    - cron: "15 5 * * 5"
+  # schedule:
+  #   # Thursday Night Football (+4h, Friday 12:15 AM ET → 05:15 UTC)
+  #   - cron: "15 5 * * 5"
 
-    # Sunday 1 PM Game (+4h, 5 PM ET → 22:00 UTC)
-    - cron: "0 22 * * 0"
+  #   # Sunday 1 PM Game (+4h, 5 PM ET → 22:00 UTC)
+  #   - cron: "0 22 * * 0"
 
-    # Sunday 4:25 PM Game (+4h, 8:25 PM ET → 01:25 UTC Monday)
-    - cron: "25 1 * * 1"
+  #   # Sunday 4:25 PM Game (+4h, 8:25 PM ET → 01:25 UTC Monday)
+  #   - cron: "25 1 * * 1"
 
-    # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
-    - cron: "20 5 * * 1"
+  #   # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
+  #   - cron: "20 5 * * 1"
 
-    # Monday Night Football (+4h, 12:20 AM ET Tuesday → 05:20 UTC Tuesday)
-    - cron: "20 5 * * 2"
+  #   # Monday Night Football (+4h, 12:20 AM ET Tuesday → 05:20 UTC Tuesday)
+  #   - cron: "20 5 * * 2"
 
 jobs:
   buildAndTest:
