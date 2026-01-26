@@ -2,8 +2,8 @@ name: BotBlitz End of Week Workflow
 
 on:
   workflow_dispatch:
-  schedule:
-     - cron: "12 17 * * 2"
+  # schedule:
+  #    - cron: "12 17 * * 2"
 
 jobs:
   buildAndTest:
