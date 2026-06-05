@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="blitz_env",
     version="0.1.0",
-    packages=find_packages(),  # Automatically find packages in subfolders
+    packages=find_packages(include=["blitz_env", "blitz_env.*"]),  # ship only the runtime SDK; harness/ stays out of the wheel
     author="Mitch Chris",
     author_email="mitchchris@example.com",
     description="Used for bot blitz",
