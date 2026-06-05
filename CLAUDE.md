@@ -39,11 +39,12 @@ This file contains important context and reminders for working on the BotBlitz c
   - Stats can be refreshed using `RefreshWeeklyStats()` which re-copies from the source
 - **Tracked in git**: ✅ Yes (checked into repo at `data/game_states/`)
 
-### **Root Level Files (Leftover/Development)** ⚠️
+### **Archived Development Snapshots**
 
-- `./stats.db` - Old/development file, NOT used by production code
-- `./gamestate.db` - Old/development file (in `.gitignore`), NOT used by production code
-- **These should be ignored** - they're leftovers from development/testing
+- `data/archive/2025/stats.db` and `data/archive/2025/gamestate.db` - old development
+  snapshots (formerly at repo root), NOT used by production code. Kept for reference and
+  used only by `make launch-simulator` (datasette browser). The live source of truth is
+  `data/stats/{year}/stats.db` and `data/game_states/{year}/gs-*.db`.
 
 ### **Key Code References**
 
