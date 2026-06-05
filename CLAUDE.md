@@ -116,7 +116,7 @@ data/stats/{year}/stats.db` and `collect_weekly_injuries`. Updated by the
 The actual league state (bots, players, matchups, league_settings, game_statuses) **plus
 copies** of the stats tables. When games are created/updated, Go **ATTACHES**
 `data/stats/{year}/stats.db` and **COPIES** the stats tables in
-(`pkg/gamestate/handler.go:580-621`), so each game snapshots stats at creation time;
+(`pkg/gamestate/handler.go:772-803`), so each game snapshots stats at creation time;
 `RefreshWeeklyStats()` re-copies. Tracked in git.
 
 ### Archived dev snapshots
@@ -124,10 +124,10 @@ copies** of the stats tables. When games are created/updated, Go **ATTACHES**
 `make launch-simulator`, not production.
 
 ### Key code references
-- Stats DB path: `pkg/gamestate/handler.go:553-561` (`getStatsDatabaseFilePath`)
-- Game state DB path: `pkg/gamestate/handler.go:740-754` (`getSaveFileName`)
-- Stats table population: `pkg/gamestate/handler.go:602-650` (`populateStatsTables`)
-- Weekly stats refresh: `pkg/gamestate/handler.go:563-600` (`RefreshWeeklyStats`)
+- Stats DB path: `pkg/gamestate/handler.go:705-714` (`getStatsDatabaseFilePath`)
+- Game state DB path: `pkg/gamestate/handler.go:910-925` (`getSaveFileName`)
+- Stats table population: `pkg/gamestate/handler.go:772-803` (`populateStatsTables`)
+- Weekly stats refresh: `pkg/gamestate/handler.go:715-771` (`RefreshWeeklyStats`)
 
 ### Constants
 ```go
