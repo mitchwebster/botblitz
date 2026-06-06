@@ -1,11 +1,10 @@
-import nfl_data_py as nfl
 import pandas as pd
-import numpy as np
-from typing import List
-import requests
-from blitz_env.agent_pb2 import Player
-from bs4 import BeautifulSoup
 import re
+
+# NOTE: `requests`/`bs4`/`nfl_data_py` are intentionally NOT imported at module load.
+# They are only needed by the FantasyPros scrapers below (used by the offline data
+# collectors, not at bot runtime), so they're imported lazily inside fp_stats_dynamic.
+# This keeps `import blitz_env` lean inside the container.
 
 def fp_seasonal_years(page, years):
     dfs = []
@@ -30,6 +29,9 @@ def fp_weekly_years(page, years):
     return pd.concat(dfs).reset_index()
 
 def fp_stats_dynamic(page, **kwargs):
+    import requests
+    from bs4 import BeautifulSoup
+
     url_query = f"https://www.fantasypros.com/nfl/stats/{page}.php"
     params = kwargs
     response = requests.get(url_query, params=params)
@@ -151,75 +153,3 @@ def fp_stats_dynamic(page, **kwargs):
     # Return stats DataFrame
     return stats_df
 
-class StatsDB:
-    def __init__(self, years: List[int], include_k_dst = False):
-        """
-        Initialize the StatsDB with a list of years and loads NFL data into memory.
-
-        The data includes weekly, play-by-play (pbp), seasonal data, and player IDs, which are all
-        fetched from the nfl_data_py library.
-
-        Args:
-        years (List[int]): A list of integers representing years for which data is to be loaded.
-        """
-        self.years = years
-        self.weekly_df = nfl.import_weekly_data(years)
-        # self.pbp_df = nfl.import_pbp_data(years)
-        self.seasonal_df = nfl.import_seasonal_data(years)
-        self.dst_seasonal_df = None
-        self.dst_weekly_df = None
-        self.k_seasonal_df = None
-        self.k_weekly_df = None
-        if include_k_dst:
-            self.dst_seasonal_df = fp_seasonal_years("dst", years)
-            self.dst_weekly_df = fp_weekly_years("dst", years)
-            self.k_seasonal_df = fp_seasonal_years("k", years)
-            self.k_weekly_df = fp_weekly_years("k", years)
-
-        self.ids_df = nfl.import_ids()
-
-    def get_weekly_data(self, player: Player) -> pd.DataFrame:
-        """
-        Retrieves weekly data for a specified player.
-
-        Args:
-        player (Player): A player protobuf object containing the player's ID.
-
-        Returns:
-        pd.DataFrame: A DataFrame containing the weekly data for the specified player.
-        """
-        if player.allowed_positions[0] == 'K' and self.k_weekly_df is not None:
-            return self.k_weekly_df[self.k_weekly_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST' and self.dst_weekly_df is not None:
-            return self.dst_weekly_df[self.dst_weekly_df['fantasypros_id'] == player.id]
-
-        return self.weekly_df[self.weekly_df.player_id == player.gsis_id]
-
-    def get_seasonal_data(self, player: Player) -> pd.DataFrame:
-        """
-        Retrieves seasonal data for a specified player.
-
-        Args:
-        player (Player): A player protobuf object containing the player's ID.
-
-        Returns:
-        pd.DataFrame: A DataFrame containing the seasonal data for the specified player.
-        """
-        if player.allowed_positions[0] == 'K' and self.k_seasonal_df is not None:
-            return self.k_seasonal_df[self.k_seasonal_df['fantasypros_id'] == player.id]
-        if player.allowed_positions[0] == 'DST' and self.dst_seasonal_df is not None:
-            return self.dst_seasonal_df[self.dst_seasonal_df['fantasypros_id'] == player.id]
-        
-        return self.seasonal_df[self.seasonal_df.player_id == player.gsis_id]
-
-    def get_ids(self, player: Player) -> pd.DataFrame:
-        """
-        Retrieves ID data for a specified player.
-
-        Args:
-        player (Player): A player protobuf object containing the player's ID.
-
-        Returns:
-        pd.DataFrame: A DataFrame containing the ID mappings for the specified player.
-        """
-        return self.ids_df[self.ids_df.gsis_id == player.gsis_id]

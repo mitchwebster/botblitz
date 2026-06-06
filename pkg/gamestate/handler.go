@@ -1,7 +1,6 @@
 package gamestate
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,12 +16,8 @@ import (
 const AppDatabaseName = "gamestate" + fileSuffix
 
 const saveFolderRelativePath = "data/game_states"
-const statsFolderRelativePath = "data/stats"
-const filePrefix = "gs-"
-const draftDesc = "draft"
-const seasonDesc = "season"
 const fileSuffix = ".db"
-const statsDatabaseFileName = "stats.db"
+const seasonDatabaseFileName = "season" + fileSuffix
 const singleRowTableId = 1
 const ByeId = "BYE"
 
@@ -425,9 +420,19 @@ func (handler *GameStateHandler) AddMatchups(matchups []Matchup) error {
 }
 
 func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
-	saveFileName, err := getSaveFileName(year, seasonDesc)
+	saveFileName, err := getSaveFileName(year)
 	if err != nil {
 		return nil, err
+	}
+
+	// season.db must already exist (from build-season + the draft); never let
+	// gorm.Open create an empty file, which a later draft would then mistake for a
+	// real season DB.
+	if !fileExists(saveFileName) {
+		return nil, fmt.Errorf(
+			"season.db not found at %q; run the draft for year %d first",
+			saveFileName, year,
+		)
 	}
 
 	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
@@ -567,14 +572,21 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 		return nil, fmt.Errorf("Cannot create game for %d bots", len(bots))
 	}
 
-	saveFileName, err := getSaveFileName(settings.Year, draftDesc)
+	// The single consolidated season.db is pre-seeded (players + stats tables) by the
+	// `build-season` step, so the draft opens it in place rather than creating a fresh
+	// file and copying stats/players into it.
+	saveFileName, err := getSaveFileName(settings.Year)
 	if err != nil {
 		return nil, err
 	}
 
-	err = verifyFileDoesNotExistAndCreate(saveFileName)
-	if err != nil {
-		return nil, err
+	// season.db must already exist (materialized by `make bootstrap-data-build-season`);
+	// the engine opens it in place rather than creating a fresh draft file.
+	if !fileExists(saveFileName) {
+		return nil, fmt.Errorf(
+			"season.db not found at %q; run `make bootstrap-data-build-season YEAR=%d` first",
+			saveFileName, settings.Year,
+		)
 	}
 
 	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
@@ -582,8 +594,9 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 		return nil, err
 	}
 
-	// Auto migrate the database tables
-	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &Player{}, &WeeklyLineup{}, &Transaction{})
+	// season.db already carries the `players` pool + reference tables. The engine
+	// owns only the league-state tables, so migrate just those into the existing file.
+	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &WeeklyLineup{}, &Transaction{})
 	if err != nil {
 		return nil, err
 	}
@@ -608,16 +621,6 @@ func populateDatabase(db *gorm.DB, bots []*common.Bot, settings *common.LeagueSe
 	}
 
 	err = populateGameStatusTable(db, bots)
-	if err != nil {
-		return err
-	}
-
-	err = populatePlayersTable(db, settings.Year)
-	if err != nil {
-		return err
-	}
-
-	err = populateStatsTables(db, settings.Year)
 	if err != nil {
 		return err
 	}
@@ -669,22 +672,6 @@ func populateLeagueSettingsTable(db *gorm.DB, settings *common.LeagueSettings) e
 	return nil
 }
 
-func populatePlayersTable(db *gorm.DB, year uint32) error {
-	players, err := loadPlayers(year)
-	if err != nil {
-		return err
-	}
-
-	for _, player := range players {
-		result := db.Create(&player)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert player %s: %v", player.ID, result.Error)
-		}
-	}
-
-	return nil
-}
-
 func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	currentBotID := bots[0].Id
 
@@ -702,103 +689,19 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	return nil
 }
 
-func getStatsDatabaseFilePath(year uint32) (string, error) {
-	statsFolderName := statsFolderRelativePath + "/" + strconv.Itoa(int(year))
-	absPath, err := common.BuildLocalAbsolutePath(statsFolderName)
+func getSaveFileName(year uint32) (string, error) {
+	absFolderPath, err := getSaveFolderPath(year)
 	if err != nil {
 		return "", err
 	}
 
-	return absPath + "/" + statsDatabaseFileName, nil
-}
-
-func (handler *GameStateHandler) RefreshWeeklyStats() error {
-	settings, err := handler.GetLeagueSettings()
+	err = os.MkdirAll(absFolderPath, os.ModePerm)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Get the data for this
-	statsDBFile, err := getStatsDatabaseFilePath(uint32(settings.Year))
-	if err != nil {
-		return err
-	}
-
-	if !fileExists(statsDBFile) {
-		return fmt.Errorf("stats.db file does not exist, it will need to be created using collect_stats.py and collect_weekly_stats.py")
-	}
-
-	// Remove the weekly stats table from the game state
-	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_stats;`).Error; err != nil {
-		return err
-	}
-
-	// Remove the weekly projections table from the game state
-	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_projections;`).Error; err != nil {
-		return err
-	}
-
-	// Remove the weekly injuries table from the game state
-	if err := handler.db.Exec(`DROP TABLE IF EXISTS weekly_injuries;`).Error; err != nil {
-		return err
-	}
-
-	// Attach the other DB
-	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
-	println(attachQuery)
-	if err := handler.db.Exec(attachQuery).Error; err != nil {
-		return err
-	}
-
-	if err := handler.db.Exec(`CREATE TABLE weekly_stats AS SELECT * FROM other.weekly_stats;`).Error; err != nil {
-		return err
-	}
-
-	if err := handler.db.Exec(`CREATE TABLE weekly_projections AS SELECT * FROM other.weekly_projections;`).Error; err != nil {
-		return err
-	}
-
-	if err := handler.db.Exec(`CREATE TABLE weekly_injuries AS SELECT * FROM other.weekly_injuries;`).Error; err != nil {
-		return err
-	}
-
-	if err := handler.db.Exec(`DETACH DATABASE other;`).Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func populateStatsTables(db *gorm.DB, year uint32) error {
-	// Get the data for this
-	statsDBFile, err := getStatsDatabaseFilePath(year)
-	if err != nil {
-		return err
-	}
-
-	if !fileExists(statsDBFile) {
-		return fmt.Errorf("stats.db file does not exist, it will need to be created using collect_stats.py and collect_weekly_stats.py")
-	}
-
-	// Attach the other DB
-	attachQuery := fmt.Sprintf("ATTACH DATABASE '%s' AS other;", statsDBFile)
-	if err := db.Exec(attachQuery).Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec(`CREATE TABLE season_stats AS SELECT * FROM other.season_stats;`).Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec(`CREATE TABLE preseason_projections AS SELECT * FROM other.preseason_projections;`).Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec(`DETACH DATABASE other;`).Error; err != nil {
-		return err
-	}
-
-	return nil
+	// the single consolidated game-state file is named season.db
+	return absFolderPath + "/" + seasonDatabaseFileName, nil
 }
 
 func fileExists(path string) bool {
@@ -812,115 +715,6 @@ func fileExists(path string) bool {
 	}
 
 	return false
-}
-
-func loadPlayers(year uint32) ([]Player, error) {
-	player_rank_file := fmt.Sprintf("player_ranks_%d.csv", year)
-	csv_file_path, err := common.BuildLocalAbsolutePath("blitz_env/" + player_rank_file)
-	if err != nil {
-		return nil, err
-	}
-
-	// Open the CSV file
-	file, err := os.Open(csv_file_path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file: %v", err)
-	}
-	defer file.Close()
-
-	// Create a new CSV reader
-	reader := csv.NewReader(file)
-
-	// Skip the first line (the header)
-	_, err = reader.Read() // Read the first line and ignore it
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CSV header: %v", err)
-	}
-
-	players := []Player{}
-
-	// Read the file line by line
-	for {
-		record, err := reader.Read() // Read one record (a []string)
-		if err != nil {
-			// Check if we've reached the end of the file
-			if err.Error() == "EOF" {
-				break
-			}
-			return nil, fmt.Errorf("failed to read CSV record: %v", err)
-		}
-
-		byeWeek, _ := strconv.Atoi(record[4])
-		rank, _ := strconv.Atoi(record[5])
-		tier, _ := strconv.Atoi(record[6])
-
-		pos_rank, pos_rank_err := strconv.Atoi(record[7])
-		if pos_rank_err != nil {
-			pos_rank = 0
-		}
-
-		pos_tier, pos_tier_err := strconv.Atoi(record[8])
-		if pos_tier_err != nil {
-			pos_tier = 0
-		}
-
-		// Convert allowed positions to JSON string
-		allowedPositionsJSON, err := json.Marshal([]string{record[2]})
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal allowed positions: %v", err)
-		}
-
-		dbPlayer := Player{
-			ID:               record[0],
-			FullName:         record[1],
-			AllowedPositions: string(allowedPositionsJSON),
-			ProfessionalTeam: record[3],
-			PlayerByeWeek:    byeWeek,
-			Rank:             rank,
-			Tier:             tier,
-			PositionRank:     pos_rank,
-			PositionTier:     pos_tier,
-			GSISID:           record[9],
-			Availability:     "AVAILABLE",
-			PickChosen:       nil,
-			CurrentBotID:     nil,
-		}
-
-		players = append(players, dbPlayer)
-	}
-
-	return players, nil
-}
-
-func verifyFileDoesNotExistAndCreate(filePath string) error {
-	_, err := os.Stat(filePath)
-	if err != nil && os.IsNotExist(err) {
-		file, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		file.Close()
-
-		return nil
-	}
-
-	return fmt.Errorf("Draft file already exists, please delete before drafting again: %q", filePath)
-}
-
-func getSaveFileName(year uint32, description string) (string, error) {
-	absFolderPath, err := getSaveFolderPath(year)
-	if err != nil {
-		return "", err
-	}
-
-	err = os.MkdirAll(absFolderPath, os.ModePerm)
-	if err != nil {
-		return "", err
-	}
-
-	// we want files named like gs-draft.db or gs-week1.db
-	fileName := filePrefix + description + fileSuffix
-	return absFolderPath + "/" + fileName, nil
 }
 
 func getSaveFolderPath(year uint32) (string, error) {

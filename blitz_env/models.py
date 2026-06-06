@@ -1,8 +1,10 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, Table, JSON
+from sqlalchemy import text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from typing import List
+import pandas as pd
 
 Base = declarative_base()
 
@@ -121,3 +123,49 @@ class DatabaseManager:
             return False
         total_picks = settings.total_rounds * num_bots
         return status.current_draft_pick > total_picks
+
+    # --- Stats/projections accessors (absorbed from the former StatsDB/ProjectionsDB) ---
+    # All return the single FantasyPros schema (FPTS, RUSHING_YDS, ...) keyed by
+    # fantasypros_id (== Player.id), normalized so `season`/`week` are numeric (Int64).
+
+    def _read_for_player(self, table: str, player) -> "pd.DataFrame":
+        try:
+            df = pd.read_sql(
+                text(f"SELECT * FROM {table} WHERE fantasypros_id = :pid"),
+                self.engine,
+                params={"pid": str(player.id)},
+            )
+        except Exception:
+            return pd.DataFrame()
+        if "season" not in df.columns and "year" in df.columns:
+            df["season"] = df["year"]
+        for col in ("season", "week"):
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+        return df.reset_index(drop=True)
+
+    def get_seasonal_data(self, player, seasons=None) -> "pd.DataFrame":
+        df = self._read_for_player("season_stats", player)
+        if seasons is not None and "season" in df.columns:
+            df = df[df["season"].isin([int(s) for s in seasons])]
+        return df.reset_index(drop=True)
+
+    def get_weekly_data(self, player, seasons=None) -> "pd.DataFrame":
+        df = self._read_for_player("weekly_stats", player)
+        if seasons is not None and "season" in df.columns:
+            df = df[df["season"].isin([int(s) for s in seasons])]
+        return df.reset_index(drop=True)
+
+    def get_preseason_projections(self, player, season) -> "pd.DataFrame":
+        df = self._read_for_player("preseason_projections", player)
+        if season is not None and "season" in df.columns:
+            df = df[df["season"] == int(season)]
+        return df.reset_index(drop=True)
+
+    def get_weekly_projections(self, player, season, week) -> "pd.DataFrame":
+        df = self._read_for_player("weekly_projections", player)
+        if season is not None and "season" in df.columns:
+            df = df[df["season"] == int(season)]
+        if week is not None and "week" in df.columns:
+            df = df[df["week"] == int(week)]
+        return df.reset_index(drop=True)

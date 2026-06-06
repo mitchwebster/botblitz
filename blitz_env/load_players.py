@@ -3,10 +3,14 @@ import pandas as pd
 from blitz_env.agent_pb2 import Player
 
 def load_players(year: int):
-    if year not in [2021, 2022, 2023, 2024, 2025]:
-        raise Exception("year not supported")
     current_dir = os.path.dirname(__file__)
     file_path = os.path.join(current_dir, f'player_ranks_{str(year)}.csv')
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(
+            f"No player ranks for {year}: expected '{file_path}'. "
+            f"Generate it with `Rscript fetch_ranks.R {year}` (see docs/bootstrap-2026.md), "
+            f"then `make build-py-module` to copy it into blitz_env/."
+        )
     players = load_all_players(file_path)
     return players
 

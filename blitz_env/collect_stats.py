@@ -224,7 +224,7 @@ def parse_week_range(week_str: str) -> List[str]:
         return [w.strip() for w in week_str.split(',')]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv=None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Rebuild stats.db from scratch for the last N years.")
     ap.add_argument("--db", default="stats.db", help="Path to output SQLite DB (recreated each run).")
     ap.add_argument("--years", type=int, default=10, help="How many years back including end-year (default: 10).")
@@ -232,11 +232,11 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--include-weekly", action="store_true", help="Include weekly projections and stats in the database.")
     ap.add_argument("--include-injuries", action="store_true", help="Include weekly injury data in the database.")
     ap.add_argument("--weeks", default="1:17", help="Week range for weekly data (e.g., '1:17' or '1,2,3').")
-    return ap.parse_args()
+    return ap.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
     db_path = Path(args.db).resolve()
     end_year = args.end_year
     start_year = end_year - (args.years - 1)

@@ -3,7 +3,6 @@
 import argparse
 import sys
 import os
-from blitz_env.stats_db import StatsDB
 from blitz_env.models import DatabaseManager, Player, Bot, LeagueSettings
 from rich.console import Console
 from rich.table import Table
@@ -11,8 +10,8 @@ from rich import box
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_points(stats_db, player, year, week):
-    df = stats_db.get_weekly_data(player)
+def get_points(db, player, year, week):
+    df = db.get_weekly_data(player)
     try:
         data_row = df[(df["season"] == year) & (df["week"] == week)]
         if "fantasy_points_ppr" in data_row.columns:
@@ -44,15 +43,15 @@ def create_slot_objects(player_slots_dict):
     
     return slots
 
-def get_best_possible_score(stats_db, players, player_slots_dict, year, week):
+def get_best_possible_score(db, players, player_slots_dict, year, week):
     player_slots = create_slot_objects(player_slots_dict)
-    
+
     total_score = 0
     used_player_ids = set()
     player_contributions = {}  # New dictionary to track player contributions for the week
     player_points = {}
     for player in players:
-        player_points[player.id] = get_points(stats_db, player, year, week)
+        player_points[player.id] = get_points(db, player, year, week)
 
     # Sort slots by the size of allowed positions (ascending)
     sorted_slots = sorted(player_slots, key=lambda slot: len(slot.allowed_player_positions))
@@ -84,13 +83,13 @@ def get_best_possible_score(stats_db, players, player_slots_dict, year, week):
     return total_score, player_contributions, player_points
 
 total_weeks = 17
-def get_best_possible_score_season(stats_db, players, player_slots_dict, year):
+def get_best_possible_score_season(db, players, player_slots_dict, year):
     total_score = 0.0
     season_contributions = {}  # Dictionary to accumulate player contributions over the season
     season_player_points = {}
 
     for week in range(1, total_weeks + 1):
-        weekly_score, weekly_contributions, weekly_player_points = get_best_possible_score(stats_db, players, player_slots_dict, year, week)
+        weekly_score, weekly_contributions, weekly_player_points = get_best_possible_score(db, players, player_slots_dict, year, week)
         total_score += weekly_score
 
         # Accumulate weekly contributions into season contributions
@@ -100,22 +99,22 @@ def get_best_possible_score_season(stats_db, players, player_slots_dict, year):
             season_player_points[player_id] = season_player_points.get(player_id, 0) + points
     return total_score, season_contributions, season_player_points
 
-def get_weekly_rankings(db, stats_db, year):
+def get_weekly_rankings(db, year):
     """Calculate weekly rankings for each team throughout the season."""
     weekly_rankings = {}  # team_id -> list of weekly ranks (1-based)
     bots = db.get_all_bots()
     settings = db.get_league_settings()
-    
+
     for week in range(1, total_weeks + 1):
         team_scores = []
-        
+
         for bot in bots:
             # Get the players drafted by the team
             team_players = [player for player in db.get_all_players() if player.current_bot_id == bot.id]
-            
+
             # Compute the team's best possible score for this week
             best_possible_score, _, _ = get_best_possible_score(
-                stats_db, team_players, settings.player_slots, year, week
+                db, team_players, settings.player_slots, year, week
             )
             
             team_scores.append((bot.id, best_possible_score))
@@ -223,7 +222,7 @@ def print_top_teams_by_best_possible_score(team_scores):
         # Adjust the rank formatting
         print(f"{rank:>{rank_width}}. {owner:<15} | {bar} {score:.2f} points")
 
-def print_draft_board(db, stats_db, year, player_contributions, player_total_points, week=None):
+def print_draft_board(db, year, player_contributions, player_total_points, week=None):
     console = Console(force_terminal=True)  # Force ANSI codes even when output is redirected
     bots = db.get_all_bots()
     settings = db.get_league_settings()
@@ -519,9 +518,6 @@ def main():
             print("Error: No league settings found in database.")
             sys.exit(1)
 
-        # Create stats_db instance
-        stats_db = StatsDB([settings.year], include_k_dst=True)
-
         # Initialize variables
         player_contributions = {}  # Mapping player_id to total points contributed to best possible score
         player_total_points = {}
@@ -536,12 +532,12 @@ def main():
             if week is not None:
                 # Compute the team's best possible score for the specified week
                 best_possible_score, team_contributions, team_points = get_best_possible_score(
-                    stats_db, team_players, settings.player_slots, settings.year, week
+                    db, team_players, settings.player_slots, settings.year, week
                 )
             else:
                 # Compute the team's best possible score over the season and player contributions
                 best_possible_score, team_contributions, team_points = get_best_possible_score_season(
-                    stats_db, team_players, settings.player_slots, settings.year
+                    db, team_players, settings.player_slots, settings.year
                 )
 
             # Append to the list with team ID for weekly rankings, owner name for display
@@ -552,7 +548,7 @@ def main():
             for player_id, points in team_contributions.items():
                 # For a single week, no need to accumulate
                 player_contributions[player_id] = points
-            
+
             # Accumulate team contributions into global player_contributions
             for player_id, points in team_points.items():
                 # For a single week, no need to accumulate
@@ -561,7 +557,6 @@ def main():
         # Now we can print the draft board, passing player_contributions and player_total_points
         print_draft_board(
             db,
-            stats_db=stats_db,
             year=settings.year,
             player_contributions=player_contributions,
             player_total_points=player_total_points,
@@ -574,7 +569,7 @@ def main():
         # If scoring the full season, also print weekly rankings summary
         if week is None:
             print("\n" + "="*80)
-            weekly_rankings = get_weekly_rankings(db, stats_db, settings.year)
+            weekly_rankings = get_weekly_rankings(db, settings.year)
             print_weekly_rankings_summary(db, weekly_rankings, team_scores_with_ids)
 
     finally:
@@ -613,9 +608,6 @@ def score_draft_for_visualization(database_path='gamestate.db', week=None):
         if not settings:
             raise RuntimeError("No league settings found in database.")
 
-        # Create stats_db instance
-        stats_db = StatsDB([settings.year], include_k_dst=True)
-
         # Initialize variables
         player_contributions = {}
         player_total_points = {}
@@ -631,12 +623,12 @@ def score_draft_for_visualization(database_path='gamestate.db', week=None):
             if week is not None:
                 # Compute the team's best possible score for the specified week
                 best_possible_score, team_contributions, team_points = get_best_possible_score(
-                    stats_db, team_players, settings.player_slots, settings.year, week
+                    db, team_players, settings.player_slots, settings.year, week
                 )
             else:
                 # Compute the team's best possible score over the season and player contributions
                 best_possible_score, team_contributions, team_points = get_best_possible_score_season(
-                    stats_db, team_players, settings.player_slots, settings.year
+                    db, team_players, settings.player_slots, settings.year
                 )
 
             # Append to the list with team ID for weekly rankings, owner name for display
@@ -646,14 +638,14 @@ def score_draft_for_visualization(database_path='gamestate.db', week=None):
             # Accumulate team contributions into global player_contributions
             for player_id, points in team_contributions.items():
                 player_contributions[player_id] = points
-            
+
             for player_id, points in team_points.items():
                 player_total_points[player_id] = points
 
         # Calculate weekly rankings if full season
         weekly_rankings = None
         if week is None:
-            weekly_rankings = get_weekly_rankings(db, stats_db, settings.year)
+            weekly_rankings = get_weekly_rankings(db, settings.year)
 
         # Create matplotlib visualization
         print_visualization_matplotlib(
