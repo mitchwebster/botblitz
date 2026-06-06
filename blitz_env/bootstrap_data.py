@@ -103,3 +103,50 @@ def build_season(year: int, stats_path: str = None, season_path: str = None) -> 
         conn.close()
 
     return season_path
+
+
+def scrape(year: int, years_back: int = 10, weeks: str = "1:18") -> str:
+    """Full network pull into the scrape cache. Delegates to collect_stats."""
+    from blitz_env import collect_stats
+
+    out = get_stats_cache_path(year)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    collect_stats.main([
+        "--db", out,
+        "--end-year", str(year),
+        "--years", str(years_back),
+        "--include-weekly",
+        "--include-injuries",
+        "--weeks", weeks,
+    ])
+    return out
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="bootstrap_data")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("scrape", help="Network pull into data/stats/{year}/stats.db")
+    s.add_argument("--year", type=int, required=True)
+    s.add_argument("--years", type=int, default=10)
+    s.add_argument("--weeks", default="1:18")
+
+    b = sub.add_parser("build-season",
+                       help="Materialize data/game_states/{year}/season.db")
+    b.add_argument("--year", type=int, required=True)
+    b.add_argument("--stats-path", default=None)
+    b.add_argument("--season-path", default=None)
+
+    args = parser.parse_args(argv)
+    if args.command == "scrape":
+        path = scrape(args.year, years_back=args.years, weeks=args.weeks)
+        print(f"Scraped -> {path}")
+    elif args.command == "build-season":
+        path = build_season(args.year, stats_path=args.stats_path,
+                            season_path=args.season_path)
+        print(f"Built season DB -> {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
