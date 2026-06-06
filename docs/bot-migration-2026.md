@@ -11,12 +11,14 @@ shows the port. The owner migrates each bot when ready.
 | Bot | Notes |
 |-----|-------|
 | `bots/nfl2025/ryan_bot.py` | imports `StatsDB` |
-| `bots/nfl2025/justin_bot.py` | imports `StatsDB` |
 | `bots/archive/2024/ryan-bot.py` | archived; imports `StatsDB` |
 | `bots/archive/2024/mitch-bot.py` | archived; imports `StatsDB` |
 
 Bots that use `pd.read_sql(...)` against `DatabaseManager` (most of `bots/nfl2025/`)
-are **not** affected — that path is unchanged.
+are **not** affected — that path is unchanged. `bots/nfl2025/justin_bot.py` has a
+**commented-out** `StatsDB` line (`# stats_db = StatsDB(...)`); it imports
+`DatabaseManager`, so it won't break unless that line is uncommented — port it
+per the table below if you re-enable it.
 
 ## How to port
 
