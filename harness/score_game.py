@@ -222,7 +222,7 @@ def print_top_teams_by_best_possible_score(team_scores):
         # Adjust the rank formatting
         print(f"{rank:>{rank_width}}. {owner:<15} | {bar} {score:.2f} points")
 
-def print_draft_board(db, stats_db, year, player_contributions, player_total_points, week=None):
+def print_draft_board(db, year, player_contributions, player_total_points, week=None):
     console = Console(force_terminal=True)  # Force ANSI codes even when output is redirected
     bots = db.get_all_bots()
     settings = db.get_league_settings()
@@ -557,7 +557,6 @@ def main():
         # Now we can print the draft board, passing player_contributions and player_total_points
         print_draft_board(
             db,
-            stats_db=db,
             year=settings.year,
             player_contributions=player_contributions,
             player_total_points=player_total_points,
