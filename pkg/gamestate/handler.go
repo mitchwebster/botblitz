@@ -425,6 +425,16 @@ func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
 		return nil, err
 	}
 
+	// season.db must already exist (from build-season + the draft); never let
+	// gorm.Open create an empty file, which a later draft would then mistake for a
+	// real season DB.
+	if !fileExists(saveFileName) {
+		return nil, fmt.Errorf(
+			"season.db not found at %q; run the draft for year %d first",
+			saveFileName, year,
+		)
+	}
+
 	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
 	if err != nil {
 		return nil, err

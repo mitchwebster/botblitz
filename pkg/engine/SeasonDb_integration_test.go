@@ -193,3 +193,22 @@ func TestDraftErrorsWhenSeasonDbMissing(t *testing.T) {
 		t.Errorf("expected a 'season.db not found' error, got: %v", err)
 	}
 }
+
+func TestSeasonLoadErrorsWhenSeasonDbMissing(t *testing.T) {
+	cwd, _ := os.Getwd()
+	dir := filepath.Join(cwd, "data", "game_states", "2997")
+	os.RemoveAll(dir)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	_, err := gamestate.LoadGameStateForWeeklyFantasy(uint32(2997))
+	if err == nil {
+		t.Fatal("expected an error when season.db is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "season.db not found") {
+		t.Errorf("expected a 'season.db not found' error, got: %v", err)
+	}
+	// The guard must NOT have let gorm.Open create an empty file.
+	if _, statErr := os.Stat(filepath.Join(dir, "season.db")); statErr == nil {
+		t.Error("season.db was created despite the missing-file guard")
+	}
+}
