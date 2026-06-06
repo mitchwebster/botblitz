@@ -52,3 +52,7 @@ blitz_env/loadPlayers.py
 *.env
 
 dist/*
+# Local simulator artifacts created at the repo root by the harness
+# (DatabaseManager defaults to ./gamestate.db). Tracked DBs live under data/.
+/gamestate.db
+/stats.db

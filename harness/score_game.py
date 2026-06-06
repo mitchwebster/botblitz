@@ -520,7 +520,7 @@ def main():
             sys.exit(1)
 
         # Create stats_db instance
-        stats_db = StatsDB([settings.year], include_k_dst=True)
+        stats_db = StatsDB([settings.year], db_url=DatabaseManager.DB_URL)
 
         # Initialize variables
         player_contributions = {}  # Mapping player_id to total points contributed to best possible score
@@ -614,7 +614,7 @@ def score_draft_for_visualization(database_path='gamestate.db', week=None):
             raise RuntimeError("No league settings found in database.")
 
         # Create stats_db instance
-        stats_db = StatsDB([settings.year], include_k_dst=True)
+        stats_db = StatsDB([settings.year], db_url=DatabaseManager.DB_URL)
 
         # Initialize variables
         player_contributions = {}

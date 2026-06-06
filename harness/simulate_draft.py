@@ -11,6 +11,15 @@ import pandas as pd
 import nfl_data_py as nfl
 from blitz_env.stats_db import fp_seasonal_years
 from sqlalchemy import text
+
+# Repo root = parent of this harness/ package. Used to resolve the tracked stats DBs
+# (data/stats/{year}/stats.db) regardless of the current working directory.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def get_stats_db_path(year: int) -> str:
+    """Absolute path to the tracked source-of-truth stats DB for a given year."""
+    return os.path.join(_REPO_ROOT, "data", "stats", str(year), "stats.db")
 def is_drafted(player: Player) -> bool:
     return player.availability in ('DRAFTED', 'ON_HOLD')
 
@@ -83,14 +92,28 @@ def init_database(year: int):
 
 _STATS_CACHE: Dict[Tuple[str, int], pd.DataFrame] = {}
 
-def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True, stats_path: str = "stats.db"):
+def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True, stats_path: str = None):
+    # Default to the tracked source-of-truth stats DB for this year. We resolve an
+    # absolute path so it works from any cwd, and fail loudly if it's missing —
+    # SQLite's ATTACH would otherwise silently create an empty file, surfacing later
+    # as a confusing "no such table: stats.season_stats".
+    if stats_path is None:
+        stats_path = get_stats_db_path(year)
+    if not os.path.isfile(stats_path):
+        raise FileNotFoundError(
+            f"Stats DB not found at '{stats_path}'. Expected the tracked source-of-truth "
+            f"stats DB for {year} (created by blitz_env/collect_stats.py). "
+            f"Available years: data/stats/<year>/stats.db."
+        )
+
     with db.engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS season_stats"))
         conn.execute(text("DROP TABLE IF EXISTS preseason_projections"))
+        conn.execute(text("DROP TABLE IF EXISTS weekly_stats"))
 
         # Attach on this short-lived connection
         conn.execute(text(f"ATTACH DATABASE '{stats_path}' AS stats"))
-        
+
 
         # copy fresh season_stats (last 2 years)
         conn.execute(
@@ -101,6 +124,21 @@ def init_preseason_stats(db: DatabaseManager, year: int, use_cache: bool = True,
             """),
             {"y": year, "y2": year - 2}
         )
+
+        # copy this year's weekly_stats so StatsDB / scoring works offline against the
+        # same game DB (mirrors what the engine copies into in-season game DBs).
+        try:
+            conn.execute(
+                text("""
+                    CREATE TABLE weekly_stats AS
+                    SELECT * FROM stats.weekly_stats
+                    WHERE year = :y
+                """),
+                {"y": year}
+            )
+        except Exception:
+            # Older stats DBs may not carry weekly_stats; drafting doesn't need it.
+            pass
 
         # copy fresh preseason_projections (this year, last 2 years)
         conn.execute(

@@ -1,10 +1,13 @@
-import requests
-from bs4 import BeautifulSoup
 import pandas as pd
 import re
 from typing import Union
 
+# `requests`/`bs4` are only needed for the live FantasyPros fetch in fp_projections;
+# import them lazily there so `import blitz_env` stays lean inside the container.
+
 def fp_projections(page, sport=None, include_metadata=False, **kwargs):
+    import requests
+
     if sport is None:
         sport = 'nfl'  # Default sport
 
@@ -44,6 +47,7 @@ def fp_projections_parse(response_obj, page):
         raise ValueError("Invalid sport")
 
 def fp_projections_parse_nfl(response, page):
+    from bs4 import BeautifulSoup
     content = response['content']
     soup = BeautifulSoup(content, 'html.parser')
     params = response['params']
