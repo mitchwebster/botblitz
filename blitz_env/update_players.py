@@ -3,7 +3,6 @@
 import argparse
 import sys
 import os
-from blitz_env.stats_db import StatsDB
 from blitz_env.agent_pb2 import GameState, PlayerStatus
 from blitz_env import load_players
 

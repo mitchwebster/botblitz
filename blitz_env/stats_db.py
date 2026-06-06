@@ -1,7 +1,4 @@
 import pandas as pd
-from typing import List
-from sqlalchemy import create_engine
-from blitz_env.agent_pb2 import Player
 import re
 
 # NOTE: `requests`/`bs4`/`nfl_data_py` are intentionally NOT imported at module load.
@@ -156,58 +153,3 @@ def fp_stats_dynamic(page, **kwargs):
     # Return stats DataFrame
     return stats_df
 
-class StatsDB:
-    """Reads season & weekly fantasy stats from a local SQLite DB — no network calls.
-
-    The data is the FantasyPros-schema stats (``FPTS``, ``RUSHING_YDS``, ``PASSING_TD``,
-    ...) keyed by ``fantasypros_id`` (== ``Player.id``). This is the single schema
-    produced by ``collect_stats.py`` and copied into every game DB by the engine, so the
-    same data is available uniformly for every position (including K/DST) both in the
-    local harness and inside the container.
-
-    By default it reads from the bot's own game DB (``DatabaseManager.DB_URL``), which
-    already carries copies of ``season_stats`` and ``weekly_stats``. Pass ``db_url`` to
-    read from a different SQLite database.
-    """
-
-    def __init__(self, years: List[int], include_k_dst: bool = False, db_url: str = None):
-        # `include_k_dst` is accepted for backwards compatibility and ignored: K and DST
-        # now live in the same tables and schema as every other position.
-        self.years = [int(y) for y in years] if years else []
-        if db_url is None:
-            from blitz_env.models import DatabaseManager
-            db_url = DatabaseManager.DB_URL
-        engine = create_engine(db_url)
-        self.seasonal_df = self._load_table(engine, "season_stats")
-        self.weekly_df = self._load_table(engine, "weekly_stats")
-
-    def _load_table(self, engine, table: str) -> pd.DataFrame:
-        try:
-            df = pd.read_sql(f"SELECT * FROM {table}", engine)
-        except Exception:
-            # Table may be absent (e.g. a draft-only game DB has no weekly_stats).
-            return pd.DataFrame()
-        # Normalize keys/years. weekly_stats stores the year as `year`, season_stats as
-        # `season`; expose a uniform numeric `season` either way, and a numeric `week`.
-        if "season" not in df.columns and "year" in df.columns:
-            df["season"] = df["year"]
-        for col in ("season", "week"):
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-        if "fantasypros_id" in df.columns:
-            df["fantasypros_id"] = df["fantasypros_id"].astype(str)
-        if self.years and "season" in df.columns:
-            df = df[df["season"].isin(self.years)]
-        return df.reset_index(drop=True)
-
-    def get_weekly_data(self, player: Player) -> pd.DataFrame:
-        """Weekly stats rows for a player (FantasyPros schema), keyed by Player.id."""
-        if self.weekly_df.empty:
-            return self.weekly_df
-        return self.weekly_df[self.weekly_df["fantasypros_id"] == str(player.id)]
-
-    def get_seasonal_data(self, player: Player) -> pd.DataFrame:
-        """Seasonal stats rows for a player (FantasyPros schema), keyed by Player.id."""
-        if self.seasonal_df.empty:
-            return self.seasonal_df
-        return self.seasonal_df[self.seasonal_df["fantasypros_id"] == str(player.id)]

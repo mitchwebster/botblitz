@@ -7,7 +7,6 @@
 # legacy CSV/in-memory backend (simulate_draft.py, score_game.py) was removed in the
 # 2025 consolidation; load_players and is_drafted (player_utils) are retained helpers.
 from .load_players import load_players
-from .stats_db import StatsDB
 from .player_utils import is_drafted
 from .agent_pb2 import (
     Player, 
@@ -27,4 +26,3 @@ from.models import (
     GameStatus,
     DatabaseManager
 )
-from .projections_db import ProjectionsDB
