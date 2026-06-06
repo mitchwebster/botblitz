@@ -59,9 +59,10 @@ def build_season(year: int, stats_path: str = None, season_path: str = None) -> 
 
     # 1) players pool via the ORM schema, populated from the rank CSV
     engine = create_engine(f"sqlite:///{season_path}")
-    Player.__table__.create(engine)
-    session = sessionmaker(bind=engine)()
+    session = None
     try:
+        Player.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
         for p in load_players(year):
             session.add(Player(
                 id=p.id,
@@ -78,7 +79,8 @@ def build_season(year: int, stats_path: str = None, season_path: str = None) -> 
             ))
         session.commit()
     finally:
-        session.close()
+        if session is not None:
+            session.close()
         engine.dispose()
 
     # 2) reference tables copied from the scrape cache (raw sqlite3 for clean ATTACH)
@@ -93,8 +95,11 @@ def build_season(year: int, stats_path: str = None, season_path: str = None) -> 
             if present:
                 conn.execute(f"CREATE TABLE {table} AS SELECT * FROM cache.{table}")
         conn.commit()
-        conn.execute("DETACH DATABASE cache")
     finally:
+        try:
+            conn.execute("DETACH DATABASE cache")
+        except sqlite3.Error:
+            pass
         conn.close()
 
     return season_path
