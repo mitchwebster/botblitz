@@ -104,38 +104,61 @@ a Datasette browser on a dev snapshot. The harness imports `blitz_env` and takes
 
 ## 9. Data & source of truth
 
-### Source of truth: `data/stats/{year}/stats.db` ✅
-Raw stats & projections. Tables: `preseason_projections`, `season_stats`, `weekly_stats`,
-`weekly_injuries`. Created by `python3 blitz_env/collect_stats.py --db
-data/stats/{year}/stats.db --end-year {year} --years 10`; weekly updates via
-`python3 -m blitz_env.collect_weekly_stats --year {year} --week {week} --db
-data/stats/{year}/stats.db` and `collect_weekly_injuries`. Updated by the
-`update-scores.yml` action. Tracked in git.
+### One per-season DB: `data/game_states/{year}/season.db` ✅
+The single SQLite file the engine, harness, and bots all read/write. It holds three
+data tiers in one place (no more stats duplication, no `gs-draft → gs-season`
+handoff):
 
-### Game state: `data/game_states/{year}/gs-{draft|season}.db`
-The actual league state (bots, players, matchups, league_settings, game_statuses) **plus
-copies** of the stats tables. When games are created/updated, Go **ATTACHES**
-`data/stats/{year}/stats.db` and **COPIES** the stats tables in
-(`populateStatsTables` in `pkg/gamestate/handler.go`), so each game snapshots stats at
-creation time; `RefreshWeeklyStats` re-copies. Tracked in git.
+- **Reference, frozen:** `season_stats`, `preseason_projections` (all historical years).
+- **Reference, rolling:** `weekly_stats`, `weekly_projections`, `weekly_injuries`
+  (the in-progress season, appended week over week by `update-scores`).
+- **Player pool:** `players` (draftable universe + draft status).
+- **League state:** `bots`, `league_settings`, `game_statuses`, `matchups`,
+  `transactions`, `weekly_lineups` (created by the engine/harness at run time, NOT
+  shipped in the prebuilt DB).
 
-### Archived dev snapshots
-`data/archive/2025/{stats,gamestate}.db` — old dev snapshots, used only by
-`make launch-simulator`, not production.
+The engine mutates this file in place (git snapshots it at meaningful points). Draft,
+season, and playoffs are phases of the same file. The harness never mutates the
+tracked DB: it copies `season.db` to a gitignored scratch and resets only the
+league-state tables per mock draft. The repo currently ships a complete **2025**
+`season.db`; see `docs/bootstrap-2026.md` to ship a new year.
 
-### Key code references
-Referenced by function name (grep for them — line numbers drift, names don't). All in
-`pkg/gamestate/handler.go`:
-- Stats DB path: `getStatsDatabaseFilePath`
-- Game state DB path: `getSaveFileName`
-- Stats table population (attach + copy): `populateStatsTables`
-- Weekly stats refresh: `RefreshWeeklyStats`
+### Scrape cache (build input): `data/stats/{year}/stats.db`
+The slow/network artifact that `build-season` reads offline. Created by the
+`bootstrap_data scrape` phase (FantasyPros stats/projections + NFL.com injuries).
+**Bots never read this file** — it is a build input only. Retained in git as the
+cache for rebuilds.
+
+### The `bootstrap_data` CLI (`blitz_env/bootstrap_data.py`)
+Two phases mirroring the user's mental model:
+- `scrape --year Y` → full network pull into `data/stats/Y/stats.db` (the only step
+  that hits the network). Makefile: `make bootstrap-data-scrape YEAR=Y`.
+- `build-season --year Y` → materialize `data/game_states/Y/season.db` (reference
+  tables copied from the cache + the `players` pool from `player_ranks_Y.csv`;
+  offline, repeatable). Makefile: `make bootstrap-data-build-season YEAR=Y`.
+
+### Weekly updates
+`update-scores` scrapes the new week and **appends** its rows directly into
+`season.db` (`collect_weekly_{stats,projections,injuries} --db
+data/game_states/{year}/season.db`). The old Go copy step (`populateStatsTables` /
+`RefreshWeeklyStats`) is gone — one write, every consumer sees it. A mid-season
+rebuild = re-`scrape` + `build-season`, then restore league state from git.
+
+### Engine ↔ DB (Go, `pkg/gamestate/handler.go`)
+Referenced by function name (grep for them — line numbers drift, names don't):
+- Per-season DB path: `getSaveFileName` → `data/game_states/{year}/season.db`.
+- Draft: `NewGameStateHandlerForDraft` opens the existing `season.db`, `AutoMigrate`s
+  only the league-state tables, and `populateDatabase` seeds bots/settings/game_status
+  (it no longer creates `players` or copies stats — those are already in `season.db`).
+- Season: `LoadGameStateForWeeklyFantasy` opens the same file; `initSeason` builds
+  matchups.
+- Weekly scoring reads `weekly_stats` straight from `season.db`
+  (`GetPlayerScoresForCurrentWeek`).
 
 ### Constants
 ```go
-const saveFolderRelativePath = "data/game_states"  // Game state DBs
-const statsFolderRelativePath = "data/stats"       // Stats DBs (source of truth)
-const statsDatabaseFileName = "stats.db"
+const saveFolderRelativePath = "data/game_states"          // per-season DBs
+const seasonDatabaseFileName = "season" + fileSuffix       // "season.db"
 ```
 
 ### Injury data
@@ -143,12 +166,18 @@ Scraped from NFL.com; fuzzy-matched (rapidfuzz) on `(year, week, player_name, po
 FantasyPros IDs. Fields: `player_name`, `team`, `position`, `injury`, `practice_status`,
 `game_status`, `fantasypros_id`, `gsis_id`, `sleeper_id`.
 
-### Historical backfill
+### Archived dev snapshots
+`data/archive/{year}/` holds old snapshots used only by `make launch-simulator`, not
+production. For 2025 this includes the pre-consolidation `gs-draft.db` / `gs-season.db`
+(the old per-phase layout) plus `stats.db` / `gamestate.db`.
+
+### Historical / full rebuild
 ```bash
-python3 blitz_env/collect_stats.py --db data/stats/2025/stats.db --end-year 2025 \
-  --years 10 --include-weekly --include-injuries --weeks 1:18
+python3 -m blitz_env.bootstrap_data scrape --year 2025          # -> data/stats/2025/stats.db
+python3 -m blitz_env.bootstrap_data build-season --year 2025    # -> data/game_states/2025/season.db
 ```
-Warning: ~180 HTTP requests to NFL.com for injury data; 5–10 min, possible rate limiting.
+The `scrape` phase makes ~180 HTTP requests to NFL.com for injury data; 5–10 min,
+possible rate limiting.
 
 ## 10. CI / GitHub Actions
 
