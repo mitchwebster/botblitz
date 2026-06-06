@@ -82,27 +82,27 @@ jobs:
         # Print out what will be run (just for logging)
         echo "Running weekly data collection for week: $CURRENT_WEEK"
 
-        # Get weekly stats added to stats.db (mission critical - must succeed)
-        python3 -m blitz_env.collect_weekly_stats --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db
+        # Append weekly stats directly into season.db (mission critical - must succeed)
+        python3 -m blitz_env.collect_weekly_stats --year 2026 --week $CURRENT_WEEK --db data/game_states/2026/season.db
 
-        # Get weekly projections added to stats.db (important but not critical - continue on failure)
+        # Append weekly projections into season.db (important but not critical - continue on failure)
         echo "Collecting weekly projections for week $(( CURRENT_WEEK + 1 ))..."
-        if python3 -m blitz_env.collect_weekly_projections --year 2025 --week $(( CURRENT_WEEK + 1 )) --db data/stats/2025/stats.db; then
+        if python3 -m blitz_env.collect_weekly_projections --year 2026 --week $(( CURRENT_WEEK + 1 )) --db data/game_states/2026/season.db; then
           echo "✓ Weekly projections collected successfully"
         else
           echo "⚠ Warning: Failed to collect weekly projections (non-critical, continuing)"
         fi
 
-        # Get weekly injuries added to stats.db (important but not critical - continue on failure)
+        # Append weekly injuries into season.db (important but not critical - continue on failure)
         echo "Collecting weekly injuries..."
-        if python3 -m blitz_env.collect_weekly_injuries --year 2025 --week $CURRENT_WEEK --db data/stats/2025/stats.db; then
+        if python3 -m blitz_env.collect_weekly_injuries --year 2026 --week $CURRENT_WEEK --db data/game_states/2026/season.db; then
           echo "✓ Weekly injuries collected successfully"
         else
           echo "⚠ Warning: Failed to collect weekly injuries (non-critical, continuing)"
         fi
     
     - name: Update fantasy week scores
-      run: make update-scores
+      run: go run pkg/cmd/engine_bootstrap.go -game_mode=UpdateWeeklyScores -year=2026
 
     - name: Create PR w/ new gamestate
       id: cpr
@@ -112,7 +112,7 @@ jobs:
         title: '[Automated] Weekly Score Updates'
         commit-message: '[Automated] Weekly Score Updates'
         add-paths: |
-            data/*.db
+            data/game_states/2026/season.db
         branch: update-weekly-scores
         auto-merge-method: squash
     
