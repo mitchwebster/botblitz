@@ -23,6 +23,9 @@ test:
 	go list -f '{{.Dir}}' -m | xargs -L1 go work sync -C
 	go list -f '{{.Dir}}' -m | xargs -L1 go test -C
 
+test-py:
+	python3 -m pytest tests -q
+
 run-draft:
 	go run pkg/cmd/engine_bootstrap.go -game_mode=Draft
 
