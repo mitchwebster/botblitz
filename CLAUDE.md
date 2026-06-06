@@ -1,107 +1,168 @@
-# Claude Code Documentation
+# Claude Code Documentation — BotBlitz
 
-This file contains important context and reminders for working on the BotBlitz codebase.
+Context and rules for working in this repo (human + agentic). These instructions take
+precedence over default behavior.
 
-## Database Structure & Source of Truth
+## 1. What this repo is
 
-### **Source of Truth: `data/stats/{year}/stats.db`** ✅
+A bot-vs-bot **fantasy football engine**. Human-written Python "bots" draft players and make
+weekly roster decisions; a Go engine orchestrates them, each running sandboxed in its own
+Docker container. It has always been a fantasy-football project — a brief NBA exploration was
+abandoned and left only stray artifacts (not the repo's origin).
 
-- **Location**: `data/stats/{year}/stats.db` (e.g., `data/stats/2025/stats.db`)
-- **Purpose**: Contains all the raw stats & projections data
-- **Tables**:
-  - `preseason_projections` - Preseason fantasy projections for all players
-  - `season_stats` - Full season stats for all players
-  - `weekly_stats` - Weekly stats for each player/week
-  - `weekly_injuries` - Weekly injury reports from NFL.com (includes injury type, practice status, game status)
-- **How it's created**:
-  - Initially: `python3 blitz_env/collect_stats.py --db data/stats/{year}/stats.db --end-year {year} --years 10`
-  - Weekly updates:
-    - `python3 -m blitz_env.collect_weekly_stats --year {year} --week {week} --db data/stats/{year}/stats.db`
-    - `python3 -m blitz_env.collect_weekly_injuries --year {year} --week {week} --db data/stats/{year}/stats.db`
-- **When it updates**: GitHub action (`.github/workflows/update-scores.yml`) runs after each game to add current week's stats
-- **Tracked in git**: ✅ Yes (checked into repo at `data/stats/`)
+Season evolution: **2024 = draft only. 2025 = added season gameplay + add/drop**, and moved
+the draft/scoring data model to **SQLite**.
 
-### **Game State: `data/game_states/{year}/gs-*.db`**
+## 2. Languages & ownership
 
-- **Location**: `data/game_states/{year}/gs-{draft|season}.db`
-- **Purpose**: Contains the actual fantasy league state (who drafted who, matchups, scores, etc.)
-- **Tables**:
-  - `bots` - Bot/team information
-  - `players` - Player information and roster assignments
-  - `matchups` - Weekly matchup pairings
-  - `league_settings` - League configuration
-  - `game_statuses` - Current game state
-  - **Copied from stats.db**: `season_stats`, `preseason_projections`, `weekly_stats`
-- **How it works**:
-  - When games are created/updated, Go code **ATTACHES** `data/stats/{year}/stats.db` as a separate database
-  - It **COPIES** the stats tables into the game state DB (see `pkg/gamestate/handler.go:580-597`, `602-621`)
-  - This way each game state has its own snapshot of stats at the time of creation
-  - Stats can be refreshed using `RefreshWeeklyStats()` which re-copies from the source
-- **Tracked in git**: ✅ Yes (checked into repo at `data/game_states/`)
+- **Go (`pkg/`)** — the engine: orchestration, Docker container lifecycle, game state /
+  SQLite, draft + weekly-fantasy + playoff logic, Google Sheets output.
+- **Python (`blitz_env/`, `py_grpc_server/`, `bots/`)** — the runtime bot SDK (`blitz_env`),
+  the gRPC server that runs inside each container, stats-collection scripts, and user bots.
+- **Python (`harness/`)** — local testing/simulation (NOT shipped to the container).
+- **R (`fetch_ranks.R`)** — legacy ranking scraper; `player_ranks_*.csv` are the artifacts.
+- **JS/React (`ux/`)** — a Datasette-backed web viewer (create-react-app).
 
-### **Archived Development Snapshots**
+## 3. ⚠️ Guardrails (read before refactoring)
 
-- `data/archive/2025/stats.db` and `data/archive/2025/gamestate.db` - old development
-  snapshots (formerly at repo root), NOT used by production code. Kept for reference and
-  used only by `make launch-simulator` (datasette browser). The live source of truth is
-  `data/stats/{year}/stats.db` and `data/game_states/{year}/gs-*.db`.
+- **`blitz_env` is the public runtime SDK / wheel API.** It is built into a wheel
+  (`blitz_env-0.1.0-py3-none-any.whl`) baked into the `py_grpc_server` Docker image, and bots
+  import it at runtime (some historical bots fetch source from pinned GitHub raw URLs).
+  Renaming/removing a top-level name is a breaking change.
+- **Keep `blitz_env` lean.** `blitz_env/__init__.py` must never import `matplotlib`, anything
+  under `bots/`, or simulation code — it is loaded inside the container where no `bots`
+  package exists. `is_drafted` lives in `blitz_env/player_utils.py` (protobuf, dependency-light)
+  precisely so `import blitz_env` stays light; `py_grpc_server/bot.py` depends on it.
+- **Single data backend: sqlite via `models.DatabaseManager` (`init_database`).** The legacy
+  CSV/in-memory backend was removed in the 2025 consolidation; `load_players` and `is_drafted`
+  are retained helpers.
+- **Runtime SDK vs harness.** Local simulation/testing (`simulate_draft`, `visualize_draft_board`,
+  `score_game`) lives in the top-level **`harness/`** package. The dependency is one-way
+  (`harness` → `blitz_env`), and `harness/` is **not** in the wheel. `harness/simulate_draft.py`
+  pulls in heavy deps (matplotlib, nfl_data_py, pandas) so it must stay out of the runtime SDK.
+- **Don't edit user bot files** (`bots/nfl2025/*.py`, `bots/archive/**`) to satisfy a refactor.
 
-### **Key Code References**
+## 4. Runtime model (how a bot reaches a container)
 
-- **Stats DB path construction**: `pkg/gamestate/handler.go:553-561` (`getStatsDatabaseFilePath`)
-- **Game state DB path construction**: `pkg/gamestate/handler.go:740-754` (`getSaveFileName`)
-- **Stats table population**: `pkg/gamestate/handler.go:602-650` (`populateStatsTables`)
-- **Weekly stats refresh**: `pkg/gamestate/handler.go:563-600` (`RefreshWeeklyStats`)
+1. The Go engine writes the selected bot's source to host `/tmp/bot.py`
+   (`pkg/engine/ContainerHandler.go`, const `botFileRelativePath = /tmp/bot.py`).
+2. It bind-mounts host `/tmp` → container `/botblitz`.
+3. `py_grpc_server/bootstrap.sh` runs `cp -r /botblitz/* /app/py_grpc_server` then
+   `python3 -u server.py`.
+4. `server.py` / `isolate_action.py` do `from bot import draft_player,
+   perform_weekly_fantasy_actions` and `import blitz_env`.
 
-### **Constants**
+So the user's `bot.py` overwrites the default `py_grpc_server/bot.py` at runtime, and every
+bot runs against the current wheel.
 
+## 5. Build & codegen
+
+- `make gen` — regenerates proto for **both** Go (`pkg/common/agent*.pb.go`) and Python.
+- `make gen-python-only` — Python stubs only; copies them into `py_grpc_server/`.
+- `make build-py-module` — copies root `player_ranks_*.csv` into `blitz_env/`, builds the
+  wheel into `dist/`.
+- `make build-docker` — runs `gen-python-only` → `build-py-module` → `docker build`.
+- **Generated, NOT tracked:** `blitz_env/agent_pb2*.py`, `py_grpc_server/agent_pb2*.py`,
+  `blitz_env/player_ranks_*.csv`. **Exception:** the Go proto `pkg/common/agent*.pb.go` **is**
+  tracked — and `make clean` deletes it, so after `make clean` you must `make gen` or
+  `git checkout` to restore.
+
+## 6. Running the engine
+
+Entry: `pkg/cmd/engine_bootstrap.go` (module name is `pkg/runner`, not `pkg/cmd`).
+
+Game modes (`pkg/engine/GameMode.go`): `Draft`, `PerformWeeklyFantasyActions`,
+`UpdateWeeklyScores`, `FinishPreviousWeek`. Makefile wrappers: `run-draft`,
+`run-weekly-fantasy`, `update-scores`, `run-finish-week`.
+
+Flags: `-game_mode`, `-year` (default 2025), `-enable_google_sheets` (default true),
+`-enable_verbose_logging`, `-is_running_on_github`.
+
+- The bot roster is **hardcoded** in `engine_bootstrap.go`: it loads bot **source** from
+  `bots/nfl2025/*.py` and **env vars** from `bots/nfl/envs/*.env`.
+- `bots/nfl/envs/*.env` is **gitignored** (per-bot secrets). A full local draft needs **every**
+  configured bot's env file or it exits — an env-setup limitation, not a code bug.
+- Requires a running **Docker daemon**; the engine expects the `py_grpc_server` image to
+  already exist (`make build-docker`).
+
+## 7. Local simulation / harness
+
+`harness/` + `SimulateDraft.ipynb` are the local way to test a bot's draft logic without the
+full engine. `make launch-simulator` builds the wheel, installs it, and opens the notebook +
+a Datasette browser on a dev snapshot. The harness imports `blitz_env` and takes the bot's
+`draft_player` as a parameter; other teams use `default_draft_strategy`.
+
+## 8. Verification (how to actually prove a change works)
+
+- **Build ≠ proof.** Building the wheel/image does not exercise the runtime path.
+- Real proof = run the engine, or exercise the container directly:
+  - `docker run --rm py_grpc_server python3 -c "import blitz_env; from blitz_env import
+    is_drafted; from blitz_env.models import DatabaseManager"`
+  - `docker run --rm py_grpc_server sh -c "cd /app/py_grpc_server && python3 -c 'import bot'"`
+- Go tests live only in `pkg/engine` (`go test ./...` there). `pkg/gamestate` has its own
+  `go.mod` but is **not** in `go.work`; running `./...` from it errors and it has no tests.
+
+## 9. Data & source of truth
+
+### Source of truth: `data/stats/{year}/stats.db` ✅
+Raw stats & projections. Tables: `preseason_projections`, `season_stats`, `weekly_stats`,
+`weekly_injuries`. Created by `python3 blitz_env/collect_stats.py --db
+data/stats/{year}/stats.db --end-year {year} --years 10`; weekly updates via
+`python3 -m blitz_env.collect_weekly_stats --year {year} --week {week} --db
+data/stats/{year}/stats.db` and `collect_weekly_injuries`. Updated by the
+`update-scores.yml` action. Tracked in git.
+
+### Game state: `data/game_states/{year}/gs-{draft|season}.db`
+The actual league state (bots, players, matchups, league_settings, game_statuses) **plus
+copies** of the stats tables. When games are created/updated, Go **ATTACHES**
+`data/stats/{year}/stats.db` and **COPIES** the stats tables in
+(`populateStatsTables` in `pkg/gamestate/handler.go`), so each game snapshots stats at
+creation time; `RefreshWeeklyStats` re-copies. Tracked in git.
+
+### Archived dev snapshots
+`data/archive/2025/{stats,gamestate}.db` — old dev snapshots, used only by
+`make launch-simulator`, not production.
+
+### Key code references
+Referenced by function name (grep for them — line numbers drift, names don't). All in
+`pkg/gamestate/handler.go`:
+- Stats DB path: `getStatsDatabaseFilePath`
+- Game state DB path: `getSaveFileName`
+- Stats table population (attach + copy): `populateStatsTables`
+- Weekly stats refresh: `RefreshWeeklyStats`
+
+### Constants
 ```go
 const saveFolderRelativePath = "data/game_states"  // Game state DBs
 const statsFolderRelativePath = "data/stats"       // Stats DBs (source of truth)
 const statsDatabaseFileName = "stats.db"
 ```
 
-## Historical Data Backfill Commands
+### Injury data
+Scraped from NFL.com; fuzzy-matched (rapidfuzz) on `(year, week, player_name, position)` to
+FantasyPros IDs. Fields: `player_name`, `team`, `position`, `injury`, `practice_status`,
+`game_status`, `fantasypros_id`, `gsis_id`, `sleeper_id`.
 
-### Collect All Historical Stats (10 years)
+### Historical backfill
 ```bash
-python3 blitz_env/collect_stats.py \
-  --db data/stats/2025/stats.db \
-  --end-year 2025 \
-  --years 10 \
-  --include-weekly \
-  --include-injuries \
-  --weeks 1:18
+python3 blitz_env/collect_stats.py --db data/stats/2025/stats.db --end-year 2025 \
+  --years 10 --include-weekly --include-injuries --weeks 1:18
 ```
+Warning: ~180 HTTP requests to NFL.com for injury data; 5–10 min, possible rate limiting.
 
-**Warning**: This makes ~180 HTTP requests to NFL.com for injury data (10 years × 18 weeks). Expect 5-10 minutes runtime and possible rate limiting.
+## 10. CI / GitHub Actions
 
-### Collect Single Week (Testing)
-```bash
-python3 -m blitz_env.collect_weekly_injuries --year 2025 --week 6 --db data/stats/2025/stats.db
-```
+`.github/workflows/`: `update-scores.yml`, `weekly-fantasy.yml`, `finish-week.yml`,
+`download-weekly-data.yml`, `core-validations.yml`. Several scheduled triggers are disabled
+for the offseason. `update-scores` treats weekly **stats** as mission-critical (must succeed)
+and **projections/injuries** as best-effort (continue-on-failure).
 
-## Injury Data Details
+## 11. Caveats
 
-- **Source**: Scraped from NFL.com official injury reports
-- **Player matching**: Uses fuzzy matching (rapidfuzz) to match player names to FantasyPros IDs
-- **Merge key**: `(year, week, player_name, position)` - matches on name and position, not ID initially
-- **Fields**:
-  - `player_name`, `team`, `position`
-  - `injury` - injury type (e.g., "Ankle", "Hamstring")
-  - `practice_status` - practice participation
-  - `game_status` - game day status (e.g., "Questionable", "Out")
-  - `fantasypros_id`, `gsis_id`, `sleeper_id` - matched player IDs
-
-## GitHub Actions
-
-### `.github/workflows/update-scores.yml`
-Runs after games to update weekly data. Collections are prioritized:
-- **Weekly stats** (mission critical) - Must succeed or action fails
-- **Weekly projections** (important but non-critical) - Continues on failure
-- **Weekly injuries** (important but non-critical) - Continues on failure
-
-If projections or injuries fail to scrape (e.g., page format changes, data unavailable), the action logs a warning but continues successfully. This prevents breaking the core score update workflow.
-
-### `.github/workflows/download-weekly-data.yml`
-Downloads projections/stats to S3
+- `make clean` deletes the tracked Go proto — regenerate (`make gen`) or `git checkout` after.
+- Git history is **not** trustworthy for secrets: a defunct workflow's Discord webhook +
+  odds-API key were committed and later removed from the tree but **remain in history** —
+  rotation is the real fix. `sheets-creds.json` (live Google key) is gitignored and was never
+  committed.
+- ~120 MB of old binaries/DBs linger in git history (out of scope to purge; would need
+  `git filter-repo` + force-push).

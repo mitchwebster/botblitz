@@ -11,8 +11,6 @@ import pandas as pd
 import nfl_data_py as nfl
 from blitz_env.stats_db import fp_seasonal_years
 from sqlalchemy import text
-from bots.nfl2025.chris_bot import draft_player as chris_draft_player
-
 def is_drafted(player: Player) -> bool:
     return player.availability in ('DRAFTED', 'ON_HOLD')
 
@@ -266,11 +264,7 @@ def simulate_draft(draft_player: Callable[[], str], year: int):
         user_bot.name = "Your Bot"
         draft_strategy_map[user_bot.id] = draft_player
 
-        available_bots = [bot for bot in bots if bot is not user_bot]
-        second_bot = random.choice(available_bots)
-        second_bot.owner = "Bot Chris"
-        second_bot.name = "Chris's real bot"
-        draft_strategy_map[second_bot.id] = chris_draft_player
+        # All other bots use the built-in default_draft_strategy (set above).
 
         db.session.commit()
 
