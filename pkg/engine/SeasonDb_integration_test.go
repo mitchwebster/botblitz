@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mitchwebster/botblitz/pkg/common"
@@ -172,4 +173,23 @@ func TestSeasonLoadRunsInitSeasonOnSameFile(t *testing.T) {
 		t.Fatalf("GetPlayerScoresForCurrentWeek: %v", err)
 	}
 	_ = scores // current week is 1; the fixture row may or may not be on a roster — call must just succeed
+}
+
+func TestDraftErrorsWhenSeasonDbMissing(t *testing.T) {
+	cwd, _ := os.Getwd()
+	// Ensure no leftover season.db for this throwaway year, and clean up the dir.
+	dir := filepath.Join(cwd, "data", "game_states", "2998")
+	os.RemoveAll(dir)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+
+	bots, settings := testBotsAndSettings()
+	settings.Year = uint32(2998)
+
+	_, err := gamestate.NewGameStateHandlerForDraft(bots, settings)
+	if err == nil {
+		t.Fatal("expected an error when season.db is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "season.db not found") {
+		t.Errorf("expected a 'season.db not found' error, got: %v", err)
+	}
 }

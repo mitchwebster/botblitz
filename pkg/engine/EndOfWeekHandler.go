@@ -13,11 +13,8 @@ import (
 const NonePlayerName = "None"
 
 func (e *BotEngine) updateWeeklyScores(ctx context.Context, finishWeek bool) error {
-	err := e.gameStateHandler.RefreshWeeklyStats()
-	if err != nil {
-		return err
-	}
-
+	// weekly_stats are appended directly into season.db by the update-scores job,
+	// so there is no longer a copy/refresh step here — read them straight through.
 	playerScores, currentFantasyWeek, err := e.gameStateHandler.GetPlayerScoresForCurrentWeek()
 	if err != nil {
 		return err
