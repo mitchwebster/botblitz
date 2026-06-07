@@ -578,128 +578,349 @@ def size_bid(upgrade, upgrade_max, remaining_budget, week):
     return max(1, min(bid, cap, budget))
 
 
-def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    db = DatabaseManager()
+# ---------------------------------------------------------------------------
+# Waiver claim selection (issue #266)
+#
+# select_waiver_claims is PURE: it consumes two forward-valued DataFrames
+# (my roster + the available free agents, each already scored through the #265
+# player_forward_value blend in the wiring) plus the remaining FAAB budget and
+# the current week, and returns an ordered list of plain claim dicts
+# ({add_id, drop_id, bid}). It never touches the DB or engine, so the trigger /
+# ordering / fallback logic is fully unit-testable offline. The DB-reading
+# wiring that feeds it (load_waiver_valuation_inputs) and turns its output into
+# WaiverClaim objects lives in perform_weekly_fantasy_actions below.
+#
+# Conservative by design: claims fire ONLY on a real trigger (a rostered player
+# OUT, on bye with no startable cover, or clearly underperforming). With no
+# trigger the selector returns an empty list — no churn.
+# ---------------------------------------------------------------------------
 
-    def find_replacements(position, current_week: int, league_year: int, exclude_players: set = None) -> pd.DataFrame:
-        """
-        Find available replacement players for a given position that are not on bye during the current week.
-        Uses season_stats table for better ranking based on current season performance.
-        
-        Args:
-            position: The position to find replacements for
-            current_week: The current fantasy week
-            league_year: The current league year
-            exclude_players: Set of fantasypros_ids to exclude from the search
-        
-        Returns:
-            A DataFrame containing the best available player at that position
-        """
+# How many trailing weeks of actual FPTS feed the forward-value blend.
+WAIVER_TRAILING_WEEKS = 3
 
-        exclude_clause = ""
-        if exclude_players:
-            excluded_ids = ", ".join(f"'{pid}'" for pid in exclude_players)
-            exclude_clause = f"AND ss.fantasypros_id NOT IN ({excluded_ids})"
-        
-        replacement = pd.read_sql(
-            f"""
-            SELECT
-            ss.fantasypros_id, ss.player_name, ss.position, ss.FPTS, p.availability, p.player_bye_week, ws.FPTS AS 'pFTPS'
-            FROM
-            season_stats ss
-            JOIN players p ON ss.fantasypros_id = p.id
-            JOIN weekly_stats ws ON ss.fantasypros_id = ws.fantasypros_id AND ws.week = {current_week - 1}
-            WHERE
-            p.availability = 'AVAILABLE' AND
-            ss.position = '{position}'
-            AND ss.year = {league_year}
-            AND p.player_bye_week != {current_week}
-            AND ws.FPTS > 0
-            {exclude_clause}
-            ORDER BY
-            ss.FPTS desc
-            LIMIT
-            1
-            """,
-            db.engine
+# A rostered player's forward value at/above this is treated as a genuine
+# startable body: it both (a) counts as bye cover for a teammate and (b) keeps
+# the player off the underperformance trigger.
+STARTABLE_VALUE_THRESHOLD = 6.0
+
+# Clear-underperformance trigger: an available player at the same position must
+# beat the rostered player's forward value by at least this margin (and the
+# rostered player must himself be below STARTABLE_VALUE_THRESHOLD) before we
+# call it underperformance worth churning a roster spot for.
+UNDERPERFORM_UPGRADE_MARGIN = 5.0
+
+# Minimum value gain (best add forward value - dropped player forward value)
+# required for any claim to fire. Keeps marginal swaps off the wire.
+MIN_CLAIM_UPGRADE = 1.0
+
+# Number of FALLBACK claims (same drop, next-best alternate adds at the top
+# trigger's needed position) appended after the primary claims so a higher
+# priority team grabbing our top target doesn't waste the claim.
+NUM_FALLBACK_CLAIMS = 2
+
+
+def _waiver_status_is_out(game_status):
+    """True iff an injury game-status string means the player is OUT."""
+    if game_status is None:
+        return False
+    if isinstance(game_status, float) and math.isnan(game_status):
+        return False
+    return str(game_status).strip().upper() == "OUT"
+
+
+def _has_startable_cover(team, position, exclude_id):
+    """Does another rostered player at ``position`` provide startable cover?
+
+    Cover = a teammate (not the player we're checking) at the same position who
+    is not on bye this week, not OUT, and whose forward value clears
+    STARTABLE_VALUE_THRESHOLD. Used to decide whether a bye player actually
+    needs a waiver replacement.
+    """
+    others = team[(team["position"] == position) & (team["id"] != exclude_id)]
+    for _, o in others.iterrows():
+        if bool(o.get("on_bye")):
+            continue
+        if _waiver_status_is_out(o.get("game_status")):
+            continue
+        if float(o.get("forward_value") or 0.0) >= STARTABLE_VALUE_THRESHOLD:
+            return True
+    return False
+
+
+def _best_available_value(avail, position):
+    """Best forward value available at ``position`` (0.0 if none)."""
+    pool = avail[avail["position"] == position]
+    if pool.empty:
+        return 0.0
+    return float(pool["forward_value"].max())
+
+
+def select_waiver_claims(my_team_df, available_df, remaining_budget, week):
+    """Pick waiver claims for the week. PURE — DataFrames in, plain dicts out.
+
+    Expected columns:
+      ``my_team_df``  : id, position, forward_value, game_status, on_bye
+                        (one row per rostered player; forward_value already
+                         injury-gated via player_forward_value in the wiring)
+      ``available_df``: id, position, forward_value
+                        (free agents able to play this week)
+
+    A claim fires ONLY when some rostered player triggers:
+      1. severe injury     — game_status OUT,
+      2. bye-with-no-cover — on bye this week and no startable teammate at the
+                             position (``_has_startable_cover``),
+      3. underperformance  — forward value below STARTABLE_VALUE_THRESHOLD and an
+                             available player at the same position beats it by at
+                             least UNDERPERFORM_UPGRADE_MARGIN.
+    With no trigger this returns ``[]`` (conservative — no churn).
+
+    On a trigger we DROP the weakest forward-valued rosterable player and ADD the
+    best forward-valued available player at each needed (triggered) position.
+    Primary claims are ordered by upgrade (add forward value - drop forward
+    value); FALLBACK claims (same drop, next-best alternate adds at the top
+    trigger's position) are appended so a higher-priority team taking our top
+    target doesn't waste the claim. FAAB bids come from ``size_bid``.
+
+    Returns an ordered list of ``{"add_id", "drop_id", "bid"}`` dicts.
+    """
+    budget = int(remaining_budget or 0)
+    if budget <= 0 or my_team_df is None or len(my_team_df) == 0:
+        return []
+    if available_df is None or len(available_df) == 0:
+        return []
+
+    team = my_team_df.copy().reset_index(drop=True)
+    avail = available_df.copy().reset_index(drop=True)
+
+    team["position"] = team["position"].astype(str).str.upper()
+    avail["position"] = avail["position"].astype(str).str.upper()
+    team["forward_value"] = pd.to_numeric(team.get("forward_value"), errors="coerce").fillna(0.0)
+    avail["forward_value"] = pd.to_numeric(avail.get("forward_value"), errors="coerce").fillna(0.0)
+    if "on_bye" not in team.columns:
+        team["on_bye"] = False
+    team["on_bye"] = team["on_bye"].fillna(False).astype(bool)
+    if "game_status" not in team.columns:
+        team["game_status"] = None
+
+    # 1. Which positions have a triggered rostered player (-> need a replacement).
+    needed_positions = []
+    for _, p in team.iterrows():
+        pos = p["position"]
+        fv = float(p["forward_value"])
+        triggered = False
+        if _waiver_status_is_out(p.get("game_status")):
+            triggered = True
+        elif bool(p["on_bye"]) and not _has_startable_cover(team, pos, p["id"]):
+            triggered = True
+        elif fv < STARTABLE_VALUE_THRESHOLD and (
+            _best_available_value(avail, pos) - fv
+        ) >= UNDERPERFORM_UPGRADE_MARGIN:
+            triggered = True
+        if triggered and pos not in needed_positions:
+            needed_positions.append(pos)
+
+    if not needed_positions:
+        return []  # conservative: no real trigger -> no claims
+
+    # 2. Drop = the single weakest forward-valued rosterable player.
+    drop_row = team.sort_values("forward_value", ascending=True).iloc[0]
+    drop_id = drop_row["id"]
+    drop_value = float(drop_row["forward_value"])
+
+    # 3. Primary claims: best available add at each needed position.
+    primary = []
+    used_adds = set()
+    for pos in needed_positions:
+        pool = avail[(avail["position"] == pos) & (~avail["id"].isin(used_adds))]
+        pool = pool.sort_values("forward_value", ascending=False)
+        if pool.empty:
+            continue
+        add_row = pool.iloc[0]
+        upgrade = float(add_row["forward_value"]) - drop_value
+        if upgrade < MIN_CLAIM_UPGRADE:
+            continue
+        used_adds.add(add_row["id"])
+        primary.append({
+            "add_id": add_row["id"],
+            "drop_id": drop_id,
+            "position": pos,
+            "upgrade": upgrade,
+        })
+
+    if not primary:
+        return []
+
+    primary.sort(key=lambda c: c["upgrade"], reverse=True)
+    upgrade_max = primary[0]["upgrade"]
+
+    # 4. Fallbacks: same drop, alternate adds at the top trigger's position.
+    top_pos = primary[0]["position"]
+    fallbacks = []
+    fb_pool = avail[(avail["position"] == top_pos) & (~avail["id"].isin(used_adds))]
+    fb_pool = fb_pool.sort_values("forward_value", ascending=False)
+    for _, add_row in fb_pool.head(NUM_FALLBACK_CLAIMS).iterrows():
+        upgrade = float(add_row["forward_value"]) - drop_value
+        if upgrade < MIN_CLAIM_UPGRADE:
+            continue
+        used_adds.add(add_row["id"])
+        fallbacks.append({
+            "add_id": add_row["id"],
+            "drop_id": drop_id,
+            "position": top_pos,
+            "upgrade": upgrade,
+        })
+
+    # 5. Size each FAAB bid and emit plain claim dicts (wiring builds WaiverClaim).
+    claims = []
+    for c in primary + fallbacks:
+        claims.append({
+            "add_id": c["add_id"],
+            "drop_id": c["drop_id"],
+            "bid": size_bid(c["upgrade"], upgrade_max, budget, week),
+        })
+    return claims
+
+
+def get_remaining_waiver_budget(db, bot_id):
+    """Remaining FAAB for ``bot_id`` from bots.remaining_waiver_budget (0 if unset)."""
+    df = pd.read_sql(
+        f"SELECT remaining_waiver_budget FROM bots WHERE id = '{bot_id}'", db.engine
+    )
+    if df.empty:
+        return 0
+    try:
+        return int(df.iloc[0]["remaining_waiver_budget"])
+    except (TypeError, ValueError):
+        return 0
+
+
+def load_waiver_valuation_inputs(db, current_week, bot_id):
+    """DB seam for the waiver selector: build the forward-valued my-team and
+    available-free-agent DataFrames ``select_waiver_claims`` expects.
+
+    Pulls trailing actual FPTS (the prior ``WAIVER_TRAILING_WEEKS`` weeks from
+    ``weekly_stats``), upcoming projected FPTS (``weekly_projections`` for the
+    current week) and current-week injury game status (``weekly_injuries``),
+    then folds each player through ``player_forward_value`` (the #265 pure
+    blend). Available adds exclude players on bye this week (they can't help).
+    Both frames share columns: id, position, forward_value, game_status, on_bye.
+    """
+    current_week = int(current_week)
+    start_week = max(1, current_week - WAIVER_TRAILING_WEEKS)
+
+    trailing = pd.read_sql(
+        "SELECT fantasypros_id, FPTS FROM weekly_stats "
+        f"WHERE CAST(week AS INTEGER) >= {start_week} "
+        f"AND CAST(week AS INTEGER) < {current_week}",
+        db.engine,
+    )
+    trailing["fantasypros_id"] = trailing["fantasypros_id"].astype(str)
+    trailing_map = trailing.groupby("fantasypros_id")["FPTS"].apply(list).to_dict()
+
+    proj = pd.read_sql(
+        "SELECT fantasypros_id, FPTS FROM weekly_projections "
+        f"WHERE CAST(week AS INTEGER) = {current_week}",
+        db.engine,
+    )
+    proj["fantasypros_id"] = proj["fantasypros_id"].astype(str)
+    proj_map = proj.groupby("fantasypros_id")["FPTS"].apply(list).to_dict()
+
+    inj = pd.read_sql(
+        "SELECT fantasypros_id, game_status FROM weekly_injuries "
+        f"WHERE CAST(week AS INTEGER) = {current_week}",
+        db.engine,
+    )
+    inj_map = {}
+    for _, r in inj.iterrows():
+        fid = r["fantasypros_id"]
+        if fid is None or (isinstance(fid, float) and math.isnan(fid)):
+            continue
+        fid_str = str(int(fid)) if isinstance(fid, float) else str(fid)
+        status = r["game_status"]
+        if status is not None and str(status).strip():
+            inj_map[fid_str] = status
+
+    def _forward_value(pid):
+        return player_forward_value(
+            trailing_map.get(pid, []),
+            proj_map.get(pid, []),
+            inj_map.get(pid),
         )
-        return replacement
 
+    def _to_frame(players_df):
+        rows = []
+        for _, pl in players_df.iterrows():
+            pid = str(pl["id"])
+            pos = _primary_position(pl.get("allowed_positions"))
+            if pos is None:
+                continue
+            bye = pl.get("player_bye_week")
+            rows.append({
+                "id": pid,
+                "position": pos,
+                "forward_value": _forward_value(pid),
+                "game_status": inj_map.get(pid),
+                "on_bye": (bye == current_week),
+            })
+        return pd.DataFrame(
+            rows, columns=["id", "position", "forward_value", "game_status", "on_bye"]
+        )
+
+    my_players = pd.read_sql(
+        f"SELECT * FROM players WHERE current_bot_id = '{bot_id}'", db.engine
+    )
+    avail_players = pd.read_sql(
+        "SELECT * FROM players WHERE availability = 'AVAILABLE'", db.engine
+    )
+
+    my_team_df = _to_frame(my_players)
+    available_df = _to_frame(avail_players)
+    # Available adds must be able to play this week (drop bye-week free agents).
+    if not available_df.empty:
+        available_df = available_df[~available_df["on_bye"]].reset_index(drop=True)
+    return my_team_df, available_df
+
+
+def _primary_position(allowed_positions_json):
+    """First allowed position from a players.allowed_positions JSON cell."""
+    try:
+        parsed = json.loads(allowed_positions_json) if allowed_positions_json else []
+    except (TypeError, ValueError):
+        return None
+    return parsed[0] if parsed else None
+
+
+def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
+    """Weekly waiver path: identify my team, value my roster + the free-agent
+    pool forward-looking, select conservative trigger-driven claims, and return
+    them as AttemptedFantasyActions.
+
+    All valuation/selection logic is the pure ``select_waiver_claims``; this
+    wiring only reads the DB (team via ``get_my_bot_id``, budget from
+    ``bots.remaining_waiver_budget``, week from ``game_statuses``) and converts
+    the returned claim dicts into ``WaiverClaim`` objects.
+    """
+    db = DatabaseManager()
     try:
         bot_id = get_my_bot_id(db)
-        league_year = db.get_league_settings().year
-        gs = pd.read_sql("SELECT * FROM game_statuses", db.engine)
-        current_week = gs.iloc[0]["current_fantasy_week"]
+        gs = pd.read_sql("SELECT current_fantasy_week FROM game_statuses", db.engine)
+        current_week = int(gs.iloc[0]["current_fantasy_week"])
+        remaining_budget = get_remaining_waiver_budget(db, bot_id)
 
-        # Get my team data and last week's points
-        my_team_df = pd.read_sql(
-            f"""
-            SELECT p.*, ws.FPTS
-            FROM players p
-            JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = {current_week - 1}
-            WHERE p.current_bot_id = '{bot_id}'
-            """,
-            db.engine
+        my_team_df, available_df = load_waiver_valuation_inputs(db, current_week, bot_id)
+        selected = select_waiver_claims(
+            my_team_df, available_df, remaining_budget, current_week
         )
 
-        # Identify players on bye
-        bye_players_df = my_team_df[my_team_df["player_bye_week"] == current_week]
-        if bye_players_df.empty:
-            print("No players on bye this week.")
-        else:
-            print("Players on bye:")
-            print(bye_players_df[["full_name", "player_bye_week", "tier"]])
-
-        # Identify players who scored 0 points last week and are not on bye
-        zero_score_df = my_team_df[
-            (my_team_df["player_bye_week"] != current_week - 1) & 
-            (my_team_df["FPTS"] == 0)
+        claims = [
+            WaiverClaim(
+                player_to_add_id=str(c["add_id"]),
+                player_to_drop_id=str(c["drop_id"]),
+                bid_amount=int(c["bid"]),
+            )
+            for c in selected
         ]
-        if zero_score_df.empty:
-            print("No players scored 0 points this week (excluding bye).")
-        else:
-            print("\nPlayers who scored 0 points (not on bye):")
-            print(zero_score_df[["full_name", "player_bye_week", "tier", "FPTS"]])
-
-        # Combine into trading_block (distinct players)
-        trading_block = pd.concat([bye_players_df, zero_score_df]).drop_duplicates(subset=["id"])
-        print(f"\nTrading block ({len(trading_block)} players):")
-        print(trading_block[["full_name", "player_bye_week", "tier", "FPTS"]])
-
-        # For each player in the trading block, try to replace with best available player at that position
-        claims = []
-        claimed_players = set()
-        bid = 1
-        tier_threshold = 3 # Keep this around 8 so that you don't drop good players
-        print("\nTier threshold for replacement:", tier_threshold)
-        for _, player in trading_block.iterrows():
-            # Get primary position
-            position = json.loads(player["allowed_positions"])[0]
-            print(f"Finding replacements for {player['full_name']} - {position}")
-            
-            # Find replacement excluding already claimed players
-            replacement = find_replacements(position, current_week, league_year, exclude_players=claimed_players)
-            if player["tier"] < tier_threshold and player["FPTS"] > 0:
-                print(f"Keep {player['full_name']}")
-            else:
-                # Add WaiverClaim to claims array, tracking claimed players
-                if not replacement.empty:
-                    add = replacement.iloc[0]["fantasypros_id"]
-                    drop = player["id"]
-                    print(f"Claiming {replacement.iloc[0]['player_name']} to replace {player['full_name']}")
-                    claims.append(
-                        WaiverClaim(
-                            player_to_add_id=add,
-                            player_to_drop_id=drop,
-                            bid_amount=bid
-                        )
-                    )
-                    claimed_players.add(add)
-        print(claims)
-        actions = AttemptedFantasyActions(
-            waiver_claims=claims
-        )
-        return actions
-    
+        print(f"Submitting {len(claims)} waiver claim(s) (budget {remaining_budget}).")
+        return AttemptedFantasyActions(waiver_claims=claims)
     finally:
         db.close()
