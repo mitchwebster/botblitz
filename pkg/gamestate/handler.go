@@ -120,6 +120,14 @@ func (handler *GameStateHandler) GetBotsInRandomOrder() ([]Bot, error) {
 	return handler.cachedBotList, nil
 }
 
+// SetCachedBotOrder overrides the cached bot list with an explicit, caller-determined
+// order. The draft consumes GetBots() in slice order, so this fixes the draft order
+// deterministically (used by the evaluator to pin the candidate's draft slot). This is the
+// reproducible counterpart to GetBotsInRandomOrder.
+func (handler *GameStateHandler) SetCachedBotOrder(bots []Bot) {
+	handler.cachedBotList = bots
+}
+
 func (handler *GameStateHandler) GetPastMatchups(currentWeek int) ([]Matchup, error) {
 	var matchups []Matchup
 	result := handler.db.Where("week < ?", currentWeek).Find(&matchups)

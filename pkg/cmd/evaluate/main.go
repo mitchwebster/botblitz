@@ -22,6 +22,8 @@ var (
 	dataYear     = flag.Int("year", 2025, "season whose data (season.db) to evaluate against")
 	numTeams     = flag.Int("teams", 14, "number of teams in the league")
 	runs         = flag.Int("runs", 1, "number of independent season simulations")
+	draftSlot    = flag.Int("draft_slot", 0, "1-based draft slot to pin the candidate bot to (0 = random order, the default)")
+	draftSeed    = flag.Int64("seed", 0, "seed for the surrounding field's draft order when -draft_slot is set (reproducible)")
 )
 
 // scratchYear is a throwaway season the engine drafts/replays against so the tracked
@@ -95,11 +97,26 @@ func runOneSeason(ctx context.Context) ([]engine.Standing, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Load-bearing despite the discarded result: this seeds the handler's cached bot
-	// order that runDraft reads, so the draft order is randomized each run. Without it
-	// the draft falls back to id-ascending and bot "0" would always pick first.
-	if _, err := draftHandler.GetBotsInRandomOrder(); err != nil {
-		return nil, err
+	// Seed the handler's cached bot order that runDraft reads. Two paths:
+	//   - draft_slot unset (0): randomized order each run (GetBotsInRandomOrder).
+	//     Load-bearing despite the discarded result; without it the draft falls back to
+	//     id-ascending and bot "0" would always pick first.
+	//   - draft_slot set: pin the candidate to that 1-based slot, with the surrounding
+	//     field seeded so the whole order is reproducible across runs.
+	if *draftSlot == 0 {
+		if _, err := draftHandler.GetBotsInRandomOrder(); err != nil {
+			return nil, err
+		}
+	} else {
+		botsAsc, err := draftHandler.GetBots()
+		if err != nil {
+			return nil, err
+		}
+		ordered, err := engine.OrderBotsWithPinnedSlot(botsAsc, botUnderTestID, *draftSlot, *draftSeed)
+		if err != nil {
+			return nil, err
+		}
+		draftHandler.SetCachedBotOrder(ordered)
 	}
 	draftEngine := engine.NewBotEngine(
 		draftHandler,
