@@ -1,7 +1,7 @@
 from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
 import pandas as pd
-import json, os
+import json, os, math
 
 # ---------------------------------------------------------------------------
 # VORP draft valuation core (issue #263)
@@ -38,6 +38,12 @@ TIER_CLIFF_BONUS = 8.0
 NO_PROJECTION_FLOOR = -1.0e6
 
 FLEX_ELIGIBLE = {"RB", "WR", "TE"}
+
+# Anti-hoard: extra *bench* depth tolerated per position on top of that
+# position's startable slots before the anti-hoard guardrail stops drafting more
+# of it. K/DST get 0 (never draft a second kicker/defense); skill positions get
+# a few bench bodies for bye/injury cover, QB one backup.
+ANTI_HOARD_BENCH_DEPTH = {"QB": 1, "RB": 3, "WR": 3, "TE": 1, "K": 0, "DST": 0}
 
 
 def compute_replacement_baselines(slots, num_teams):
@@ -233,67 +239,200 @@ def load_available_players(db):
     df = pd.read_sql("SELECT * FROM players where availability = 'AVAILABLE'", db.engine)
     return df
 
-def draft_player() -> str:
+
+# ---------------------------------------------------------------------------
+# Draft pick selection (issue #264)
+#
+# choose_draft_pick is PURE: it consumes the scored pool from score_draft_pool,
+# my current roster, the draft round and the league slots, and returns the id
+# of the player to draft. It layers roster need + guardrails on top of the raw
+# VORP value so the engine wiring (draft_player) only has to read the DB and
+# call these functions. All round/slot-derived thresholds come from the slots
+# map (no hardcoded magic round numbers).
+# ---------------------------------------------------------------------------
+
+
+def _roster_positions(my_roster):
+    """Normalize my_roster (dict {name: position} or an iterable of positions)
+    into an upper-cased list of positions."""
+    if isinstance(my_roster, dict):
+        positions = my_roster.values()
+    elif my_roster is None:
+        positions = []
+    else:
+        positions = my_roster
+    return [str(p).upper() for p in positions if p is not None]
+
+
+def _roster_position_counts(my_roster):
+    """Count how many rostered players I have at each position."""
+    counts = {}
+    for p in _roster_positions(my_roster):
+        counts[p] = counts.get(p, 0) + 1
+    return counts
+
+
+def remaining_roster_needs(my_roster, slots):
+    """Set of positions still rosterable given what I've drafted vs the slots.
+
+    Mirrors the engine's slot accounting: each rostered player fills its own
+    explicit slot first, then spills into FLEX, then SUPERFLEX, then BENCH. The
+    remaining (count >= 1) slots are expanded through ``adjust_available_positions``
+    so FLEX/SUPERFLEX/BENCH openings re-admit their eligible positions.
     """
-    Selects a player to draft based on the highest rank.
+    counts = {k: int(v or 0) for k, v in slots.items()}
+    for position in _roster_positions(my_roster):
+        if counts.get(position, 0) > 0:
+            counts[position] -= 1
+        elif position in ("RB", "WR", "TE") and counts.get("FLEX", 0) > 0:
+            counts["FLEX"] -= 1
+        elif position in ("QB", "RB", "WR", "TE") and counts.get("SUPERFLEX", 0) > 0:
+            counts["SUPERFLEX"] -= 1
+        elif counts.get("BENCH", 0) > 0:
+            counts["BENCH"] -= 1
+    remaining = {pos for pos, count in counts.items() if count >= 1}
+    return adjust_available_positions(remaining)
 
-    Args:
-        players (List[Player]): A list of Player objects.
 
-    Returns:
-        str: The id of the drafted player.
+def _startable_slots(slots):
+    """Startable slot count per position implied by the league slots. FLEX and
+    SUPERFLEX count toward every position they can start (an upper bound used
+    only to size the anti-hoard cap)."""
+    def n(p):
+        return int(slots.get(p, 0) or 0)
+
+    flex = n("FLEX") + n("SUPERFLEX")
+    return {
+        "QB": n("QB") + n("SUPERFLEX"),
+        "RB": n("RB") + flex,
+        "WR": n("WR") + flex,
+        "TE": n("TE") + flex,
+        "K": n("K"),
+        "DST": n("DST"),
+    }
+
+
+def _anti_hoard_caps(slots):
+    """Max number of each position to draft before the anti-hoard guardrail
+    blocks more (startable slots + tolerated bench depth)."""
+    startable = _startable_slots(slots)
+    return {p: startable[p] + ANTI_HOARD_BENCH_DEPTH.get(p, 0) for p in startable}
+
+
+def _best_id(candidates):
+    """Best id from an already value-sorted candidate frame. If NO candidate
+    has a projection, fall back to players.rank order (lower rank == better)."""
+    if candidates.empty:
+        return ""
+    proj = pd.to_numeric(candidates.get("projected_fpts"), errors="coerce")
+    if proj is not None and proj.notna().any():
+        return candidates.iloc[0]["id"]  # already sorted best-first by value_score
+    rank = pd.to_numeric(candidates.get("rank"), errors="coerce")
+    if rank is None or rank.notna().sum() == 0:
+        return candidates.iloc[0]["id"]
+    return candidates.iloc[int(rank.fillna(float("inf")).values.argmin())]["id"]
+
+
+def choose_draft_pick(scored_df, my_roster, round, slots):
+    """Pick a player id from the scored pool, applying (in priority order):
+
+      1. Roster-need filter — only positions still rosterable given my roster.
+      2. QB-deadline guardrail — secure two startable QBs (QB + SUPERFLEX) by a
+         deadline round derived from the slots; force a QB when under-stocked.
+      3. K/DST reserve — in the final rounds reserve picks for any unfilled
+         required K/DST slot.
+      4. Anti-hoard cap — drop positions I've already stocked to capacity.
+
+    Then take the highest ``value_score`` candidate, falling back to
+    ``players.rank`` order when no remaining candidate has a projection.
+
+    PURE: ``scored_df`` is the (already best-first) output of
+    ``score_draft_pool``; ``my_roster`` is the {name: position} map (or position
+    iterable); ``round`` is the current draft round; ``slots`` is the league
+    player_slots map. No DB / engine access.
+    """
+    if scored_df is None or len(scored_df) == 0:
+        return ""
+
+    df = scored_df.copy().reset_index(drop=True)
+    pos = df["position"].astype(str).str.upper()
+
+    # 1. Roster-need filter.
+    needs = remaining_roster_needs(my_roster, slots)
+    candidates = df[pos.isin(needs)] if needs else df
+    if candidates.empty:
+        candidates = df  # never return empty-handed while the pool has players
+
+    roster_counts = _roster_position_counts(my_roster)
+    total_rounds = sum(int(v or 0) for v in slots.values())
+    kdst_slots = int(slots.get("K", 0) or 0) + int(slots.get("DST", 0) or 0)
+    rounds_remaining = max(1, total_rounds - int(round) + 1)
+
+    def cand_pos(frame):
+        return frame["position"].astype(str).str.upper()
+
+    # 2. QB-deadline guardrail: secure two startable QBs (QB + SUPERFLEX) before
+    # the K/DST reserve rounds; if still short by then, force the best QB.
+    qb_target = int(slots.get("QB", 0) or 0) + int(slots.get("SUPERFLEX", 0) or 0)
+    qb_deadline_round = total_rounds - kdst_slots
+    if roster_counts.get("QB", 0) < qb_target and round >= qb_deadline_round:
+        qb_cand = candidates[cand_pos(candidates) == "QB"]
+        if not qb_cand.empty:
+            return _best_id(qb_cand)
+
+    # 3. K/DST reserve: in the final rounds, force any unfilled required K/DST.
+    needed_kdst = [
+        p for p in ("K", "DST")
+        if roster_counts.get(p, 0) < int(slots.get(p, 0) or 0)
+    ]
+    if needed_kdst and rounds_remaining <= len(needed_kdst):
+        kdst_cand = candidates[cand_pos(candidates).isin(needed_kdst)]
+        if not kdst_cand.empty:
+            return _best_id(kdst_cand)
+
+    # 4. Anti-hoard cap: drop positions already stocked to capacity.
+    caps = _anti_hoard_caps(slots)
+    over = cand_pos(candidates).map(
+        lambda p: roster_counts.get(p, 0) >= caps.get(p, 10 ** 9)
+    )
+    capped = candidates[~over.values]
+    if not capped.empty:
+        candidates = capped
+
+    return _best_id(candidates)
+
+
+def draft_player() -> str:
+    """Draft the best available player for my team.
+
+    Orchestrates the full draft path: read league slots / team count / my roster
+    / the available pool (with projections + last-season actuals) from the DB,
+    compute VORP replacement baselines, score the pool, then apply roster-need
+    and guardrails via choose_draft_pick. Returns the chosen available player id.
     """
     db = DatabaseManager()
     try:
-        positions_to_fill = get_positions_to_fill(db)
-        my_team = get_my_team(db)
+        slots = get_positions_to_fill(db)
+        num_teams = get_num_teams(db)
+        my_roster = get_my_team(db)
 
-        for player_name, position in my_team.items():
-            if position in positions_to_fill and positions_to_fill[position] > 0:
-                # fill explicit positions first
-                positions_to_fill[position] = positions_to_fill[position] - 1
-            else:
-                # if the position is not explicitly in the map, then begin decrementing the FLEX, SUPERFLEX, and Bench slots
-                # start with most specific
-                if position in ["RB", "WR", "TE"] and positions_to_fill["FLEX"] > 0:
-                    positions_to_fill["FLEX"] = positions_to_fill["FLEX"] - 1
-                elif position in ["QB", "RB", "WR", "TE"] and positions_to_fill["SUPERFLEX"] > 0:
-                    positions_to_fill["SUPERFLEX"] = positions_to_fill["SUPERFLEX"] - 1
-                else:
-                    positions_to_fill["BENCH"] = positions_to_fill["BENCH"] - 1
+        available_df = load_draft_valuation_inputs(db)
+        baselines = compute_replacement_baselines(slots, num_teams)
+        scored = score_draft_pool(available_df, baselines, my_roster)
 
-        remaining_positions_to_fill = {pos for pos, count in positions_to_fill.items() if count >= 1}
-        position_filter = adjust_available_positions(remaining_positions_to_fill)
+        # Current round from the engine: ceil(current_draft_pick / num_teams).
+        status = pd.read_sql("SELECT current_draft_pick FROM game_statuses", db.engine)
+        current_pick = int(status.iloc[0]["current_draft_pick"])
+        round_num = math.ceil(current_pick / num_teams) if num_teams else 1
 
-        # load all of the available players into a pandas dataframe
-        df = pd.read_sql("SELECT * FROM players where availability = 'AVAILABLE'", db.engine)
+        chosen = choose_draft_pick(scored, my_roster, round_num, slots)
+        if chosen:
+            print(f"Drafting player id {chosen}")
+            return str(chosen)
 
-        # expand the allowed_position json strings into a set
-        df["allowed_positions_set"] = df["allowed_positions"].apply(
-            lambda x: set(json.loads(x)) if x else set()
-        )
-
-        # apply the filtered posiions
-        filtered_df = df[df["allowed_positions_set"].apply(lambda s: bool(s & position_filter))]
-        filtered_df_sorted = filtered_df.sort_values(by="rank", ascending=True)
-
-        preferred_players = ["Ja'Marr Chase", "Bijan Robinson", "Justin Jefferson", "Saquon Barkley", "Jahmyr Gibbs", "Christian McCaffrey", "CeeDee Lamb", "Malik Nabers", "Puka Nacua", "Ashton Jeanty", "Amon-Ra St. Brown", "De'Von Achane", "Josh Allen", "Lamar Jackson", "Jayden Daniels", "Jalen Hurts", "Joe Burrow", "Garrett Wilson", "Marvin Harrison Jr.", "DK Metcalf", "Xavier Worthy", "Mike Evans", "DJ Moore", "Zay Flowers", "Courtland Sutton", "Calvin Ridley", "DeVonta Smith", "Jaylen Waddle", "Jerry Jeudy", "Jameson Williams", "Rashee Rice", "George Pickens", "Rome Odunze", "Travis Hunter", "Jakobi Meyers", "Matthew Golden", "Emeka Egbuka", "Chris Olave", "Ricky Pearsall", "Michael Pittman Jr.", "Stefon Diggs", "Cooper Kupp", "Jordan Addison", "Jauan Jennings", "Deebo Samuel Sr.", "Khalil Shakir", "Keon Coleman", "Chris Godwin", "Josh Downs", "Brock Bowers"]
-        
-        # Check if any preferred player is available
-        preferred_available = filtered_df_sorted[
-            filtered_df_sorted["full_name"].isin(preferred_players)
-        ]
-        if not preferred_available.empty:
-            best_pref = preferred_available.iloc[0]
-            print(f"Drafting preferred player: {best_pref['full_name']}")
-            return best_pref["id"]
-        
-        if not filtered_df_sorted.empty:
-            best_player = filtered_df_sorted.iloc[0]
-            print(best_player["full_name"])
-            return best_player["id"]  # No need for conditional on the Series itself
-        else:
-            return ""  # No eligible player
+        # Last-ditch fallback: best available by rank (should rarely trigger).
+        fallback = load_available_players(db).sort_values(by="rank", ascending=True)
+        return str(fallback.iloc[0]["id"]) if not fallback.empty else ""
     finally:
         db.close()
 
