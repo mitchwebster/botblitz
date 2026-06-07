@@ -7,12 +7,22 @@ def get_positions_to_fill(db):
     df = pd.read_sql("SELECT * FROM league_settings", db.engine)
     return json.loads(df.iloc[0]["player_slots"])
 
+def get_my_bot_id(db):
+    """Return the id of the bot the engine is currently asking to act.
+
+    The engine writes the acting bot into game_statuses.current_bot_id before
+    invoking us (each draft pick and each weekly turn), so this is the single
+    source of truth for "which team am I?" — never hardcode an id.
+    """
+    df = pd.read_sql("SELECT current_bot_id FROM game_statuses", db.engine)
+    return df.iloc[0]["current_bot_id"]
+
 def get_my_team(db):
     df = pd.read_sql("SELECT * FROM game_statuses", db.engine) # get game status
     draft_pick = df.iloc[0]["current_draft_pick"]
     print(f"Current pick is {draft_pick}")
-    
-    bot_id = df.iloc[0]["current_bot_id"]
+
+    bot_id = get_my_bot_id(db)
     queryStr = f"SELECT * FROM players where current_bot_id = '{bot_id}'"
     my_team = pd.read_sql(queryStr, db.engine) 
 
@@ -153,7 +163,7 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
         return replacement
 
     try:
-        bot_id = 8
+        bot_id = get_my_bot_id(db)
         league_year = db.get_league_settings().year
         gs = pd.read_sql("SELECT * FROM game_statuses", db.engine)
         current_week = gs.iloc[0]["current_fantasy_week"]
@@ -164,7 +174,7 @@ def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
             SELECT p.*, ws.FPTS
             FROM players p
             JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = {current_week - 1}
-            WHERE p.current_bot_id = {bot_id}
+            WHERE p.current_bot_id = '{bot_id}'
             """,
             db.engine
         )
