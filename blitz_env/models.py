@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, F
 from sqlalchemy import text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker
 from typing import List
 import pandas as pd
 
@@ -25,10 +25,11 @@ class Player(Base):
     # Player status fields
     availability = Column(String, default='AVAILABLE')  # AVAILABLE, DRAFTED, ON_HOLD
     pick_chosen = Column(Integer)
-    current_bot_id = Column(String, ForeignKey('bots.id'))
-
-    # Correct relationship: points to Bot.players
-    bot = relationship("Bot", back_populates="players")
+    # Plain column, intentionally NOT a ForeignKey. The `bots` table does not exist when
+    # build-season materializes `players`, so a FK here is dangling — and it breaks the Go
+    # engine's GORM SQLite migrator, which misparses the emitted `FOREIGN KEY` clause as a
+    # column. The draft writes current_bot_id directly; no DB-level FK is needed.
+    current_bot_id = Column(String)
 
 class Bot(Base):
     __tablename__ = 'bots'
@@ -38,9 +39,6 @@ class Bot(Base):
     name = Column(String)
     owner = Column(String)
     current_waiver_priority = Column(Integer, default=0)
-
-    # Reverse side: a bot has many players
-    players = relationship("Player", back_populates="bot")
 
 class LeagueSettings(Base):
     __tablename__ = 'league_settings'
