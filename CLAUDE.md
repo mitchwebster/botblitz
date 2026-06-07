@@ -87,10 +87,23 @@ Flags: `-game_mode`, `-year` (default 2025), `-enable_google_sheets` (default tr
 
 ## 7. Local simulation / harness
 
+Evaluation and running of bots go through the **Go engine** (the production path) so eval logic can't drift from what runs weekly; the Python CLI (`bootstrap_data`) is for **data bootstrapping only**.
+
 `harness/` + `SimulateDraft.ipynb` are the local way to test a bot's draft logic without the
 full engine. `make launch-simulator` builds the wheel, installs it, and opens the notebook +
 a Datasette browser on a dev snapshot. The harness imports `blitz_env` and takes the bot's
 `draft_player` as a parameter; other teams use `default_draft_strategy`.
+
+### Evaluating a bot (engine-driven, authoritative)
+`make evaluate-bot BOT=bots/nfl2025/<bot>.py YEAR=2025 RUNS=3` builds the
+`py_grpc_server` image, then runs the bot through the **real engine** over a full
+historical season — draft, weekly waivers + scoring, playoffs — against a baseline
+field of containerized `standard-bot` opponents, and prints where it finished. Each
+run copies `season.db` to a scratch year (2999, gitignored) so the tracked DB is
+never mutated. This is the source of truth for "is my bot good"; the Python `harness/`
+(`simulate_draft`, `score_game`, `SimulateDraft.ipynb`) remains only an interactive dev
+aid, not an evaluator. Entry: `pkg/cmd/evaluate/main.go`; season loop + standings:
+`pkg/engine/SeasonReplayHandler.go` (`ReplaySeason`, `FinalStandings`).
 
 ## 8. Verification (how to actually prove a change works)
 
