@@ -80,6 +80,15 @@ evaluate-bot:
 	DOCKER_HOST="$${DOCKER_HOST:-$$(docker context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null)}" \
 		go run ./pkg/cmd/evaluate -bot=$(BOT) -year=$(YEAR) -runs=$(RUNS)
 
+# Fast evaluation: reuses containers across phases/runs and runs the bot in-process
+# (no subprocess per pick/waiver). Cuts ~6 min → ~1-2 min per run. See CLAUDE.md
+# "Fast evaluation mode" for warnings before using this for anything beyond local iteration.
+evaluate-bot-fast:
+	$(MAKE) build-docker
+	DOCKER_HOST="$${DOCKER_HOST:-$$(docker context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null)}" \
+		go run ./pkg/cmd/evaluate -bot=$(BOT) -year=$(YEAR) -runs=$(RUNS) \
+			-optimize-by-reusing-containers-wont-match-prod=true
+
 launch-in-season-datasette:
 	pip3 install -r requirements.txt
 	$(MAKE) gen-python-only

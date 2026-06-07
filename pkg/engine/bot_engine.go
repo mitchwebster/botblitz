@@ -18,6 +18,12 @@ const digits = "0123456789"
 type BotEngineSettings struct {
 	VerboseLoggingEnabled bool
 	GameMode              GameMode
+	// InlineExecution tells the container's gRPC server to call the bot's functions
+	// directly (in-process) rather than forking a fresh Python subprocess per call.
+	// Eliminates the ~700-1000ms cold-start overhead on every draft pick and waiver RPC.
+	// Only safe for evaluation: a crashing bot will kill the container's gRPC server,
+	// which is acceptable when the run is already invalid. Never set in production.
+	InlineExecution bool
 }
 
 type BotContainerInfo struct {
@@ -43,6 +49,17 @@ func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngi
 		sheetsClient:     sheetsClient,
 		botContainers:    make(map[string]*BotContainerInfo),
 	}
+}
+
+// UseSharedContainers makes this engine reuse an externally-owned container map
+// instead of its own freshly-allocated one. Only the evaluator (simulation) uses this,
+// and only behind its opt-in --optimize-by-reusing-containers-wont-match-prod flag, to
+// keep a single set of bot containers alive across the draft and season phases and across
+// independent simulation runs — the bot source is identical throughout, so the per-phase,
+// per-run teardown/rebuild is pure overhead. The production engine never calls this and
+// keeps its own per-instance map, so its container lifecycle is unchanged.
+func (e *BotEngine) UseSharedContainers(containers map[string]*BotContainerInfo) {
+	e.botContainers = containers
 }
 
 func (e *BotEngine) Summarize() string {

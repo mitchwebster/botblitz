@@ -27,6 +27,7 @@ type Standing struct {
 // ReplaySeason advances the loaded season to completion, running each week's waiver
 // actions (bot containers) and then scoring + finishing that week (engine code).
 func (e *BotEngine) ReplaySeason(ctx context.Context) error {
+	defer LogElapsed("season replay (all weeks)")()
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -39,16 +40,24 @@ func (e *BotEngine) ReplaySeason(ctx context.Context) error {
 			return nil
 		}
 		fmt.Printf("\n===== Replaying fantasy week %d =====\n", week)
+		weekDone := LogElapsed("week %d (total)", week)
 		// Waivers require running bot containers; skip when no bot source is
 		// configured (e.g. unit tests that only exercise the scoring replay).
 		if len(e.sourceCodeCache) > 0 {
-			if err := e.performWeeklyFantasyActions(ctx); err != nil {
+			waiversDone := LogElapsed("week %d waivers (bot containers)", week)
+			err := e.performWeeklyFantasyActions(ctx)
+			waiversDone()
+			if err != nil {
 				return err
 			}
 		}
-		if err := e.updateWeeklyScores(ctx, true); err != nil {
+		scoringDone := LogElapsed("week %d scoring (engine)", week)
+		err = e.updateWeeklyScores(ctx, true)
+		scoringDone()
+		if err != nil {
 			return err
 		}
+		weekDone()
 	}
 }
 

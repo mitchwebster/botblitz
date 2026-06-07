@@ -10,6 +10,8 @@ import (
 )
 
 func (e *BotEngine) runDraft(ctx context.Context) error {
+	defer LogElapsed("draft (all rounds)")()
+
 	err := e.initializeDraftSheet()
 	if err != nil {
 		return err

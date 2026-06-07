@@ -105,6 +105,25 @@ never mutated. This is the source of truth for "is my bot good"; the Python `har
 aid, not an evaluator. Entry: `pkg/cmd/evaluate/main.go`; season loop + standings:
 `pkg/engine/SeasonReplayHandler.go` (`ReplaySeason`, `FinalStandings`).
 
+#### Fast evaluation mode (local iteration only)
+
+`make evaluate-bot-fast BOT=bots/nfl2025/<bot>.py YEAR=2025 RUNS=3` enables two
+speed optimizations that together cut a single-run evaluation from ~6 min to ~1-2 min:
+
+| Flag | What it does | Trade-off |
+|---|---|---|
+| `--optimize-by-reusing-containers-wont-match-prod` | One container set shared across all phases and runs instead of rebuilding per phase/run | A stateful bot carries in-memory state across phase boundaries and across runs that are meant to be independent seasons |
+| `BOTBLITZ_EVAL_INLINE=1` (set automatically) | The container's gRPC server calls the bot's functions in-process rather than forking a fresh `python3` subprocess per pick/waiver claim | A crashing bot kills the container's gRPC server; no subprocess isolation |
+
+**When to use fast mode:**
+- Rapid iteration on bot logic (tight feedback loop, many runs)
+- Profiling where time goes (`⏱` timing lines are emitted at phase, week, and step granularity)
+
+**When NOT to use fast mode:**
+- Final validation before a season — use `make evaluate-bot` (prod-matching container lifecycle)
+- Any bot that intentionally persists state across calls (the in-process path reuses the imported module, so module-level globals survive between picks/waiver rounds)
+- Multi-run averages meant to be trustworthy — cross-run state bleed can skew results
+
 ## 8. Verification (how to actually prove a change works)
 
 - **Build ≠ proof.** Building the wheel/image does not exercise the runtime path.

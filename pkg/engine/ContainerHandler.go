@@ -160,6 +160,10 @@ func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port int) (string, err
 		env = envVarsFromCache
 	}
 
+	if e.settings.InlineExecution {
+		env = append(env, "BOTBLITZ_EVAL_INLINE=1")
+	}
+
 	containerId, err := e.createAndStartContainer(env, port)
 	if err != nil {
 		return "", err
@@ -398,8 +402,12 @@ func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerIn
 		return nil, err
 	}
 
-	// Use the existing startBotContainer function
+	// Use the existing startBotContainer function. Time only actual builds: in the
+	// container-reuse path this fires once per bot, so it isolates true container-start
+	// cost (vs. the RPC time that dominates once a container is warm).
+	buildDone := LogElapsed("container build for bot %s", bot.ID)
 	containerId, err := e.startBotContainer(bot, port)
+	buildDone()
 	if err != nil {
 		return nil, err
 	}
