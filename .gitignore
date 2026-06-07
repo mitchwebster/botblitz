@@ -56,3 +56,6 @@ dist/*
 # (DatabaseManager defaults to ./gamestate.db). Tracked DBs live under data/.
 /gamestate.db
 /stats.db
+
+# scratch season DB used by `make evaluate-bot` (pkg/cmd/evaluate)
+/data/game_states/2999/

@@ -322,31 +322,7 @@ func fetchBotList() []*common.Bot {
 }
 
 func fetchLeagueSettings(year uint32, numTeams uint32) *common.LeagueSettings {
-	playerslots := make(map[string]uint32)
-	playerslots[engine.QB.String()] = 1
-	playerslots[engine.RB.String()] = 2
-	playerslots[engine.WR.String()] = 2
-	playerslots[engine.SUPERFLEX.String()] = 1
-	playerslots[engine.FLEX.String()] = 1
-	playerslots[engine.K.String()] = 1
-	playerslots[engine.DST.String()] = 1
-	playerslots[engine.BENCH.String()] = 3
-
-	total_rounds := uint32(0)
-	for _, v := range playerslots {
-		total_rounds += v
-	}
-
-	settings := common.LeagueSettings{
-		NumTeams:           numTeams,
-		IsSnakeDraft:       true,
-		TotalRounds:        uint32(total_rounds),
-		PointsPerReception: 1.0,
-		Year:               uint32(year),
-		SlotsPerTeam:       playerslots,
-	}
-
-	return &settings
+	return engine.BuildDefaultLeagueSettings(year, numTeams)
 }
 
 func getSourceCodeMap(bots []*common.Bot) (map[string][]byte, error) {

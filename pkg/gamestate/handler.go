@@ -435,7 +435,9 @@ func LoadGameStateForWeeklyFantasy(year uint32) (*GameStateHandler, error) {
 		)
 	}
 
-	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -567,6 +569,26 @@ func generateSchedule(botIds []string, weeks int) [][]Matchup {
 	return schedule
 }
 
+// createLeagueStateTables creates the engine-owned league-state tables when absent,
+// WITHOUT running AutoMigrate. A blanket AutoMigrate reconciles associated models —
+// including the prebuilt `players` table (via Bot.Players / WeeklyLineup.Player) — and
+// GORM's SQLite migrator rebuilds that Python-built table to change VARCHAR columns to
+// text, silently NULLing the data. Creating only the missing league-state tables (with FK
+// constraints disabled via the gorm.Config) never touches `players`. Row reads/writes on
+// players continue to work through the Player model.
+func createLeagueStateTables(db *gorm.DB) error {
+	models := []interface{}{&Bot{}, &gameStatus{}, &LeagueSettings{}, &WeeklyLineup{}, &Transaction{}}
+	for _, m := range models {
+		if db.Migrator().HasTable(m) {
+			continue
+		}
+		if err := db.Migrator().CreateTable(m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSettings) (*GameStateHandler, error) {
 	if len(bots) < 1 {
 		return nil, fmt.Errorf("Cannot create game for %d bots", len(bots))
@@ -589,15 +611,21 @@ func NewGameStateHandlerForDraft(bots []*common.Bot, settings *common.LeagueSett
 		)
 	}
 
-	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(saveFileName), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// season.db already carries the `players` pool + reference tables. The engine
-	// owns only the league-state tables, so migrate just those into the existing file.
-	err = db.AutoMigrate(&Bot{}, &gameStatus{}, &LeagueSettings{}, &WeeklyLineup{}, &Transaction{})
-	if err != nil {
+	// season.db already carries the `players` pool + reference tables. The engine owns
+	// only the league-state tables, so CREATE just those (when absent). We must NOT run a
+	// blanket AutoMigrate: it reconciles associated models — including the prebuilt
+	// `players` table (via Bot.Players / WeeklyLineup.Player) — and GORM's SQLite migrator
+	// rebuilds that Python-built table to "fix" VARCHAR->text columns, which silently NULLs
+	// the data. The draft still reads/writes player ROWS through the Player model; only the
+	// schema reconciliation is skipped.
+	if err = createLeagueStateTables(db); err != nil {
 		return nil, err
 	}
 

@@ -1,3 +1,7 @@
+BOT ?= bots/nfl2025/standard-bot.py
+YEAR ?= 2025
+RUNS ?= 1
+
 clean:
 	rm -f pkg/common/agent.pb.go
 	rm -f pkg/common/agent_grpc.pb.go
@@ -70,6 +74,11 @@ launch-simulator:
 	datasette data/archive/2025/gamestate.db --host 127.0.0.1 --port 8001 &
 	python3 -m webbrowser http://127.0.0.1:8001/
 	jupyter lab SimulateDraft.ipynb
+
+evaluate-bot:
+	$(MAKE) build-docker
+	DOCKER_HOST="$${DOCKER_HOST:-$$(docker context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null)}" \
+		go run ./pkg/cmd/evaluate -bot=$(BOT) -year=$(YEAR) -runs=$(RUNS)
 
 launch-in-season-datasette:
 	pip3 install -r requirements.txt
