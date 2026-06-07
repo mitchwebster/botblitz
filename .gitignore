@@ -59,3 +59,7 @@ dist/*
 
 # scratch season DB used by `make evaluate-bot` (pkg/cmd/evaluate)
 /data/game_states/2999/
+
+# evaluator-jw.sh artifacts: built binary + per-run logs (results doc is tracked)
+/evaluate
+/eval-logs/
