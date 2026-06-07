@@ -436,6 +436,148 @@ def draft_player() -> str:
     finally:
         db.close()
 
+# ---------------------------------------------------------------------------
+# Weekly waiver valuation + FAAB bid sizing (issue #265)
+#
+# These are PURE functions: player_forward_value takes already-extracted
+# sequences (recent weekly actuals + upcoming weekly projections) plus an
+# injury status string; size_bid takes plain numbers. Neither reads the DB or
+# engine, so both are unit-tested fully offline. The weekly DB wiring that
+# feeds them (pulling trailing_actuals / projections / game_status out of
+# weekly_stats / weekly_projections / weekly_injuries) lands in #266.
+# ---------------------------------------------------------------------------
+
+# Injury game-status gates, keyed off weekly_injuries.game_status (NFL.com values
+# like 'Out', 'Doubtful', 'Questionable'). The multiplier scales a player's
+# forward value DOWN toward zero when they're unlikely to play: OUT collapses it
+# to 0 (won't play), DOUBTFUL / QUESTIONABLE get partial discounts, everything
+# else (ACTIVE / PROBABLE / None / unknown) keeps full value. Matched
+# case-insensitively so 'OUT' and 'Out' gate identically.
+INJURY_PLAY_MULTIPLIER = {
+    "OUT": 0.0,
+    "DOUBTFUL": 0.25,
+    "QUESTIONABLE": 0.75,
+    "PROBABLE": 1.0,
+    "ACTIVE": 1.0,
+}
+
+# Blend weight on trailing actuals vs. upcoming projections in forward value.
+# 0.5 = equal trust in recent production and what the projections expect next.
+FORWARD_TRAILING_WEIGHT = 0.5
+
+# Default FAAB aggressiveness when the BID_AMOUNT env var is unset. 1.0 is
+# neutral; >1 bids harder (spends a larger share of budget per upgrade), <1 is
+# more conservative. The engine injects BID_AMOUNT per-bot from bots/nfl/envs.
+DEFAULT_BID_AMOUNT = 1.0
+
+# Regular-season FAAB weeks, used to derive how much of the budget is unlocked
+# each week (the late-season reserve ramp).
+FAAB_SEASON_WEEKS = 14
+
+# Floor on the per-week spendable fraction so even very early / low-budget weeks
+# can still place a small bid instead of being capped to 1.
+MIN_SPEND_FRACTION = 0.10
+
+# Tie-break margin. League ties break toward the worse-ranked team, so to win a
+# claim as the better-ranked team we must strictly OUTBID an equal-value
+# opponent — round up and add this margin (still subject to the budget clamp).
+TIE_BREAK_MARGIN = 1
+
+
+def injury_play_multiplier(injury_status):
+    """Map an injury / game-status string to a [0, 1] play-likelihood multiplier.
+
+    Case-insensitive; None / unknown statuses keep full value (1.0). 'OUT'
+    collapses to 0.0 (player won't play)."""
+    if injury_status is None:
+        return 1.0
+    return INJURY_PLAY_MULTIPLIER.get(str(injury_status).strip().upper(), 1.0)
+
+
+def player_forward_value(trailing_actuals, projections, injury_status=None):
+    """Forward-looking weekly value: a blend of average trailing-N-week actual
+    FPTS and average next-N-week projected FPTS, gated DOWN by injury status.
+
+    PURE: ``trailing_actuals`` is an iterable of recent weekly actual FPTS,
+    ``projections`` an iterable of upcoming weekly projected FPTS (None / NaN
+    entries are ignored, empty -> 0.0), ``injury_status`` a game-status string
+    (e.g. 'OUT'/'Questionable') or None.
+
+    Monotonic in both inputs: raising any trailing actual or any projection
+    weakly increases the value (positive blend weights). Injury gating only
+    ever scales the value down (OUT -> 0)."""
+    def _avg(seq):
+        vals = [
+            float(x) for x in (seq or [])
+            if x is not None and not (isinstance(x, float) and math.isnan(x))
+        ]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    trailing = _avg(trailing_actuals)
+    upcoming = _avg(projections)
+    base = (
+        FORWARD_TRAILING_WEIGHT * trailing
+        + (1.0 - FORWARD_TRAILING_WEIGHT) * upcoming
+    )
+    return base * injury_play_multiplier(injury_status)
+
+
+def _bid_aggressiveness():
+    """Read the BID_AMOUNT env var as a non-negative aggressiveness scalar,
+    falling back to DEFAULT_BID_AMOUNT when unset / unparseable."""
+    try:
+        return max(0.0, float(os.environ.get("BID_AMOUNT", DEFAULT_BID_AMOUNT)))
+    except (TypeError, ValueError):
+        return DEFAULT_BID_AMOUNT
+
+
+def size_bid(upgrade, upgrade_max, remaining_budget, week):
+    """Size a FAAB bid (int) for a waiver upgrade.
+
+    The bid is proportional to this upgrade's share of the best upgrade
+    available (``upgrade / upgrade_max``), scaled by the remaining budget and
+    the BID_AMOUNT aggressiveness scalar, then clamped:
+
+      * never below 1 (when there's any positive upgrade and budget to spend),
+      * never above ``remaining_budget``,
+      * never above a budget-reserve cap that SHRINKS when the budget is low
+        (the cap is a fraction OF the budget) or the season is early (the
+        fraction ramps from MIN_SPEND_FRACTION up to 1.0 by FAAB_SEASON_WEEKS),
+        preserving a late-season reserve.
+
+    A strictly-positive upgrade rounds UP and adds TIE_BREAK_MARGIN so we
+    clearly outbid an equal-value opponent (ties break toward the worse-ranked
+    team); the budget / reserve clamps always win over that margin.
+
+    PURE: plain numbers in, int out. No DB / engine access."""
+    budget = int(remaining_budget or 0)
+    if budget <= 0:
+        return 0
+
+    up = max(0.0, float(upgrade or 0.0))
+    up_max = float(upgrade_max or 0.0)
+    if up <= 0.0:
+        return 1  # minimal speculative bid; never drop below 1 with budget left
+
+    share = up / up_max if up_max > 0 else 1.0
+    share = min(1.0, max(0.0, share))
+
+    # Late-season reserve ramp: unlock more of the budget as the season goes on.
+    spend_fraction = max(
+        MIN_SPEND_FRACTION,
+        min(1.0, float(week or 0) / FAAB_SEASON_WEEKS),
+    )
+    # Reserve cap shrinks with low budget (fraction OF budget) and early weeks
+    # (smaller fraction). Bounded by the remaining budget.
+    cap = min(budget, max(1, int(math.ceil(budget * spend_fraction))))
+
+    raw = share * budget * _bid_aggressiveness()
+    # Round up + margin so a better-ranked team clearly outbids on a tie.
+    bid = int(math.ceil(raw)) + TIE_BREAK_MARGIN
+    # Clamp: at least 1, never over the reserve cap or the remaining budget.
+    return max(1, min(bid, cap, budget))
+
+
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     db = DatabaseManager()
 
