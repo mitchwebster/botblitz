@@ -75,10 +75,14 @@ launch-simulator:
 	python3 -m webbrowser http://127.0.0.1:8001/
 	jupyter lab SimulateDraft.ipynb
 
+# Optional: SLOT pins the candidate's 1-based draft slot (reproducible), SEED fixes the
+# surrounding field's order. Unset => today's random draft order. e.g. make evaluate-bot
+# BOT=... YEAR=2025 RUNS=3 SLOT=7 SEED=42
 evaluate-bot:
 	$(MAKE) build-docker
 	DOCKER_HOST="$${DOCKER_HOST:-$$(docker context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null)}" \
-		go run ./pkg/cmd/evaluate -bot=$(BOT) -year=$(YEAR) -runs=$(RUNS)
+		go run ./pkg/cmd/evaluate -bot=$(BOT) -year=$(YEAR) -runs=$(RUNS) \
+		$(if $(SLOT),-draft_slot=$(SLOT),) $(if $(SEED),-seed=$(SEED),)
 
 launch-in-season-datasette:
 	pip3 install -r requirements.txt
