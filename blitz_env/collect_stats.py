@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
 """
-Rebuild stats.db from scratch: preseason_projections and season_stats
-for the last N years, replacing the DB file every run.
+Build/refresh stats.db: preseason_projections, season_stats, and (optionally)
+weekly_projections/weekly_stats/weekly_injuries.
 
-Requirements (import paths may need tweaking for your project):
-- load_nfl_projections_all_positions(year) -> pd.DataFrame
-- fp_seasonal_years(position: str, years: list[int]) -> pd.DataFrame
+Incremental by default: years/weeks already present in an existing DB are not
+re-fetched (no network call at all for them) -- only missing years/weeks are
+pulled and merged in. The current/target year (--end-year) is always
+re-fetched at the year level (preseason_projections, season_stats), since an
+in-progress season's totals change week to week; weekly tables only ever fetch
+(year, week) pairs that aren't already cached, since a played week's box score
+is final. Pass --full-refresh to wipe the DB and rebuild everything from
+scratch instead.
+
+All network sourcing goes through R (ffpros for projections, nflreadr for
+actual stats and injuries) via blitz_env/load_projections_ffpros.py and
+blitz_env/load_stats_nflreadr.py -- see those modules for the legacy-column
+alias policy.
 
 Usage:
   python collect_stats.py --db stats.db --years 10 --end-year 2025
+  python collect_stats.py --db stats.db --years 10 --end-year 2025 --full-refresh
 """
 
 import argparse
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Set, Tuple
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 
-# --- Adjust these imports to your project structure if needed ---
-from blitz_env.projections_db import load_nfl_projections_all_positions
-from blitz_env.stats_db import fp_seasonal_years
+from blitz_env.load_projections_ffpros import fetch_projections
+from blitz_env.load_stats_nflreadr import fetch_season_stats
 
 
 def ensure_year_column(df: pd.DataFrame, year: int) -> pd.DataFrame:
@@ -56,182 +66,200 @@ def union_align(dfs: List[pd.DataFrame]) -> pd.DataFrame:
     return pd.concat(fixed, ignore_index=True)
 
 
+def read_existing_table(engine, table_name: str) -> pd.DataFrame:
+    """Read a table if it exists, else an empty DataFrame."""
+    if not inspect(engine).has_table(table_name):
+        return pd.DataFrame()
+    return pd.read_sql(f"SELECT * FROM {table_name}", engine)
+
+
+def existing_years(df: pd.DataFrame) -> Set[int]:
+    if df.empty or "year" not in df.columns:
+        return set()
+    return set(pd.to_numeric(df["year"], errors="coerce").dropna().astype(int).unique())
+
+
+def existing_year_weeks(df: pd.DataFrame) -> Set[Tuple[int, int]]:
+    if df.empty or "year" not in df.columns or "week" not in df.columns:
+        return set()
+    sub = df[["year", "week"]].copy()
+    sub["year"] = pd.to_numeric(sub["year"], errors="coerce")
+    sub["week"] = pd.to_numeric(sub["week"], errors="coerce")
+    sub = sub.dropna()
+    return set(zip(sub["year"].astype(int), sub["week"].astype(int)))
+
+
 def collect_preseason(years: List[int]) -> pd.DataFrame:
     """
-    Build one DataFrame for preseason projections across all requested years.
-    Ensures a 'year' column and aligns schema across years.
+    Build one DataFrame for preseason projections across the given years
+    (already filtered down to only what needs fetching by the caller).
+    Sourced from ffpros (R) via fetch_projections; ensures a 'year' column.
     """
     parts: List[pd.DataFrame] = []
     for y in years:
-        df = load_nfl_projections_all_positions(y)
+        print(f"Collecting preseason projections for year {y}...")
+        try:
+            df = fetch_projections(y, ["draft"])
+        except Exception as e:
+            print(f"Warning: Failed to collect preseason projections for year {y}: {e}")
+            continue
+        if df.empty:
+            print(f"No preseason projections available for year {y}")
+            continue
         df = ensure_year_column(df, y)
         parts.append(df)
-    return union_align(parts)
+    return union_align(parts) if parts else pd.DataFrame()
 
 
 def collect_season_stats(years: List[int]) -> pd.DataFrame:
     """
-    Build one DataFrame for season stats across positions and requested years.
-    Uses fp_seasonal_years for each position, then aligns schemas across positions.
+    Build one DataFrame for season stats (offense + DST) across the given
+    years (already filtered down to only what needs fetching by the caller).
+    Sourced from nflreadr (R) via fetch_season_stats(summary_level="reg").
     """
-    pos_parts: List[pd.DataFrame] = []
-    for pos in ("rb", "qb", "wr", "te", "dst", "k"):
-        d = fp_seasonal_years(pos, years)
-        if "year" not in d.columns:
-            # safety: enforce presence
-            raise ValueError(f"'year' column missing from season stats for position '{pos}'")
-        pos_parts.append(d)
-    return union_align(pos_parts)
-
-
-def collect_weekly_projections(years: List[int], weeks: List[str]) -> pd.DataFrame:
-    """
-    Build one DataFrame for weekly projections across positions, years, and weeks.
-    Uses fp_projections for each position, then aligns schemas across positions.
-    Fails silently for individual weeks and returns whatever data was successfully collected.
-    """
-    from blitz_env.projections_db import fp_projections
-    
-    all_parts: List[pd.DataFrame] = []
-    
-    for year in years:
-        for week in weeks:
-            print(f"Collecting weekly projections for year {year}, week {week}...")
-            
-            try:
-                week_parts: List[pd.DataFrame] = []
-                for pos in ("rb", "qb", "wr", "te", "k", "dst"):
-                    try:
-                        df = fp_projections(page=pos, sport='nfl', year=year, week=week, scoring='PPR')
-                        df = ensure_year_column(df, year)
-                        df['week'] = week
-                        df['position'] = df['position'].str.upper()
-                        week_parts.append(df)
-                    except Exception as e:
-                        print(f"Warning: Failed to get projections for {pos} in year {year}, week {week}: {e}")
-                        continue
-                
-                if week_parts:
-                    week_df = union_align(week_parts)
-                    week_df.sort_values(by="FPTS", ascending=False, inplace=True)
-                    all_parts.append(week_df)
-                    print(f"Successfully collected projections for year {year}, week {week}")
-                else:
-                    print(f"No projections collected for year {year}, week {week}")
-                    
-            except Exception as e:
-                print(f"Warning: Failed to collect projections for year {year}, week {week}: {e}")
-                continue
-    
-    return union_align(all_parts) if all_parts else pd.DataFrame()
-
-
-def collect_weekly_stats(years: List[int], weeks: List[str]) -> pd.DataFrame:
-    """
-    Build one DataFrame for weekly stats across positions, years, and weeks.
-    Uses fp_weekly_years from stats_db to get weekly player stats.
-    Fails silently for individual positions and returns whatever data was successfully collected.
-    """
-    from blitz_env.stats_db import fp_weekly_years
-    
-    all_parts: List[pd.DataFrame] = []
-    
-    # Filter to only numeric weeks
-    weekly_nums = [int(w) for w in weeks if w.isdigit()]
-    
-    for pos in ("rb", "qb", "wr", "te", "dst", "k"):
-        print(f"Collecting weekly stats for position {pos}...")
+    parts: List[pd.DataFrame] = []
+    for y in years:
+        print(f"Collecting season stats for year {y}...")
         try:
-            # Get weekly stats for this position across all years
-            pos_df = fp_weekly_years(pos, years)
-            
-            # Filter to only the requested weeks
-            if weekly_nums:
-                pos_df = pos_df[pos_df['week'].isin(weekly_nums)]
-            
-            if not pos_df.empty:
-                all_parts.append(pos_df)
-                print(f"Successfully collected weekly stats for position {pos}")
-            else:
-                print(f"No weekly stats collected for position {pos}")
-                
+            offense, dst = fetch_season_stats(y, summary_level="reg")
         except Exception as e:
-            print(f"Warning: Failed to get weekly stats for position {pos}: {e}")
+            print(f"Warning: Failed to collect season stats for year {y}: {e}")
             continue
-    
+        for df in (offense, dst):
+            if df is not None and not df.empty:
+                parts.append(ensure_year_column(df, y))
+        if offense.empty and dst.empty:
+            print(f"No season stats available for year {y}")
+    return union_align(parts) if parts else pd.DataFrame()
+
+
+def collect_weekly_projections(year_weeks: Dict[int, List[int]]) -> pd.DataFrame:
+    """
+    Build one DataFrame for weekly projections across the given {year: [weeks]}
+    map (already filtered down to only missing (year, week) pairs by the caller).
+    Sourced from ffpros (R) via fetch_projections. One R subprocess call per
+    (year, week) -- not per year -- so a slow/failed week (ffpros has no bulk
+    historical endpoint; a full year is ~100+ sequential FantasyPros requests
+    and can exceed any reasonable subprocess timeout) only drops that week,
+    not the whole year.
+    """
+    all_parts: List[pd.DataFrame] = []
+    for year, weeks in year_weeks.items():
+        if not weeks:
+            continue
+        print(f"Collecting weekly projections for year {year}, weeks {weeks}...")
+        year_parts: List[pd.DataFrame] = []
+        for week in weeks:
+            try:
+                df = fetch_projections(year, [week])
+            except Exception as e:
+                print(f"Warning: Failed to collect weekly projections for year {year}, week {week}: {e}")
+                continue
+            if not df.empty:
+                year_parts.append(df)
+
+        if not year_parts:
+            print(f"No weekly projections available for year {year}")
+            continue
+        year_df = union_align(year_parts)
+        year_df = ensure_year_column(year_df, year)
+        all_parts.append(year_df)
+        print(f"Successfully collected {len(year_df)} weekly projection rows for year {year}")
+
     return union_align(all_parts) if all_parts else pd.DataFrame()
 
 
-def collect_weekly_injuries(years: List[int], weeks: List[str]) -> pd.DataFrame:
+def collect_weekly_stats(year_weeks: Dict[int, List[int]]) -> pd.DataFrame:
     """
-    Build one DataFrame for weekly injuries across years and weeks.
-    Uses NFLInjuryScraper to get injury data from NFL.com.
-    Fails silently for individual weeks and returns whatever data was successfully collected.
+    Build one DataFrame for weekly stats (offense + DST) across the given
+    {year: [weeks]} map (already filtered down to only missing (year, week)
+    pairs by the caller). Sourced from nflreadr (R) via
+    fetch_season_stats(summary_level="week").
     """
-    from blitz_env.download_injuries import NFLInjuryScraper
+    all_parts: List[pd.DataFrame] = []
+    for year, weeks in year_weeks.items():
+        if not weeks:
+            continue
+        print(f"Collecting weekly stats for year {year}, weeks {weeks}...")
+        try:
+            offense, dst = fetch_season_stats(year, summary_level="week")
+        except Exception as e:
+            print(f"Warning: Failed to collect weekly stats for year {year}: {e}")
+            continue
+
+        for df in (offense, dst):
+            if df is None or df.empty:
+                continue
+            df = df[df["week"].isin(weeks)]
+            if not df.empty:
+                all_parts.append(ensure_year_column(df, year))
+
+        if offense.empty and dst.empty:
+            print(f"No weekly stats available for year {year}")
+        else:
+            print(f"Successfully collected weekly stats for year {year}")
+
+    return union_align(all_parts) if all_parts else pd.DataFrame()
+
+
+def collect_weekly_injuries(year_weeks: Dict[int, List[int]]) -> pd.DataFrame:
+    """
+    Build one DataFrame for weekly injuries across the given {year: [weeks]}
+    map (already filtered down to only missing (year, week) pairs by the
+    caller). Sources from nflverse (one request per season, via
+    `fetch_injuries.R`) and joins to FantasyPros IDs on `gsis_id`.
+    """
+    from blitz_env.load_injuries_nflverse import fetch_season_injuries
 
     all_parts: List[pd.DataFrame] = []
 
-    for year in years:
-        for week_str in weeks:
-            # Convert week string to int
-            try:
-                week = int(week_str)
-            except ValueError:
-                print(f"Warning: Skipping non-numeric week: {week_str}")
-                continue
+    for year, weeks in year_weeks.items():
+        if not weeks:
+            continue
+        print(f"Collecting injury data for year {year}...")
 
-            print(f"Collecting injury data for year {year}, week {week}...")
+        try:
+            df = fetch_season_injuries(year)
+        except Exception as e:
+            print(f"Warning: Failed to collect injuries for year {year}: {e}")
+            continue
 
-            try:
-                scraper = NFLInjuryScraper(year=year, week=week)
+        if df.empty:
+            print(f"No injury data available for year {year}")
+            continue
 
-                # Scrape the data
-                injury_data = scraper.scrape()
-
-                # Convert to DataFrame
-                df = scraper.to_dataframe(injury_data)
-
-                # Match with player IDs
-                df_with_ids = scraper.match_player_ids(df)
-
-                # Clean up week field - convert "Week 6" to just 6
-                if 'week' in df_with_ids.columns:
-                    df_with_ids['week'] = df_with_ids['week'].str.replace('Week ', '', regex=False).astype(int)
-
-                if not df_with_ids.empty:
-                    all_parts.append(df_with_ids)
-                    print(f"Successfully collected {len(df_with_ids)} injury records for year {year}, week {week}")
-                else:
-                    print(f"No injury data collected for year {year}, week {week}")
-
-            except Exception as e:
-                print(f"Warning: Failed to collect injuries for year {year}, week {week}: {e}")
-                continue
+        df = df[df['week'].isin(weeks)]
+        if not df.empty:
+            all_parts.append(df)
+            print(f"Successfully collected {len(df)} injury records for year {year}")
+        else:
+            print(f"No injury data in requested weeks for year {year}")
 
     return pd.concat(all_parts, ignore_index=True) if all_parts else pd.DataFrame()
 
 
-def parse_week_range(week_str: str) -> List[str]:
+def parse_week_range(week_str: str) -> List[int]:
     """
     Parse week range string like '1:17' or comma-separated list like '1,2,3'.
-    Returns list of week strings.
+    Returns a list of ints.
     """
     if ':' in week_str:
         start_week, end_week = map(int, week_str.split(':'))
-        return [str(w) for w in range(start_week, end_week + 1)]
+        return list(range(start_week, end_week + 1))
     else:
-        return [w.strip() for w in week_str.split(',')]
+        return [int(w.strip()) for w in week_str.split(',')]
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description="Rebuild stats.db from scratch for the last N years.")
-    ap.add_argument("--db", default="stats.db", help="Path to output SQLite DB (recreated each run).")
+    ap = argparse.ArgumentParser(description="Build/refresh stats.db for the last N years.")
+    ap.add_argument("--db", default="stats.db", help="Path to output SQLite DB.")
     ap.add_argument("--years", type=int, default=10, help="How many years back including end-year (default: 10).")
     ap.add_argument("--end-year", type=int, required=True, help="Most recent year to include (e.g., 2025).")
     ap.add_argument("--include-weekly", action="store_true", help="Include weekly projections and stats in the database.")
     ap.add_argument("--include-injuries", action="store_true", help="Include weekly injury data in the database.")
     ap.add_argument("--weeks", default="1:17", help="Week range for weekly data (e.g., '1:17' or '1,2,3').")
+    ap.add_argument("--full-refresh", action="store_true",
+                     help="Wipe the DB and re-fetch everything, ignoring any existing cached data.")
     return ap.parse_args(argv)
 
 
@@ -241,49 +269,80 @@ def main(argv=None):
     end_year = args.end_year
     start_year = end_year - (args.years - 1)
     years = list(range(start_year, end_year + 1))
+    weeks = parse_week_range(args.weeks) if (args.include_weekly or args.include_injuries) else []
 
-    print(f"Rebuilding DB: {db_path}")
+    print(f"Target DB: {db_path}")
     print(f"Years: {years}")
+    print(f"Full refresh: {args.full_refresh}")
 
-    # 1) Remove existing DB file so we *guarantee* a fresh build
-    if db_path.exists():
+    if args.full_refresh and db_path.exists():
         db_path.unlink()
 
-    # 2) Create engine (fresh file)
     engine = create_engine(f"sqlite:///{db_path}")
 
-    # 3) Collect data
-    pre_df = collect_preseason(years)
-    season_df = collect_season_stats(years)
-    
-    # 4) Collect weekly data if requested
+    # --- Year-level tables: fetch only missing years, always refresh end_year ---
+    existing_pre = pd.DataFrame() if args.full_refresh else read_existing_table(engine, "preseason_projections")
+    existing_season = pd.DataFrame() if args.full_refresh else read_existing_table(engine, "season_stats")
+
+    pre_have = existing_years(existing_pre)
+    season_have = existing_years(existing_season)
+
+    pre_years_to_fetch = [y for y in years if y == end_year or y not in pre_have]
+    season_years_to_fetch = [y for y in years if y == end_year or y not in season_have]
+
+    print(f"Preseason projections: fetching {pre_years_to_fetch}, keeping cached {sorted(pre_have - set(pre_years_to_fetch))}")
+    print(f"Season stats: fetching {season_years_to_fetch}, keeping cached {sorted(season_have - set(season_years_to_fetch))}")
+
+    new_pre = collect_preseason(pre_years_to_fetch)
+    new_season = collect_season_stats(season_years_to_fetch)
+
+    pre_df = union_align([
+        existing_pre[~existing_pre.get("year", pd.Series(dtype=int)).isin(pre_years_to_fetch)] if not existing_pre.empty else existing_pre,
+        new_pre,
+    ])
+    season_df = union_align([
+        existing_season[~existing_season.get("year", pd.Series(dtype=int)).isin(season_years_to_fetch)] if not existing_season.empty else existing_season,
+        new_season,
+    ])
+
+    # --- Weekly tables: fetch only missing (year, week) pairs ---
     weekly_df = pd.DataFrame()
     weekly_stats_df = pd.DataFrame()
     weekly_injuries_df = pd.DataFrame()
 
-    if args.include_weekly or args.include_injuries:
-        weeks = parse_week_range(args.weeks)
-        print(f"Weekly data weeks: {weeks}")
-
     if args.include_weekly:
-        weekly_df = collect_weekly_projections(years, weeks)
+        existing_weekly_proj = pd.DataFrame() if args.full_refresh else read_existing_table(engine, "weekly_projections")
+        existing_weekly_stats = pd.DataFrame() if args.full_refresh else read_existing_table(engine, "weekly_stats")
 
-    if args.include_weekly:
-        weekly_stats_df = collect_weekly_stats(years, weeks)
+        proj_have = existing_year_weeks(existing_weekly_proj)
+        stats_have = existing_year_weeks(existing_weekly_stats)
+
+        proj_missing = {y: [w for w in weeks if (y, w) not in proj_have] for y in years}
+        stats_missing = {y: [w for w in weeks if (y, w) not in stats_have] for y in years}
+
+        new_weekly_proj = collect_weekly_projections(proj_missing)
+        new_weekly_stats = collect_weekly_stats(stats_missing)
+
+        weekly_df = union_align([existing_weekly_proj, new_weekly_proj]) if not new_weekly_proj.empty else existing_weekly_proj
+        weekly_stats_df = union_align([existing_weekly_stats, new_weekly_stats]) if not new_weekly_stats.empty else existing_weekly_stats
 
     if args.include_injuries:
-        weekly_injuries_df = collect_weekly_injuries(years, weeks)
+        existing_weekly_inj = pd.DataFrame() if args.full_refresh else read_existing_table(engine, "weekly_injuries")
+        inj_have = existing_year_weeks(existing_weekly_inj)
+        inj_missing = {y: [w for w in weeks if (y, w) not in inj_have] for y in years}
 
-    # 5) Write tables (replace ensures schema exactly matches the DataFrames)
-    pre_df.to_sql("preseason_projections", con=engine, if_exists="replace", index=False)
-    season_df.to_sql("season_stats", con=engine, if_exists="replace", index=False)
+        new_weekly_inj = collect_weekly_injuries(inj_missing)
+        weekly_injuries_df = pd.concat([existing_weekly_inj, new_weekly_inj], ignore_index=True) if not new_weekly_inj.empty else existing_weekly_inj
 
+    # --- Write tables (replace: we've already merged old + new above) ---
+    if not pre_df.empty:
+        pre_df.to_sql("preseason_projections", con=engine, if_exists="replace", index=False)
+    if not season_df.empty:
+        season_df.to_sql("season_stats", con=engine, if_exists="replace", index=False)
     if not weekly_df.empty:
         weekly_df.to_sql("weekly_projections", con=engine, if_exists="replace", index=False)
-
     if not weekly_stats_df.empty:
         weekly_stats_df.to_sql("weekly_stats", con=engine, if_exists="replace", index=False)
-
     if not weekly_injuries_df.empty:
         weekly_injuries_df.to_sql("weekly_injuries", con=engine, if_exists="replace", index=False)
 

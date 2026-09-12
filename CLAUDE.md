@@ -20,7 +20,10 @@ the draft/scoring data model to **SQLite**.
 - **Python (`blitz_env/`, `py_grpc_server/`, `bots/`)** — the runtime bot SDK (`blitz_env`),
   the gRPC server that runs inside each container, stats-collection scripts, and user bots.
 - **Python (`harness/`)** — local testing/simulation (NOT shipped to the container).
-- **R (`fetch_ranks.R`)** — legacy ranking scraper; `player_ranks_*.csv` are the artifacts.
+- **R (`fetch_ranks.R`, `fetch_projections.R`, `fetch_stats.R`, `fetch_injuries.R`)** — all
+  network sourcing for the bootstrap pipeline (draftable pool, projections, actual stats,
+  injuries), via the ffverse (`ffpros`, `nflreadr`). This is the one place that logic lives;
+  Python only shells out to these scripts and handles the SQLite upsert.
 - **JS/React (`ux/`)** — a Datasette-backed web viewer (create-react-app).
 
 ## 3. ⚠️ Guardrails (read before refactoring)
@@ -157,9 +160,10 @@ league-state tables per mock draft. The repo currently ships a complete **2025**
 
 ### Scrape cache (build input): `data/stats/{year}/stats.db`
 The slow/network artifact that `build-season` reads offline. Created by the
-`bootstrap_data scrape` phase (FantasyPros stats/projections + NFL.com injuries).
-**Bots never read this file** — it is a build input only. Retained in git as the
-cache for rebuilds.
+`bootstrap_data scrape` phase — projections via `ffpros` (`fetch_projections.R`),
+actual stats via `nflreadr` (`fetch_stats.R`), both R, both invoked by
+`blitz_env/collect_stats.py`. **Bots never read this file** — it is a build input
+only. Retained in git as the cache for rebuilds.
 
 ### The `bootstrap_data` CLI (`blitz_env/bootstrap_data.py`)
 Two phases mirroring the user's mental model:
@@ -194,9 +198,39 @@ const seasonDatabaseFileName = "season" + fileSuffix       // "season.db"
 ```
 
 ### Injury data
-Scraped from NFL.com; fuzzy-matched (rapidfuzz) on `(year, week, player_name, position)` to
-FantasyPros IDs. Fields: `player_name`, `team`, `position`, `injury`, `practice_status`,
-`game_status`, `fantasypros_id`, `gsis_id`, `sleeper_id`.
+Sourced from nflverse (`nflreadr::load_injuries`, via `fetch_injuries.R` — one request per
+season) and exact-joined on `gsis_id` to FantasyPros IDs using the dynastyprocess ID
+crosswalk (`blitz_env/load_injuries_nflverse.py`). Requires `Rscript` + the R `nflreadr`
+package at scrape time (installable from the ffverse r-universe, like `ffpros`). Fields:
+`player_name`, `team`, `position`, `injury`, `practice_status`, `game_status`,
+`fantasypros_id`, `gsis_id`, `sleeper_id`. ~25% of rows have no `fantasypros_id` (players
+outside FantasyPros' ranked pool aren't in the crosswalk) — that's an acceptable trade for
+dropping the old NFL.com scraper's fuzzy name matching, which could silently mismatch players
+(e.g. it once matched "Jawaan Taylor" to "Taywan Taylor" at an 80% score). The old
+`blitz_env/download_injuries.py` scraper was removed in the 2026 season prep.
+
+### Projections and actual stats (ffpros / nflreadr)
+`preseason_projections`/`weekly_projections` are sourced from FantasyPros via
+`ffpros::fp_projections` (`fetch_projections.R`, `blitz_env/load_projections_ffpros.py`).
+`season_stats`/`weekly_stats` (actuals, including DST) are sourced from nflverse via
+`nflreadr::load_player_stats`/`load_team_stats` (`fetch_stats.R`,
+`blitz_env/load_stats_nflreadr.py`); DST FPTS is an approximated standard scoring
+formula since nflreadr has no fantasy-points endpoint for team defenses. The old
+`blitz_env/stats_db.py`/`projections_db.py` FantasyPros HTML scrapers (and the
+`download_stats.py`/`download_projections.py`/`download-weekly-data.yml` S3 path
+that depended on them) were removed in the 2026 season prep.
+
+**Legacy column aliases:** both tables keep every original FantasyPros-scrape
+column name (`FPTS`, `PASSING_YDS`, `RUSHING_ATT`, ...) as an alias of the new
+source's native column, computed alongside (not instead of) the native lowercase
+columns (`fantasy_points_ppr`, `passing_yds`, ...) — so existing bots keep working
+unchanged, and new code can use the cleaner native names. A few legacy columns
+with no clean equivalent (`ROST`, `Y/A`, `LG`, `20+`, `pos_rank`, `FPTS/G`, DST
+`YDS AGN`) were dropped; no bot in `bots/nfl2025` reads them (verified before this
+migration). Because SQLite column names are case-insensitive, a native column
+that would collide with a legacy alias by case alone (e.g. ffpros' `fpts` vs.
+legacy `FPTS`) is renamed to `..._native` to keep the exact-case legacy name free
+— see `_free_case_collision` in both loader modules.
 
 ### Archived dev snapshots
 `data/archive/{year}/` holds old snapshots used only by `make launch-simulator`, not
@@ -208,8 +242,10 @@ production. For 2025 this includes the pre-consolidation `gs-draft.db` / `gs-sea
 python3 -m blitz_env.bootstrap_data scrape --year 2025          # -> data/stats/2025/stats.db
 python3 -m blitz_env.bootstrap_data build-season --year 2025    # -> data/game_states/2025/season.db
 ```
-The `scrape` phase makes ~180 HTTP requests to NFL.com for injury data; 5–10 min,
-possible rate limiting.
+Both `make bootstrap-data-scrape` and the bare CLI default to `--years 10`. The ffpros/
+nflreadr-backed pipeline (one request per season/week via R, not a per-page HTML scrape)
+makes this fast enough that 10 years is the default rather than a special case; a few
+minutes, mostly bound by the weekly stats/projections loop.
 
 ## 10. CI / GitHub Actions
 

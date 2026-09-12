@@ -13,23 +13,15 @@ from sqlalchemy import create_engine, inspect, MetaData, Table, text
 from sqlalchemy.dialects.sqlite import insert
 import os
 
-from blitz_env.download_injuries import NFLInjuryScraper
+from blitz_env.load_injuries_nflverse import fetch_season_injuries
 
 
 def get_injuries_for_week(year: int, week: int) -> pd.DataFrame:
-    """Fetch injury data for a specific week and match with player IDs"""
-    scraper = NFLInjuryScraper(year=year, week=week)
-
-    # Scrape the data
-    injury_data = scraper.scrape()
-
-    # Convert to DataFrame
-    df = scraper.to_dataframe(injury_data)
-
-    # Match with player IDs
-    df_with_ids = scraper.match_player_ids(df)
-
-    return df_with_ids
+    """Fetch injury data for a specific week, sourced from nflverse."""
+    df = fetch_season_injuries(year)
+    if df.empty:
+        return df
+    return df[df['week'] == week]
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,10 +42,6 @@ def main():
     print(f"Year: {year}, Week: {week}")
 
     df = get_injuries_for_week(year=year, week=week)
-
-    # Clean up week field - convert "Week 6" to just "6"
-    if 'week' in df.columns:
-        df['week'] = df['week'].str.replace('Week ', '', regex=False).astype(int)
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     engine = create_engine(f"sqlite:///{db_path}")
