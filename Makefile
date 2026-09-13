@@ -98,7 +98,7 @@ launch-in-season-datasette:
 	datasette data/game_states/2025/gs-season.db --host 127.0.0.1 --port 8001
 
 bootstrap-data-scrape:
-	python3 -m blitz_env.bootstrap_data scrape --year $(YEAR)
+	python3 -m blitz_env.bootstrap_data scrape --year $(YEAR) --years 10
 
 bootstrap-data-build-season:
 	python3 -m blitz_env.bootstrap_data build-season --year $(YEAR)

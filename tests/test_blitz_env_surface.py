@@ -6,9 +6,11 @@ def test_classes_removed():
     assert not hasattr(blitz_env, "ProjectionsDB")
 
 def test_scraper_helpers_still_available():
-    # collectors still need these
-    from blitz_env.stats_db import fp_seasonal_years, fp_weekly_years, fp_stats_dynamic
-    from blitz_env.projections_db import fp_projections, load_nfl_projections_all_positions
+    # collectors still need these -- projections/stats/injuries are all sourced
+    # via R (ffpros/nflreadr) as of the 2026 season-prep bootstrap simplification.
+    from blitz_env.load_projections_ffpros import fetch_projections
+    from blitz_env.load_stats_nflreadr import fetch_season_stats
+    from blitz_env.load_injuries_nflverse import fetch_season_injuries
 
 def test_import_stays_lean():
     for m in ("nfl_data_py", "requests", "bs4"):

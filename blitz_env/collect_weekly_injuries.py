@@ -13,23 +13,15 @@ from sqlalchemy import create_engine, inspect, MetaData, Table, text
 from sqlalchemy.dialects.sqlite import insert
 import os
 
-from blitz_env.download_injuries import NFLInjuryScraper
+from blitz_env.load_injuries_nflverse import fetch_season_injuries
 
 
 def get_injuries_for_week(year: int, week: int) -> pd.DataFrame:
-    """Fetch injury data for a specific week and match with player IDs"""
-    scraper = NFLInjuryScraper(year=year, week=week)
-
-    # Scrape the data
-    injury_data = scraper.scrape()
-
-    # Convert to DataFrame
-    df = scraper.to_dataframe(injury_data)
-
-    # Match with player IDs
-    df_with_ids = scraper.match_player_ids(df)
-
-    return df_with_ids
+    """Fetch injury data for a specific week, sourced from nflverse."""
+    df = fetch_season_injuries(year)
+    if df.empty:
+        return df
+    return df[df['week'] == week]
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,10 +43,6 @@ def main():
 
     df = get_injuries_for_week(year=year, week=week)
 
-    # Clean up week field - convert "Week 6" to just "6"
-    if 'week' in df.columns:
-        df['week'] = df['week'].str.replace('Week ', '', regex=False).astype(int)
-
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     engine = create_engine(f"sqlite:///{db_path}")
     table_name = "weekly_injuries"
@@ -63,10 +51,14 @@ def main():
     insp = inspect(engine)
     if insp.has_table(table_name):
         # Table exists → upsert
+        # Keyed on team too, not just (year, week, player_name, position):
+        # a player traded mid-season can legitimately appear twice in his
+        # trade week, once per team (e.g. Christian McCaffrey, 2022 week 7,
+        # listed under both CAR and SF).
         with engine.begin() as conn:
             conn.execute(text(f"""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique
-                ON {table_name}(year, week, player_name, position)
+                ON {table_name}(year, week, team, player_name, position)
             """))
 
         records = df.to_dict(orient="records")
@@ -77,8 +69,8 @@ def main():
 
         # Upsert: update if exists, insert if not
         upsert_stmt = stmt.on_conflict_do_update(
-            index_elements=["year", "week", "player_name", "position"],
-            set_={c.key: c for c in stmt.excluded if c.key not in ["year", "week", "player_name", "position"]}
+            index_elements=["year", "week", "team", "player_name", "position"],
+            set_={c.key: c for c in stmt.excluded if c.key not in ["year", "week", "team", "player_name", "position"]}
         )
 
         with engine.begin() as conn:

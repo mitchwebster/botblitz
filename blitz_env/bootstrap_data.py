@@ -105,20 +105,27 @@ def build_season(year: int, stats_path: str = None, season_path: str = None) -> 
     return season_path
 
 
-def scrape(year: int, years_back: int = 10, weeks: str = "1:18") -> str:
-    """Full network pull into the scrape cache. Delegates to collect_stats."""
+def scrape(year: int, years_back: int = 10, weeks: str = "1:18", full_refresh: bool = False) -> str:
+    """
+    Incremental network pull into the scrape cache (delegates to collect_stats):
+    years/weeks already present in an existing cache aren't re-fetched, only
+    what's missing. Pass full_refresh=True to wipe the cache and pull everything.
+    """
     from blitz_env import collect_stats
 
     out = get_stats_cache_path(year)
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    collect_stats.main([
+    args = [
         "--db", out,
         "--end-year", str(year),
         "--years", str(years_back),
         "--include-weekly",
         "--include-injuries",
         "--weeks", weeks,
-    ])
+    ]
+    if full_refresh:
+        args.append("--full-refresh")
+    collect_stats.main(args)
     return out
 
 
@@ -130,6 +137,8 @@ def main(argv=None) -> int:
     s.add_argument("--year", type=int, required=True)
     s.add_argument("--years", type=int, default=10)
     s.add_argument("--weeks", default="1:18")
+    s.add_argument("--full-refresh", action="store_true",
+                    help="Wipe the cache and re-fetch everything (default: incremental, only missing years/weeks).")
 
     b = sub.add_parser("build-season",
                        help="Materialize data/game_states/{year}/season.db")
@@ -139,7 +148,7 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "scrape":
-        path = scrape(args.year, years_back=args.years, weeks=args.weeks)
+        path = scrape(args.year, years_back=args.years, weeks=args.weeks, full_refresh=args.full_refresh)
         print(f"Scraped -> {path}")
     elif args.command == "build-season":
         path = build_season(args.year, stats_path=args.stats_path,
