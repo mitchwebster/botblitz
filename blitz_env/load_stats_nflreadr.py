@@ -34,7 +34,10 @@ def _load_player_ids() -> pd.DataFrame:
     global _player_ids_df
     if _player_ids_df is None:
         ids = pd.read_csv(_PLAYER_IDS_URL)
-        _player_ids_df = ids[["gsis_id", "fantasypros_id", "sleeper_id"]].dropna(subset=["gsis_id"])
+        ids = ids[["gsis_id", "fantasypros_id", "sleeper_id"]].dropna(subset=["gsis_id"])
+        # The crosswalk has ~4.5k duplicate gsis_id rows (same fantasypros_id/
+        # sleeper_id repeated); dedupe or a merge on gsis_id fans out rows.
+        _player_ids_df = ids.drop_duplicates(subset=["gsis_id"])
     return _player_ids_df
 
 

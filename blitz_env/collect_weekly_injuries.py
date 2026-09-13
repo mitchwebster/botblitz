@@ -51,10 +51,14 @@ def main():
     insp = inspect(engine)
     if insp.has_table(table_name):
         # Table exists → upsert
+        # Keyed on team too, not just (year, week, player_name, position):
+        # a player traded mid-season can legitimately appear twice in his
+        # trade week, once per team (e.g. Christian McCaffrey, 2022 week 7,
+        # listed under both CAR and SF).
         with engine.begin() as conn:
             conn.execute(text(f"""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique
-                ON {table_name}(year, week, player_name, position)
+                ON {table_name}(year, week, team, player_name, position)
             """))
 
         records = df.to_dict(orient="records")
@@ -65,8 +69,8 @@ def main():
 
         # Upsert: update if exists, insert if not
         upsert_stmt = stmt.on_conflict_do_update(
-            index_elements=["year", "week", "player_name", "position"],
-            set_={c.key: c for c in stmt.excluded if c.key not in ["year", "week", "player_name", "position"]}
+            index_elements=["year", "week", "team", "player_name", "position"],
+            set_={c.key: c for c in stmt.excluded if c.key not in ["year", "week", "team", "player_name", "position"]}
         )
 
         with engine.begin() as conn:
