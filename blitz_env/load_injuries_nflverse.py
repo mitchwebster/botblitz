@@ -2,8 +2,8 @@
 
 Replaces the retired NFL.com HTML scraper: one network request per season
 (instead of one per team/week) via `fetch_injuries.R`, and an exact join on
-`gsis_id` against the dynastyprocess ID crosswalk (instead of fuzzy name
-matching) to recover `fantasypros_id`.
+`gsis_id` against the ID crosswalk (instead of fuzzy name matching) to
+recover `fantasypros_id`.
 """
 
 import os
@@ -12,22 +12,10 @@ import tempfile
 
 import pandas as pd
 
+from blitz_env.player_id_crosswalk import load_player_id_crosswalk
+
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FETCH_SCRIPT = os.path.join(_REPO_ROOT, "fetch_injuries.R")
-_PLAYER_IDS_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv"
-
-_player_ids_df = None
-
-
-def _load_player_ids() -> pd.DataFrame:
-    global _player_ids_df
-    if _player_ids_df is None:
-        ids = pd.read_csv(_PLAYER_IDS_URL)
-        ids = ids[["gsis_id", "fantasypros_id", "sleeper_id"]].dropna(subset=["gsis_id"])
-        # The crosswalk has ~4.5k duplicate gsis_id rows (same fantasypros_id/
-        # sleeper_id repeated); dedupe or a merge on gsis_id fans out rows.
-        _player_ids_df = ids.drop_duplicates(subset=["gsis_id"])
-    return _player_ids_df
 
 
 def fetch_season_injuries(year: int) -> pd.DataFrame:
@@ -50,7 +38,7 @@ def fetch_season_injuries(year: int) -> pd.DataFrame:
     if raw.empty:
         return pd.DataFrame()
 
-    merged = raw.merge(_load_player_ids(), on="gsis_id", how="left")
+    merged = raw.merge(load_player_id_crosswalk(), on="gsis_id", how="left")
 
     return pd.DataFrame({
         "year": merged["season"],

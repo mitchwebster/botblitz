@@ -23,22 +23,10 @@ import tempfile
 
 import pandas as pd
 
+from blitz_env.player_id_crosswalk import load_player_id_crosswalk
+
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FETCH_SCRIPT = os.path.join(_REPO_ROOT, "fetch_stats.R")
-_PLAYER_IDS_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv"
-
-_player_ids_df = None
-
-
-def _load_player_ids() -> pd.DataFrame:
-    global _player_ids_df
-    if _player_ids_df is None:
-        ids = pd.read_csv(_PLAYER_IDS_URL)
-        ids = ids[["gsis_id", "fantasypros_id", "sleeper_id"]].dropna(subset=["gsis_id"])
-        # The crosswalk has ~4.5k duplicate gsis_id rows (same fantasypros_id/
-        # sleeper_id repeated); dedupe or a merge on gsis_id fans out rows.
-        _player_ids_df = ids.drop_duplicates(subset=["gsis_id"])
-    return _player_ids_df
 
 
 # nflreadr and the FantasyPros-derived player pool disagree on a couple of
@@ -169,7 +157,7 @@ def fetch_season_stats(year: int, summary_level: str = "week") -> tuple[pd.DataF
         dst = pd.read_csv(dst_path, low_memory=False) if os.path.getsize(dst_path) > 0 else pd.DataFrame()
 
     if not offense.empty:
-        ids = _load_player_ids()
+        ids = load_player_id_crosswalk()
         offense = offense.rename(columns={"player_id": "gsis_id"})
         offense = offense.merge(ids, on="gsis_id", how="left")
         offense = _add_offense_fumbles_lost(offense)
