@@ -20,10 +20,12 @@ the draft/scoring data model to **SQLite**.
 - **Python (`blitz_env/`, `py_grpc_server/`, `bots/`)** — the runtime bot SDK (`blitz_env`),
   the gRPC server that runs inside each container, stats-collection scripts, and user bots.
 - **Python (`harness/`)** — local testing/simulation (NOT shipped to the container).
-- **R (`fetch_ranks.R`, `fetch_projections.R`, `fetch_stats.R`, `fetch_injuries.R`)** — all
-  network sourcing for the bootstrap pipeline (draftable pool, projections, actual stats,
-  injuries), via the ffverse (`ffpros`, `nflreadr`). This is the one place that logic lives;
-  Python only shells out to these scripts and handles the SQLite upsert.
+- **R (`fetch_ranks.R`, `fetch_projections.R`, `fetch_stats.R`, `fetch_injuries.R`,
+  `fetch_playerids.R`, `fetch_ffanalytics_projections.R`)** — all network sourcing for
+  the bootstrap pipeline (draftable pool, projections, actual stats, injuries, ID
+  crosswalk, multi-source projections), via the ffverse (`ffpros`, `nflreadr`) and
+  `ffanalytics`. This is the one place that logic lives; Python only shells out to
+  these scripts and handles the SQLite upsert.
 - **JS/React (`ux/`)** — a Datasette-backed web viewer (create-react-app).
 
 ## 3. ⚠️ Guardrails (read before refactoring)
@@ -242,10 +244,43 @@ production. For 2025 this includes the pre-consolidation `gs-draft.db` / `gs-sea
 python3 -m blitz_env.bootstrap_data scrape --year 2025          # -> data/stats/2025/stats.db
 python3 -m blitz_env.bootstrap_data build-season --year 2025    # -> data/game_states/2025/season.db
 ```
-Both `make bootstrap-data-scrape` and the bare CLI default to `--years 10`. The ffpros/
+Both `make bootstrap-data-scrape` and the bare CLI default to `--years 5`. The ffpros/
 nflreadr-backed pipeline (one request per season/week via R, not a per-page HTML scrape)
-makes this fast enough that 10 years is the default rather than a special case; a few
+makes this fast, but 5 years is plenty of history for evaluation purposes — a few
 minutes, mostly bound by the weekly stats/projections loop.
+
+### Multi-source projections (ffanalytics): `data/ffanalytics/{year}/projections.db`
+FantasyPros' own projections pages — what `ffpros`/`fetch_projections.R` scrape for
+`preseason_projections`/`weekly_projections` — cap out at ~10 rows per position
+regardless of year or week (confirmed via direct HTTP checks against fantasypros.com;
+it's a site-side limitation, not a scraper bug, and it affects every year in the table,
+not just the current season). As a broader-coverage supplement, `fetch_ffanalytics_projections.R`
++ `blitz_env/collect_ffanalytics_projections.py` pull from the
+[ffanalytics](https://github.com/FantasyFootballAnalytics/ffanalytics) R package, which
+aggregates many fantasy sites. Of everywhere ffanalytics can pull from, only three
+sources were confirmed (by fetching their raw HTTP responses directly, not just trusting
+the R wrapper) to serve real season/week-specific data rather than always redirecting to
+the live/current page: **FFToday** (draft+weekly, ~2010+), **FantasySharks** (draft+weekly,
+2018+), and **ESPN** (draft 2018+, weekly 2019+ — and its 2023 preseason data is mostly
+NA on ESPN's own end, not fixable locally). Every other source in ffanalytics (CBS,
+FanDuel/NumberFire, RTSports, Walterfootball, and ffanalytics' own FantasyPros scrape)
+was verified to ignore the season/week params entirely and always return live data —
+not used here.
+
+Storage is a **separate** sqlite file per year (`data/ffanalytics/{year}/projections.db`,
+table `projections`), deliberately apart from `data/stats/{year}/stats.db` and
+`data/game_states/{year}/season.db`. Rows are kept **per-source and per-raw-stat**
+(`pass_yds`, `rec_tds`, `rush_att`, ...), not pre-averaged into one consensus number —
+a `points` column computed under this league's PPR scoring rides alongside for
+convenience, but the raw stat lines are what's kept so a different scoring system can
+be recomputed later without re-scraping.
+
+Two distinct operations, not one combined script:
+- `make bootstrap-data-ffanalytics-refresh YEAR=Y WEEK=W` — current week + the week
+  after (plus preseason if that year has none yet). Meant to run every time weekly
+  data is fetched; wired into `update-scores.yml` as a non-critical step.
+- `make bootstrap-data-ffanalytics-backfill` — preseason + every regular-season week,
+  for the last 5 years. Occasional/manual only, never on a schedule.
 
 ## 10. CI / GitHub Actions
 

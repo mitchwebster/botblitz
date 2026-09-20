@@ -98,7 +98,19 @@ launch-in-season-datasette:
 	datasette data/game_states/2025/gs-season.db --host 127.0.0.1 --port 8001
 
 bootstrap-data-scrape:
-	python3 -m blitz_env.bootstrap_data scrape --year $(YEAR) --years 10
+	python3 -m blitz_env.bootstrap_data scrape --year $(YEAR) --years 5
 
 bootstrap-data-build-season:
 	python3 -m blitz_env.bootstrap_data build-season --year $(YEAR)
+
+# Multi-source (ffanalytics: FFToday + FantasySharks + ESPN) projections, kept
+# separately from the ffpros-sourced preseason_projections/weekly_projections
+# in season.db -- see blitz_env/collect_ffanalytics_projections.py for why.
+# Occasional/manual: seeds or repairs history, not run on a schedule.
+bootstrap-data-ffanalytics-backfill:
+	python3 -m blitz_env.collect_ffanalytics_projections backfill --years 5
+
+# Regular: current + next week (plus preseason if this year has none yet).
+# Meant to run every time weekly data is fetched.
+bootstrap-data-ffanalytics-refresh:
+	python3 -m blitz_env.collect_ffanalytics_projections refresh --year $(YEAR) --week $(WEEK)

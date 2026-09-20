@@ -135,7 +135,7 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("scrape", help="Network pull into data/stats/{year}/stats.db")
     s.add_argument("--year", type=int, required=True)
-    s.add_argument("--years", type=int, default=10)
+    s.add_argument("--years", type=int, default=5)
     s.add_argument("--weeks", default="1:18")
     s.add_argument("--full-refresh", action="store_true",
                     help="Wipe the cache and re-fetch everything (default: incremental, only missing years/weeks).")
