@@ -115,6 +115,15 @@ jobs:
           echo "⚠ Warning: Failed to collect ffanalytics projections (non-critical, continuing)"
         fi
 
+        # NFL schedule (every week, played or not) -- lets the UI show a real
+        # opponent for future weeks, not just ones with actuals already in.
+        echo "Collecting NFL schedule..."
+        if python3 -m blitz_env.collect_schedule --year 2026; then
+          echo "✓ Schedule collected successfully"
+        else
+          echo "⚠ Warning: Failed to collect schedule (non-critical, continuing)"
+        fi
+
     - name: Update fantasy week scores
       run: go run pkg/cmd/engine_bootstrap.go -game_mode=UpdateWeeklyScores -year=2026
 

@@ -95,7 +95,7 @@ launch-in-season-datasette:
 	$(MAKE) build-py-module
 	pip3 install dist/blitz_env-0.1.0-py3-none-any.whl
 	python3 -m webbrowser http://127.0.0.1:8001/
-	datasette data/game_states/2025/gs-season.db --host 127.0.0.1 --port 8001
+	datasette data/game_states/2026/season.db --host 127.0.0.1 --port 8001
 
 bootstrap-data-scrape:
 	python3 -m blitz_env.bootstrap_data scrape --year $(YEAR) --years 5
@@ -114,3 +114,13 @@ bootstrap-data-ffanalytics-backfill:
 # Meant to run every time weekly data is fetched.
 bootstrap-data-ffanalytics-refresh:
 	python3 -m blitz_env.collect_ffanalytics_projections refresh --year $(YEAR) --week $(WEEK)
+
+# Re-run season.db write-back for already-fetched weeks missing it. No
+# re-scraping; runs automatically at the end of every backfill too.
+bootstrap-data-ffanalytics-repair:
+	python3 -m blitz_env.collect_ffanalytics_projections repair --years 5
+
+# NFL schedule (every week, played or not) -- lands in season.db's `schedule`
+# table so the UI can show a real opponent for future weeks too.
+bootstrap-data-schedule:
+	python3 -m blitz_env.collect_schedule --year $(YEAR)

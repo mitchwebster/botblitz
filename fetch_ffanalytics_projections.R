@@ -38,33 +38,38 @@ fetch_one_source <- function(src) {
     raw <- scrape_data(src = src, pos = pos_list, season = year, week = week)
 
     # Some sources' own `pos` column doesn't match what we asked for (e.g.
-    # FantasySharks reports "D" for DST, not "DST") -- force it to match the
-    # requested position (== the list name scrape_data returns it under) so
-    # position is consistent across sources.
-    raw <- Map(function(requested_pos, df) {
-      if (!is.null(df) && nrow(df) > 0) df$pos <- requested_pos
-      df
-    }, names(raw), raw)
+    # FantasySharks reports "D" for DST, not "DST"). Overwriting it before
+    # calling projections_table() breaks that function internally (it relies
+    # on the untouched pos/list-name agreement -- confirmed by testing: same
+    # call, only difference being this relabel, throws "argument is of length
+    # zero"). So leave `raw` untouched for projections_table, and instead
+    # build our own id -> requested-position lookup to standardize pos
+    # afterward, on the output only.
+    id_to_pos <- bind_rows(lapply(names(raw), function(requested_pos) {
+      d <- raw[[requested_pos]]
+      if (is.null(d) || nrow(d) == 0) return(NULL)
+      data.frame(id = d$id, pos = requested_pos, stringsAsFactors = FALSE)
+    })) %>% distinct(id, .keep_all = TRUE)
 
     # Raw stat lines, one row per player, all positions stacked (bind_rows
     # fills NA for stat columns that don't apply to a given position, same
-    # as how preseason_projections/weekly_projections already work).
-    raw_combined <- bind_rows(raw)
+    # as how preseason_projections/weekly_projections already work). Drop the
+    # source's own (possibly quirky) pos column in favor of id_to_pos below.
+    raw_combined <- bind_rows(raw) %>% select(-pos)
 
     # points/floor/ceiling/rank computed under our league's scoring, joined
-    # back onto the raw stat columns by (id, pos).
+    # back onto the raw stat columns by id.
     scored <- tryCatch({
       projections_table(raw, scoring_rules = scoring_rules, avg_type = "average") %>%
-        select(id, pos, points, floor, ceiling, points_vor, rank, pos_rank, tier)
+        select(id, points, floor, ceiling, points_vor, rank, pos_rank, tier)
     }, error = function(e) {
       cat(sprintf("Warning: could not score %s year %d week %d: %s\n", src, year, week, conditionMessage(e)))
       NULL
     })
 
-    combined <- if (!is.null(scored)) {
-      left_join(raw_combined, scored, by = c("id", "pos"))
-    } else {
-      raw_combined
+    combined <- raw_combined %>% left_join(id_to_pos, by = "id")
+    if (!is.null(scored)) {
+      combined <- combined %>% left_join(scored, by = "id")
     }
 
     combined <- add_player_info(combined)

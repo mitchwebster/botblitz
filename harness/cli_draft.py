@@ -18,7 +18,8 @@ from rich.box import SQUARE
 from rich.console import Console
 from rich.table import Table
 
-from blitz_env.models import Bot, DatabaseManager, Player
+from blitz_env.models import Bot, DatabaseManager
+from harness.draft_board_html import write_html
 from harness.simulate_draft import (
     default_draft_strategy,
     get_picking_team_index,
@@ -110,6 +111,7 @@ def main():
     parser.add_argument("--bot", required=True, help="Path to the bot .py file (must define draft_player()).")
     parser.add_argument("--year", type=int, default=2026, help="Season year to draft against (default 2026).")
     parser.add_argument("--bot-name", default=None, help="Bot name in the league to assign as the user's bot (default: derived from filename, e.g. chris_bot.py -> Chris).")
+    parser.add_argument("--html", default=None, help="Write a grid draft board (teams x rounds) to this HTML file instead of printing the round-by-round tables to the terminal.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.bot):
@@ -147,9 +149,17 @@ def main():
         run_draft(strategy_map)
         db.session.commit()
 
-        print_draft_board(db, user_bot.id)
-        print()
-        print_roster(db, user_bot)
+        if args.html:
+            out_path = write_html(db, user_bot.id, args.html)
+            print(f"Wrote draft board to {out_path}")
+            picks = [p for p in db.get_all_players() if p.current_bot_id == user_bot.id]
+            picks.sort(key=lambda p: p.pick_chosen or 0)
+            summary = ", ".join(f"{p.full_name} ({p.allowed_positions[0] if p.allowed_positions else '?'})" for p in picks)
+            print(f"{user_bot.name}'s roster: {summary}")
+        else:
+            print_draft_board(db, user_bot.id)
+            print()
+            print_roster(db, user_bot)
     finally:
         db.close()
 

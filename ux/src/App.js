@@ -1,5 +1,22 @@
 import React, { useEffect, useState } from "react";
 
+// weekly_stats' curated legacy-alias columns (see blitz_env/load_stats_nflreadr.py) --
+// a player profile only shows whichever of these actually have a nonzero
+// value for that player, so QBs get passing stats, DST gets defensive stats, etc.
+const STAT_COLUMNS = [
+  ["PASSING_CMP", "Cmp"], ["PASSING_ATT", "Pass Att"], ["PASSING_YDS", "Pass Yds"], ["PASSING_TD", "Pass TD"], ["PASSING_INT", "Int"],
+  ["RUSHING_ATT", "Rush Att"], ["RUSHING_YDS", "Rush Yds"], ["RUSHING_TD", "Rush TD"],
+  ["RECEIVING_REC", "Rec"], ["RECEIVING_TGT", "Tgt"], ["RECEIVING_YDS", "Rec Yds"], ["RECEIVING_TD", "Rec TD"],
+  ["FL", "Fum Lost"],
+  ["FG", "FG"], ["FGA", "FGA"], ["XPT", "XP"],
+  ["SACK", "Sack"], ["INT", "Def Int"], ["FR", "FR"], ["TD", "Def TD"], ["SAFETY", "Saf"], ["PA", "Pts Allowed"],
+];
+
+// weekly_stats/weekly_injuries hold every year (2017-2026) for the same
+// fantasypros_id -- a player profile has to scope to one season, or "week 18"
+// from a past year silently collides with "week 18" of the current one.
+const CURRENT_SEASON_YEAR = 2026;
+
 function App() {
   const [db, setDb] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -12,6 +29,30 @@ function App() {
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
   const [error, setError] = useState(null);
+  // Projections tab: independent week/source filters + position checkboxes,
+  // populated from whatever's actually in external_projections (not tied to
+  // game_statuses.current_fantasy_week, which only tracks league progress).
+  const [projWeeks, setProjWeeks] = useState([]);
+  const [projSources, setProjSources] = useState([]);
+  const [projWeek, setProjWeek] = useState(null);
+  const [projSource, setProjSource] = useState(null);
+  const [projPositions, setProjPositions] = useState(["QB", "RB", "WR", "TE", "K", "DST"]);
+  // Players tab: reuses projWeek/projSource above for "as of which week/source"
+  // (projected points + injuries are both week-scoped), plus its own search
+  // and actual-vs-projected toggle.
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [pointsMode, setPointsMode] = useState("actual"); // 'actual' | 'projected'
+  const [playerPositions, setPlayerPositions] = useState(["QB", "RB", "WR", "TE", "K", "DST"]);
+  // Player profile modal: click a player anywhere to see their full weekly
+  // history -- actual points + stat line + all three projection sources.
+  const [profilePlayer, setProfilePlayer] = useState(null); // { id, name }
+  const [profileRows, setProfileRows] = useState([]);
+  // weekly_stats' actual column set varies by db (older archived snapshots use
+  // different legacy names, e.g. DEF_TD/SFTY instead of TD/SAFETY, and some
+  // lack PA entirely) -- discovered at load time so the profile query only
+  // ever asks for columns that actually exist.
+  const [weeklyStatsCols, setWeeklyStatsCols] = useState(null);
+  const [profileByeWeek, setProfileByeWeek] = useState(null);
   // Theme: 'light' | 'dark' | 'system'
   const [themePref, setThemePref] = useState(() => {
     try {
@@ -53,13 +94,13 @@ function App() {
         let dbUrl;
         if (useLocalDb) {
           // Use local database from public folder
-          dbUrl = '/gs-season.db';
+          dbUrl = '/season.db';
         } else {
           // Get branch from URL parameter (e.g., ?branch=chris-bot-add-drop)
           // Defaults to 'main' if not specified
           const urlParams = new URLSearchParams(window.location.search);
           const branch = urlParams.get('branch') || 'main';
-          dbUrl = `https://raw.githubusercontent.com/mitchwebster/botblitz/${branch}/data/game_states/2025/gs-season.db`;
+          dbUrl = `https://raw.githubusercontent.com/mitchwebster/botblitz/${branch}/data/game_states/2026/season.db`;
         }
 
         const response = await fetch(dbUrl);
@@ -96,8 +137,161 @@ function App() {
     }
   }, [db, selectedWeek]);
 
+  // Populate the Projections tab's week/source options from whatever rows
+  // external_projections actually has (a table written by
+  // blitz_env.collect_ffanalytics_projections, may not exist on an older db).
   useEffect(() => {
-    if (!db || selectedWeek === null) return;
+    if (!db) return;
+    try {
+      const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='external_projections';");
+      if (tableCheck.length === 0) return;
+
+      const weeksResult = db.exec("SELECT DISTINCT week FROM external_projections ORDER BY week;");
+      const weeks = weeksResult.length > 0 ? weeksResult[0].values.map((r) => r[0]) : [];
+      setProjWeeks(weeks);
+      if (weeks.length > 0) setProjWeek((prev) => (prev === null ? weeks[weeks.length - 1] : prev));
+
+      const sourcesResult = db.exec("SELECT DISTINCT source FROM external_projections ORDER BY source;");
+      const sources = sourcesResult.length > 0 ? sourcesResult[0].values.map((r) => r[0]) : [];
+      setProjSources(sources);
+      if (sources.length > 0) setProjSource((prev) => (prev === null ? sources[0] : prev));
+    } catch (err) {
+      console.error("Failed to fetch projection weeks/sources:", err);
+    }
+  }, [db]);
+
+  // Discover which of weekly_stats' columns actually exist on this db --
+  // schema varies between an archived snapshot and a freshly-built season.db.
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const result = db.exec("PRAGMA table_info(weekly_stats);");
+      const cols = result.length > 0 ? new Set(result[0].values.map((r) => r[1])) : new Set();
+      setWeeklyStatsCols(cols);
+    } catch (err) {
+      console.error("Failed to inspect weekly_stats columns:", err);
+      setWeeklyStatsCols(new Set());
+    }
+  }, [db]);
+
+  // Player profile: full weekly history for whichever player was clicked --
+  // actual points + raw stat line (weekly_stats) alongside every source's
+  // projection for that same week (external_projections).
+  useEffect(() => {
+    if (!db || !profilePlayer || weeklyStatsCols === null) {
+      if (!profilePlayer) {
+        setProfileRows([]);
+        setProfileByeWeek(null);
+      }
+      return;
+    }
+    // Each piece (stats, projections, injuries) can be missing or
+    // schema-mismatched on any given db -- one failing shouldn't blank the
+    // whole profile, so each gets its own try/catch instead of one shared one.
+    const byWeek = {};
+    let playerTeam = null;
+
+    try {
+      const byeResult = db.exec(`SELECT player_bye_week, professional_team FROM players WHERE id = '${profilePlayer.id}'`);
+      if (byeResult.length > 0) {
+        setProfileByeWeek(byeResult[0].values[0][0]);
+        playerTeam = byeResult[0].values[0][1];
+      } else {
+        setProfileByeWeek(null);
+      }
+    } catch (err) {
+      console.error("Failed to load player bye week:", err);
+      setProfileByeWeek(null);
+    }
+
+    // Schedule covers every week of the season up front (unlike weekly_stats'
+    // opponent, which only exists for games already played) -- this is what
+    // lets future weeks show a real opponent, and also seeds byWeek with
+    // every week 1-18 so the table isn't just "however many weeks have stats."
+    if (playerTeam) {
+      try {
+        const schedResult = db.exec(`
+          SELECT week, opponent FROM schedule
+          WHERE team = '${playerTeam}' AND year = ${CURRENT_SEASON_YEAR}
+          ORDER BY week
+        `);
+        if (schedResult.length > 0) {
+          for (const [week, opponent] of schedResult[0].values) {
+            byWeek[week] = { week, actual: null, opponent, stats: {} };
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load schedule:", err);
+      }
+    }
+
+    try {
+      const availableStatCols = STAT_COLUMNS.filter(([col]) => weeklyStatsCols.has(col));
+      const statCols = availableStatCols.map(([col]) => `"${col}"`).join(", ");
+      const statsResult = db.exec(`
+        SELECT week, FPTS AS actual${statCols ? ", " + statCols : ""}
+        FROM weekly_stats
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        ORDER BY week
+      `);
+      if (statsResult.length > 0) {
+        const cols = statsResult[0].columns;
+        for (const row of statsResult[0].values) {
+          const obj = Object.fromEntries(row.map((v, i) => [cols[i], v]));
+          const existingOpponent = byWeek[obj.week]?.opponent;
+          byWeek[obj.week] = { week: obj.week, actual: obj.actual, opponent: existingOpponent, stats: obj };
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load player weekly stats:", err);
+    }
+
+    try {
+      const projResult = db.exec(`
+        SELECT week, source, points
+        FROM external_projections
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        ORDER BY week
+      `);
+      if (projResult.length > 0) {
+        for (const [week, source, points] of projResult[0].values) {
+          if (!byWeek[week]) byWeek[week] = { week, actual: null, stats: {} };
+          byWeek[week][source] = points;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load player projections:", err);
+    }
+
+    try {
+      const injuryResult = db.exec(`
+        SELECT week, injury, practice_status, game_status
+        FROM weekly_injuries
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        ORDER BY week
+      `);
+      if (injuryResult.length > 0) {
+        for (const [week, injury, , gameStatus] of injuryResult[0].values) {
+          if (!byWeek[week]) byWeek[week] = { week, actual: null, stats: {} };
+          byWeek[week].injury = injury
+            ? `${injury}${gameStatus ? ` (${gameStatus})` : ""}`
+            : (gameStatus || "");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load player injuries:", err);
+    }
+
+    setProfileRows(Object.values(byWeek).sort((a, b) => a.week - b.week));
+  }, [db, profilePlayer, weeklyStatsCols]);
+
+  useEffect(() => {
+    if (!db) return;
+    if (activeTab === "projections" || activeTab === "players") {
+      if (projWeek === null || projSource === null) return;
+    } else if (selectedWeek === null) {
+      return;
+    }
 
     // Check if weekly_lineups table exists (needed for matchupDetails)
     let weeklyLineupsExists = false;
@@ -114,6 +308,19 @@ function App() {
         setColumns([]);
         setData([]);
         return;
+      }
+    }
+
+    // players doesn't strictly need league-state tables (bots/matchups/etc) --
+    // a stats-only db (e.g. a freshly-built season.db with no draft run yet)
+    // should still show the player list, just without a fantasy team column.
+    let botsExists = false;
+    if (activeTab === "players") {
+      try {
+        const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='bots';");
+        botsExists = tableCheck.length > 0 && tableCheck[0].values.length > 0;
+      } catch (e) {
+        botsExists = false;
       }
     }
 
@@ -168,8 +375,8 @@ function App() {
         INNER JOIN bots as visitor_bot ON m.visitor_bot_id = visitor_bot.id
         INNER JOIN weekly_lineups wl ON wl.week = m.week AND (wl.bot_id = m.home_bot_id OR wl.bot_id = m.visitor_bot_id)
         INNER JOIN players p ON p.id = wl.player_id
-        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week
-        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week
+        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week AND ws.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week AND wp.year = ${CURRENT_SEASON_YEAR}
         WHERE m.week = ${selectedWeek}
         ORDER BY m.id, side,
           CASE wl.slot
@@ -209,7 +416,7 @@ function App() {
         WITH playerPoints AS (
           SELECT p.id, p.full_name, p.allowed_positions, p.current_bot_id, SUM(wk.FPTS) AS totalPoints
           FROM players AS p
-          INNER JOIN weekly_stats AS wk ON p.id = wk.fantasypros_id
+          INNER JOIN weekly_stats AS wk ON p.id = wk.fantasypros_id AND wk.year = ${CURRENT_SEASON_YEAR}
           GROUP BY 1,2,3,4
         )
         SELECT
@@ -222,9 +429,46 @@ function App() {
           wp.FPTS AS projected_points
         FROM playerPoints AS p
         LEFT JOIN bots AS b ON p.current_bot_id = b.id
-        LEFT JOIN weekly_injuries AS wi ON p.id = wi.fantasypros_id AND wi.week = ${selectedWeek}
-        LEFT JOIN weekly_projections AS wp ON p.id = wp.fantasypros_id AND wp.week = ${selectedWeek}
+        LEFT JOIN weekly_injuries AS wi ON p.id = wi.fantasypros_id AND wi.week = ${selectedWeek} AND wi.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_projections AS wp ON p.id = wp.fantasypros_id AND wp.week = ${selectedWeek} AND wp.year = ${CURRENT_SEASON_YEAR}
         ORDER BY b.name, p.full_name
+      `,
+      projections: `
+        SELECT
+          p.full_name AS player,
+          p.professional_team AS team,
+          ep.position,
+          ep.source,
+          ep.week,
+          ep.points
+        FROM external_projections ep
+        JOIN players p ON p.id = ep.fantasypros_id
+        WHERE ep.week = ${projWeek}
+          AND ep.source = '${projSource}'
+          AND ep.year = ${CURRENT_SEASON_YEAR}
+          AND ep.position IN (${(projPositions.length ? projPositions : ["__none__"]).map((p) => `'${p}'`).join(",")})
+        ORDER BY ep.points DESC
+      `,
+      players: `
+        SELECT
+          p.id,
+          p.full_name AS player,
+          p.allowed_positions,
+          p.professional_team AS team,
+          ${botsExists ? "b.name AS fantasyTeam," : "NULL AS fantasyTeam,"}
+          COALESCE(ap.actualPoints, 0) AS actualPoints,
+          ep.points AS projectedPoints,
+          wi.injury,
+          wi.practice_status,
+          wi.game_status
+        FROM players p
+        ${botsExists ? "LEFT JOIN bots b ON p.current_bot_id = b.id" : ""}
+        LEFT JOIN (
+          SELECT fantasypros_id, SUM(FPTS) AS actualPoints FROM weekly_stats WHERE year = ${CURRENT_SEASON_YEAR} GROUP BY fantasypros_id
+        ) ap ON ap.fantasypros_id = p.id
+        LEFT JOIN external_projections ep ON ep.fantasypros_id = p.id AND ep.week = ${projWeek} AND ep.source = '${projSource}' AND ep.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_injuries wi ON wi.fantasypros_id = p.id AND wi.week = ${projWeek} AND wi.year = ${CURRENT_SEASON_YEAR}
+        ORDER BY actualPoints DESC
       `,
     };
 
@@ -259,7 +503,7 @@ function App() {
         setError(`Query failed: ${err.message || err}`);
       }
     }
-  }, [db, activeTab, selectedWeek]);
+  }, [db, activeTab, selectedWeek, projWeek, projSource, projPositions]);
 
   const lightVars = {
     background: "#ffffff",
@@ -325,6 +569,8 @@ function App() {
     { key: "matchupDetails", label: "Matchup Details" },
     { key: "leaderboard", label: "Leaderboard" },
     { key: "rosters", label: "Rosters" },
+    { key: "projections", label: "Projections" },
+    { key: "players", label: "Players" },
   ];
 
   const handleSort = (col) => {
@@ -452,21 +698,182 @@ function App() {
       <tbody>
         {tableData.map((row, idx) => (
           <tr key={idx}>
-            {tableColumns.map((col) => (
-              <td key={col} style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>
-                {row[col]}
-              </td>
-            ))}
+            {tableColumns.map((col) => {
+              // Rosters rows carry both id + full_name -- make the name a link into the player profile.
+              const isPlayerName = col === "full_name" && row.id != null;
+              return (
+                <td
+                  key={col}
+                  onClick={isPlayerName ? () => setProfilePlayer({ id: row.id, name: row.full_name }) : undefined}
+                  style={{
+                    border: `1px solid ${vars.border}`,
+                    padding: "0.5rem",
+                    ...(isPlayerName ? { cursor: "pointer", color: vars.primary, textDecoration: "underline" } : {}),
+                  }}
+                >
+                  {row[col]}
+                </td>
+              );
+            })}
           </tr>
         ))}
       </tbody>
     </table>
   );
 
+  const renderPlayersTable = () => {
+    const withPoints = data.map((row) => ({
+      ...row,
+      position: (() => {
+        try {
+          return (JSON.parse(row.allowed_positions || "[]")[0]) || "";
+        } catch (e) {
+          return "";
+        }
+      })(),
+      points: pointsMode === "projected" ? row.projectedPoints : row.actualPoints,
+      injurySummary: row.injury
+        ? `${row.injury}${row.game_status ? ` (${row.game_status})` : ""}`
+        : "",
+    }));
+
+    const query = playerSearch.trim().toLowerCase();
+    const filtered = withPoints.filter((row) =>
+      playerPositions.includes(row.position) &&
+      (!query || String(row.player).toLowerCase().includes(query))
+    );
+
+    const sorted = sortData(filtered);
+
+    const col = (key, label) => (
+      <th
+        key={key}
+        style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", cursor: "pointer" }}
+        onClick={() => handleSort(key)}
+      >
+        {label} {sortColumn === key ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+      </th>
+    );
+
+    return (
+      <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${vars.border}`, marginBottom: "2rem" }}>
+        <thead>
+          <tr>
+            {col("player", "Player")}
+            {col("position", "Pos")}
+            {col("team", "NFL Team")}
+            {col("fantasyTeam", "Fantasy Team")}
+            {col("points", pointsMode === "projected" ? "Projected Points" : "Actual Points")}
+            {col("injurySummary", "Injury")}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row) => (
+            <tr key={row.id}>
+              <td
+                onClick={() => setProfilePlayer({ id: row.id, name: row.player })}
+                style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", cursor: "pointer", color: vars.primary, textDecoration: "underline" }}
+              >
+                {row.player}
+              </td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.position}</td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.team}</td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.fantasyTeam || "Undrafted"}</td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>
+                {row.points != null ? Number(row.points).toFixed(1) : "—"}
+              </td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", color: row.injurySummary ? "#dc2626" : "inherit" }}>
+                {row.injurySummary}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
+  const renderProfileModal = () => {
+    if (!profilePlayer) return null;
+
+    const visibleStatCols = STAT_COLUMNS.filter(([col]) =>
+      profileRows.some((row) => Number(row.stats?.[col]) > 0)
+    );
+
+    return (
+      <div
+        onClick={() => setProfilePlayer(null)}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ background: vars.background, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "8px", padding: "1.5rem", maxWidth: "95vw", maxHeight: "85vh", overflow: "auto" }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h2 style={{ margin: 0 }}>{profilePlayer.name}</h2>
+            <button
+              onClick={() => setProfilePlayer(null)}
+              style={{ background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px", padding: "0.4rem 0.8rem", cursor: "pointer" }}
+            >
+              Close
+            </button>
+          </div>
+
+          {profileRows.length === 0 ? (
+            <p>No weekly data found for this player.</p>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+              <thead>
+                <tr>
+                  {["Week", "Opponent", "Actual", "FFToday", "FantasySharks", "ESPN"].map((h) => (
+                    <th key={h} style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: h === "Opponent" ? "left" : "right", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                  {visibleStatCols.map(([col, label]) => (
+                    <th key={col} style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right", whiteSpace: "nowrap" }}>{label}</th>
+                  ))}
+                  <th style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "left", whiteSpace: "nowrap" }}>Injury</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profileRows.map((row) => (
+                  <tr key={row.week}>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>{row.week === 0 ? "Pre" : row.week}</td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", fontWeight: row.week === profileByeWeek ? "bold" : "normal", color: row.week === profileByeWeek ? vars.foreground : "inherit" }}>
+                      {row.week === profileByeWeek ? "BYE" : (row.opponent ? `vs ${row.opponent}` : "—")}
+                    </td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right", fontWeight: "bold" }}>
+                      {row.actual != null ? Number(row.actual).toFixed(1) : "—"}
+                    </td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>
+                      {row.FFToday != null ? Number(row.FFToday).toFixed(1) : "—"}
+                    </td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>
+                      {row.FantasySharks != null ? Number(row.FantasySharks).toFixed(1) : "—"}
+                    </td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>
+                      {row.ESPN != null ? Number(row.ESPN).toFixed(1) : "—"}
+                    </td>
+                    {visibleStatCols.map(([col]) => (
+                      <td key={col} style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>
+                        {row.stats?.[col] ?? "—"}
+                      </td>
+                    ))}
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", color: row.injury ? "#dc2626" : "inherit", whiteSpace: "nowrap" }}>
+                      {row.injury || ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh", overflowX: "auto"}}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0 }}>Botblitz 2025</h1>
+        <h1 style={{ margin: 0 }}>Botblitz 2026</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <label htmlFor="week-select" style={{ fontSize: "0.9rem" }}>Week:</label>
@@ -562,6 +969,132 @@ function App() {
           onChange={(e) => setFilterText(e.target.value)}
           style={{ marginBottom: "1rem", padding: "0.5rem", width: "100%", background: vars.background, color: vars.foreground, border: `1px solid ${vars.border}` }}
         />
+      )}
+
+      {/* Controls for projections: week, source, position -- click column headers to rank/sort */}
+      {activeTab === "projections" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.9rem" }}>Week:</label>
+            <select
+              value={projWeek ?? ""}
+              onChange={(e) => setProjWeek(Number(e.target.value))}
+              style={{ padding: "0.4rem 0.6rem", background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px" }}
+            >
+              {projWeeks.map((w) => (
+                <option key={w} value={w}>{w === 0 ? "0 (preseason)" : w}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.9rem" }}>Source:</label>
+            <select
+              value={projSource ?? ""}
+              onChange={(e) => setProjSource(e.target.value)}
+              style={{ padding: "0.4rem 0.6rem", background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px" }}
+            >
+              {projSources.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <label style={{ fontSize: "0.9rem" }}>Position:</label>
+            {["QB", "RB", "WR", "TE", "K", "DST"].map((pos) => (
+              <label key={pos} style={{ fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                <input
+                  type="checkbox"
+                  checked={projPositions.includes(pos)}
+                  onChange={(e) => {
+                    setProjPositions((prev) =>
+                      e.target.checked ? [...prev, pos] : prev.filter((p) => p !== pos)
+                    );
+                  }}
+                />
+                {pos}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Controls for players: search, actual/projected toggle, week+source (shared with Projections tab) */}
+      {activeTab === "players" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
+          <input
+            type="text"
+            placeholder="Search players..."
+            value={playerSearch}
+            onChange={(e) => setPlayerSearch(e.target.value)}
+            style={{ padding: "0.5rem", minWidth: "220px", background: vars.background, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px" }}
+          />
+          <div style={{ display: "inline-flex", border: `1px solid ${vars.border}`, borderRadius: "4px", overflow: "hidden" }}>
+            {[
+              { key: "actual", label: "Actual" },
+              { key: "projected", label: "Projected" },
+            ].map((mode) => (
+              <button
+                key={mode.key}
+                onClick={() => setPointsMode(mode.key)}
+                style={{
+                  padding: "0.5rem 0.9rem",
+                  border: "none",
+                  cursor: "pointer",
+                  background: pointsMode === mode.key ? vars.primary : vars.muted,
+                  color: pointsMode === mode.key ? "#fff" : vars.foreground,
+                  fontSize: "0.85rem",
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.9rem" }}>
+              {pointsMode === "projected" ? "Projected as of week:" : "Injuries as of week:"}
+            </label>
+            <select
+              value={projWeek ?? ""}
+              onChange={(e) => setProjWeek(Number(e.target.value))}
+              style={{ padding: "0.4rem 0.6rem", background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px" }}
+            >
+              {projWeeks.map((w) => (
+                <option key={w} value={w}>{w === 0 ? "0 (preseason)" : w}</option>
+              ))}
+            </select>
+          </div>
+          {pointsMode === "projected" && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <label style={{ fontSize: "0.9rem" }}>Source:</label>
+              <select
+                value={projSource ?? ""}
+                onChange={(e) => setProjSource(e.target.value)}
+                style={{ padding: "0.4rem 0.6rem", background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px" }}
+              >
+                {projSources.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <label style={{ fontSize: "0.9rem" }}>Position:</label>
+            {["QB", "RB", "WR", "TE", "K", "DST"].map((pos) => (
+              <label key={pos} style={{ fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                <input
+                  type="checkbox"
+                  checked={playerPositions.includes(pos)}
+                  onChange={(e) => {
+                    setPlayerPositions((prev) =>
+                      e.target.checked ? [...prev, pos] : prev.filter((p) => p !== pos)
+                    );
+                  }}
+                />
+                {pos}
+              </label>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Error message */}
@@ -726,9 +1259,12 @@ function App() {
           );
         })
         )
+      ) : activeTab === "players" ? (
+        renderPlayersTable()
       ) : (
         renderTable(sortData(data), columns)
       )}
+      {renderProfileModal()}
     </div>
   );
 }

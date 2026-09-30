@@ -16,9 +16,16 @@ so that year will simply have thinner ESPN coverage than others).
 
 Storage: one sqlite file per year at data/ffanalytics/{year}/projections.db,
 deliberately separate from data/stats/{year}/stats.db (the ffpros/nflreadr scrape
-cache) and data/game_states/{year}/season.db (what bots actually read). Rows are
-kept per-source (not pre-averaged) so a consensus can be computed downstream with
-whatever weighting makes sense later.
+cache). Rows are kept per-source (not pre-averaged) so a consensus can be
+computed downstream with whatever weighting makes sense later.
+
+A bot only ever opens one database at runtime -- the season.db the engine
+bind-mounts into its container -- so it has no way to reach this file directly.
+Every fetch also tries to match its rows to season.db's own `players.id` by
+normalized (name, position) and land them in a new `external_projections`
+table *in that same season.db* (see write_back_to_season_db below). That's
+the table a bot should actually read from; skipped for years with no
+season.db yet (pure historical backfill that was never played).
 
 Two distinct operations, matching how this data actually gets used:
   - `refresh`: current week + the week after (so waiver/lineup bots always have a
@@ -33,7 +40,10 @@ Usage:
 """
 
 import argparse
+import datetime
+import json
 import os
+import re
 import subprocess
 import tempfile
 
@@ -46,6 +56,22 @@ _FETCH_SCRIPT = os.path.join(_REPO_ROOT, "fetch_ffanalytics_projections.R")
 
 _TABLE_NAME = "projections"
 _TOTAL_WEEKS = 18
+_BOT_TABLE_NAME = "external_projections"
+_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
+
+
+def _normalize_name(name) -> str:
+    if not isinstance(name, str):
+        return ""
+    name = name.lower().strip()
+    name = re.sub(r"[.'’]", "", name)
+    name = re.sub(r"[^a-z0-9 ]", " ", name)
+    tokens = [t for t in name.split() if t not in _SUFFIXES]
+    return " ".join(tokens)
+
+
+def _season_db_path(year: int) -> str:
+    return os.path.join(_REPO_ROOT, "data", "game_states", str(year), "season.db")
 
 
 def get_db_path(year: int) -> str:
@@ -149,11 +175,149 @@ def _year_has_week(year: int, week: int) -> bool:
         return result.first() is not None
 
 
+def write_back_to_season_db(df: pd.DataFrame, year: int) -> int:
+    """
+    Match ffanalytics rows to season.db's own `players.id` (== fantasypros_id) by
+    normalized (name, position), and upsert into a new `external_projections`
+    table in that same season.db file.
+
+    Why: bots only ever open one database at runtime -- the season.db the engine
+    bind-mounts into their container -- they have no access to
+    data/ffanalytics/{year}/projections.db (that path doesn't exist in the
+    container). Landing a matched copy in season.db is what actually makes this
+    data usable by a bot; it doesn't need to look like preseason_projections/
+    weekly_projections (no legacy FantasyPros columns here), just be reachable
+    through the one DB connection a bot has.
+
+    Skipped entirely for years with no season.db yet (pure historical backfill
+    years that were never actually played) -- nothing would ever read it there.
+    """
+    season_db = _season_db_path(year)
+    if df.empty or not os.path.isfile(season_db):
+        return 0
+
+    engine = create_engine(f"sqlite:///{season_db}")
+    if not inspect(engine).has_table("players"):
+        return 0
+
+    players = pd.read_sql("SELECT id, full_name, allowed_positions FROM players", engine)
+    players["name_key"] = players["full_name"].map(_normalize_name)
+    players["positions"] = players["allowed_positions"].apply(
+        lambda x: json.loads(x) if isinstance(x, str) else (x or [])
+    )
+    players_exploded = players.explode("positions").rename(columns={"positions": "position"})
+    players_exploded["position"] = players_exploded["position"].str.upper()
+
+    # Select only what's needed before merging -- ffanalytics' own add_player_info()
+    # already put a "position" column on df (distinct from "pos"), which would
+    # otherwise collide with players_exploded's "position" and get silently
+    # suffixed (position_x/position_y) instead of raising.
+    matched = df[["first_name", "last_name", "pos", "source", "points", "year", "week"]].copy()
+    matched["player_full"] = (matched["first_name"].fillna("") + " " + matched["last_name"].fillna("")).str.strip()
+    matched["name_key"] = matched["player_full"].map(_normalize_name)
+    matched["pos"] = matched["pos"].str.upper()
+
+    matched = matched.merge(
+        players_exploded[["id", "name_key", "position"]],
+        left_on=["name_key", "pos"], right_on=["name_key", "position"], how="inner",
+    )
+    if matched.empty:
+        return 0
+
+    out = matched[["id", "year", "week", "position", "source", "points"]].rename(
+        columns={"id": "fantasypros_id"}
+    )
+    out = out.dropna(subset=["fantasypros_id", "points"]).drop_duplicates(
+        subset=["fantasypros_id", "year", "week", "source"]
+    )
+    if out.empty:
+        return 0
+
+    insp = inspect(engine)
+    if insp.has_table(_BOT_TABLE_NAME):
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_{_BOT_TABLE_NAME}_unique
+                ON {_BOT_TABLE_NAME}(fantasypros_id, year, week, source)
+            """))
+        records = out.to_dict(orient="records")
+        metadata = MetaData()
+        table = Table(_BOT_TABLE_NAME, metadata, autoload_with=engine)
+        stmt = insert(table).values(records)
+        key_cols = ["fantasypros_id", "year", "week", "source"]
+        upsert_stmt = stmt.on_conflict_do_update(
+            index_elements=key_cols,
+            set_={c.key: c for c in stmt.excluded if c.key not in key_cols},
+        )
+        with engine.begin() as conn:
+            conn.execute(upsert_stmt)
+    else:
+        out.to_sql(_BOT_TABLE_NAME, con=engine, if_exists="replace", index=False)
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_{_BOT_TABLE_NAME}_unique
+                ON {_BOT_TABLE_NAME}(fantasypros_id, year, week, source)
+            """))
+
+    return len(out)
+
+
+def _load_raw_projections(year: int, week: int) -> pd.DataFrame:
+    """Reload already-fetched rows for (year, week) straight from the raw
+    ffanalytics store, no re-scraping -- used to repair season.db write-back
+    for weeks fetched before write_back_to_season_db existed."""
+    db_path = get_db_path(year)
+    if not os.path.isfile(db_path):
+        return pd.DataFrame()
+    engine = create_engine(f"sqlite:///{db_path}")
+    if not inspect(engine).has_table(_TABLE_NAME):
+        return pd.DataFrame()
+    return pd.read_sql(
+        text(f"SELECT * FROM {_TABLE_NAME} WHERE year = :year AND week = :week"),
+        engine, params={"year": year, "week": week},
+    )
+
+
+def repair_write_back(years: int, end_year: int) -> None:
+    """Re-run the season.db write-back for every already-fetched (year, week)
+    missing it, without re-scraping anything. Needed once because backfill's
+    skip_existing only checks the raw ffanalytics cache, not whether
+    write-back ever completed -- a week cached before write_back_to_season_db
+    existed (or one where a write-back attempt failed) stays silently missing
+    from season.db forever otherwise.
+    """
+    start_year = end_year - years + 1
+    for year in range(start_year, end_year + 1):
+        season_db = _season_db_path(year)
+        raw_db = get_db_path(year)
+        if not os.path.isfile(season_db) or not os.path.isfile(raw_db):
+            continue
+
+        raw_engine = create_engine(f"sqlite:///{raw_db}")
+        if not inspect(raw_engine).has_table(_TABLE_NAME):
+            continue
+        with raw_engine.connect() as conn:
+            raw_weeks = {w for (w,) in conn.execute(text(f"SELECT DISTINCT week FROM {_TABLE_NAME}"))}
+
+        season_engine = create_engine(f"sqlite:///{season_db}")
+        written_weeks = set()
+        if inspect(season_engine).has_table(_BOT_TABLE_NAME):
+            with season_engine.connect() as conn:
+                written_weeks = {w for (w,) in conn.execute(text(f"SELECT DISTINCT week FROM {_BOT_TABLE_NAME}"))}
+
+        for week in sorted(raw_weeks - written_weeks):
+            df = _load_raw_projections(year, week)
+            n = write_back_to_season_db(df, year)
+            print(f"Repaired year={year} week={week}: {n} matched into season.db")
+
+
 def fetch_and_store(year: int, week: int) -> int:
     print(f"Fetching ffanalytics projections: year={year} week={week}")
     df = fetch_projections(year, week)
     upsert_projections(df, year)
-    print(f"  -> {len(df)} rows ({df['source'].nunique() if not df.empty else 0} sources)")
+    matched_n = write_back_to_season_db(df, year)
+    print(f"  -> {len(df)} rows ({df['source'].nunique() if not df.empty else 0} sources), "
+          f"{matched_n} matched into season.db")
     return len(df)
 
 
@@ -166,13 +330,47 @@ def refresh(year: int, week: int) -> None:
         fetch_and_store(year, week + 1)
 
 
-def backfill(years: int, end_year: int) -> None:
-    """Preseason + every regular-season week, for each of the last `years` seasons."""
+# 2026 week 1 kickoff, per nflreadr::load_schedules(2026) -- same reference date
+# used in .github/workflows/update-scores.yml's PAST_DATE calculation.
+_2026_WEEK1_KICKOFF = datetime.datetime(2026, 9, 9, 8, 0, 0)
+
+
+def _last_playable_week(year: int) -> int:
+    """For the current calendar year, weeks that haven't happened yet don't
+    have real data on any source's site -- FFToday in particular throws a
+    dplyr error scraping an empty/future week's page. Past years are fully
+    played, so they always get the full 18."""
+    today = datetime.datetime.now()
+    if year != today.year:
+        return _TOTAL_WEEKS
+    if year != 2026:
+        return _TOTAL_WEEKS  # only 2026's kickoff date is known here
+    weeks_elapsed = (today - _2026_WEEK1_KICKOFF).days // 7 + 1
+    return max(0, min(_TOTAL_WEEKS, weeks_elapsed))
+
+
+def backfill(years: int, end_year: int, skip_existing: bool = True) -> None:
+    """Preseason + every played regular-season week, for each of the last `years` seasons.
+
+    skip_existing=True (the default) makes this resumable: a (year, week)
+    that already has rows is left alone, so a backfill that got interrupted
+    partway through just picks up where it stopped instead of redoing
+    everything already fetched. Pass False to force a full re-fetch.
+    """
     start_year = end_year - years + 1
     for year in range(start_year, end_year + 1):
-        fetch_and_store(year, 0)
-        for week in range(1, _TOTAL_WEEKS + 1):
+        if not (skip_existing and _year_has_week(year, 0)):
+            fetch_and_store(year, 0)
+        for week in range(1, _last_playable_week(year) + 1):
+            if skip_existing and _year_has_week(year, week):
+                continue
             fetch_and_store(year, week)
+
+    # A week can be "cached" (skip_existing sees it and moves on) without ever
+    # having made it into season.db -- e.g. rows fetched before
+    # write_back_to_season_db existed. Sweep for that every run so it can't
+    # go silently stale again.
+    repair_write_back(years, end_year)
 
 
 def parse_args() -> argparse.Namespace:
@@ -186,6 +384,11 @@ def parse_args() -> argparse.Namespace:
     b = sub.add_parser("backfill", help="Fetch preseason + all weeks for the last N years. Run by hand, not on a schedule.")
     b.add_argument("--years", type=int, default=5)
     b.add_argument("--end-year", type=int, default=None, help="Most recent year to include (default: current calendar year).")
+    b.add_argument("--full-refresh", action="store_true", help="Re-fetch every (year, week) even if already present (default: skip what's already there, so an interrupted backfill resumes).")
+
+    rp = sub.add_parser("repair", help="Re-run season.db write-back for already-fetched (year, week) pairs missing it. No re-scraping. Also runs automatically at the end of every backfill.")
+    rp.add_argument("--years", type=int, default=5)
+    rp.add_argument("--end-year", type=int, default=None)
 
     return ap.parse_args()
 
@@ -197,9 +400,13 @@ def main():
     elif args.command == "backfill":
         end_year = args.end_year
         if end_year is None:
-            import datetime
             end_year = datetime.date.today().year
-        backfill(args.years, end_year)
+        backfill(args.years, end_year, skip_existing=not args.full_refresh)
+    elif args.command == "repair":
+        end_year = args.end_year
+        if end_year is None:
+            end_year = datetime.date.today().year
+        repair_write_back(args.years, end_year)
 
 
 if __name__ == "__main__":
