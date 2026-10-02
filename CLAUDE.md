@@ -20,8 +20,20 @@ the draft/scoring data model to **SQLite**.
 - **Python (`blitz_env/`, `py_grpc_server/`, `bots/`)** — the runtime bot SDK (`blitz_env`),
   the gRPC server that runs inside each container, stats-collection scripts, and user bots.
 - **Python (`harness/`)** — local testing/simulation (NOT shipped to the container).
-- **R (`fetch_ranks.R`)** — legacy ranking scraper; `player_ranks_*.csv` are the artifacts.
-- **JS/React (`ux/`)** — a Datasette-backed web viewer (create-react-app).
+- **R (`fetch_ranks.R`, `fetch_projections.R`, `fetch_stats.R`, `fetch_injuries.R`,
+  `fetch_playerids.R`, `fetch_ffanalytics_projections.R`)** — all network sourcing for
+  the bootstrap pipeline (draftable pool, projections, actual stats, injuries, ID
+  crosswalk, multi-source projections), via the ffverse (`ffpros`, `nflreadr`) and
+  `ffanalytics`. This is the one place that logic lives; Python only shells out to
+  these scripts and handles the SQLite upsert.
+- **JS/React (`ux/`)** — a season.db viewer (create-react-app). Loads a season.db
+  directly in the browser via `sql.js` (WASM SQLite) — either the local copy at
+  `ux/public/season.db` (`npm run start:local`, which copies it in first) or, on a
+  deployed build, `data/game_states/2026/season.db` fetched from a given git branch
+  (`?branch=` URL param, defaults to `main`). Tabs: Current/Last Week, Matchup
+  Details, Leaderboard, Rosters, Projections, and Players (searchable, sortable,
+  actual-vs-projected toggle, click a player for a full weekly profile —
+  points/stats/opponent/injury side by side with every projection source).
 
 ## 3. ⚠️ Guardrails (read before refactoring)
 
@@ -157,9 +169,10 @@ league-state tables per mock draft. The repo currently ships a complete **2025**
 
 ### Scrape cache (build input): `data/stats/{year}/stats.db`
 The slow/network artifact that `build-season` reads offline. Created by the
-`bootstrap_data scrape` phase (FantasyPros stats/projections + NFL.com injuries).
-**Bots never read this file** — it is a build input only. Retained in git as the
-cache for rebuilds.
+`bootstrap_data scrape` phase — projections via `ffpros` (`fetch_projections.R`),
+actual stats via `nflreadr` (`fetch_stats.R`), both R, both invoked by
+`blitz_env/collect_stats.py`. **Bots never read this file** — it is a build input
+only. Retained in git as the cache for rebuilds.
 
 ### The `bootstrap_data` CLI (`blitz_env/bootstrap_data.py`)
 Two phases mirroring the user's mental model:
@@ -194,9 +207,39 @@ const seasonDatabaseFileName = "season" + fileSuffix       // "season.db"
 ```
 
 ### Injury data
-Scraped from NFL.com; fuzzy-matched (rapidfuzz) on `(year, week, player_name, position)` to
-FantasyPros IDs. Fields: `player_name`, `team`, `position`, `injury`, `practice_status`,
-`game_status`, `fantasypros_id`, `gsis_id`, `sleeper_id`.
+Sourced from nflverse (`nflreadr::load_injuries`, via `fetch_injuries.R` — one request per
+season) and exact-joined on `gsis_id` to FantasyPros IDs using the dynastyprocess ID
+crosswalk (`blitz_env/load_injuries_nflverse.py`). Requires `Rscript` + the R `nflreadr`
+package at scrape time (installable from the ffverse r-universe, like `ffpros`). Fields:
+`player_name`, `team`, `position`, `injury`, `practice_status`, `game_status`,
+`fantasypros_id`, `gsis_id`, `sleeper_id`. ~25% of rows have no `fantasypros_id` (players
+outside FantasyPros' ranked pool aren't in the crosswalk) — that's an acceptable trade for
+dropping the old NFL.com scraper's fuzzy name matching, which could silently mismatch players
+(e.g. it once matched "Jawaan Taylor" to "Taywan Taylor" at an 80% score). The old
+`blitz_env/download_injuries.py` scraper was removed in the 2026 season prep.
+
+### Projections and actual stats (ffpros / nflreadr)
+`preseason_projections`/`weekly_projections` are sourced from FantasyPros via
+`ffpros::fp_projections` (`fetch_projections.R`, `blitz_env/load_projections_ffpros.py`).
+`season_stats`/`weekly_stats` (actuals, including DST) are sourced from nflverse via
+`nflreadr::load_player_stats`/`load_team_stats` (`fetch_stats.R`,
+`blitz_env/load_stats_nflreadr.py`); DST FPTS is an approximated standard scoring
+formula since nflreadr has no fantasy-points endpoint for team defenses. The old
+`blitz_env/stats_db.py`/`projections_db.py` FantasyPros HTML scrapers (and the
+`download_stats.py`/`download_projections.py`/`download-weekly-data.yml` S3 path
+that depended on them) were removed in the 2026 season prep.
+
+**Legacy column aliases:** both tables keep every original FantasyPros-scrape
+column name (`FPTS`, `PASSING_YDS`, `RUSHING_ATT`, ...) as an alias of the new
+source's native column, computed alongside (not instead of) the native lowercase
+columns (`fantasy_points_ppr`, `passing_yds`, ...) — so existing bots keep working
+unchanged, and new code can use the cleaner native names. A few legacy columns
+with no clean equivalent (`ROST`, `Y/A`, `LG`, `20+`, `pos_rank`, `FPTS/G`, DST
+`YDS AGN`) were dropped; no bot in `bots/nfl2025` reads them (verified before this
+migration). Because SQLite column names are case-insensitive, a native column
+that would collide with a legacy alias by case alone (e.g. ffpros' `fpts` vs.
+legacy `FPTS`) is renamed to `..._native` to keep the exact-case legacy name free
+— see `_free_case_collision` in both loader modules.
 
 ### Archived dev snapshots
 `data/archive/{year}/` holds old snapshots used only by `make launch-simulator`, not
@@ -208,15 +251,86 @@ production. For 2025 this includes the pre-consolidation `gs-draft.db` / `gs-sea
 python3 -m blitz_env.bootstrap_data scrape --year 2025          # -> data/stats/2025/stats.db
 python3 -m blitz_env.bootstrap_data build-season --year 2025    # -> data/game_states/2025/season.db
 ```
-The `scrape` phase makes ~180 HTTP requests to NFL.com for injury data; 5–10 min,
-possible rate limiting.
+Both `make bootstrap-data-scrape` and the bare CLI default to `--years 5`. The ffpros/
+nflreadr-backed pipeline (one request per season/week via R, not a per-page HTML scrape)
+makes this fast, but 5 years is plenty of history for evaluation purposes — a few
+minutes, mostly bound by the weekly stats/projections loop.
+
+### Multi-source projections (ffanalytics): `data/ffanalytics/{year}/projections.db`
+FantasyPros' own projections pages — what `ffpros`/`fetch_projections.R` scrape for
+`preseason_projections`/`weekly_projections` — cap out at ~10 rows per position
+regardless of year or week (confirmed via direct HTTP checks against fantasypros.com;
+it's a site-side limitation, not a scraper bug, and it affects every year in the table,
+not just the current season). As a broader-coverage supplement, `fetch_ffanalytics_projections.R`
++ `blitz_env/collect_ffanalytics_projections.py` pull from the
+[ffanalytics](https://github.com/FantasyFootballAnalytics/ffanalytics) R package, which
+aggregates many fantasy sites. Of everywhere ffanalytics can pull from, only three
+sources were confirmed (by fetching their raw HTTP responses directly, not just trusting
+the R wrapper) to serve real season/week-specific data rather than always redirecting to
+the live/current page: **FFToday** (draft+weekly, ~2010+), **FantasySharks** (draft+weekly,
+2018+), and **ESPN** (draft 2018+, weekly 2019+ — and its 2023 preseason data is mostly
+NA on ESPN's own end, not fixable locally). Every other source in ffanalytics (CBS,
+FanDuel/NumberFire, RTSports, Walterfootball, and ffanalytics' own FantasyPros scrape)
+was verified to ignore the season/week params entirely and always return live data —
+not used here.
+
+Storage is a **separate** sqlite file per year (`data/ffanalytics/{year}/projections.db`,
+table `projections`), deliberately apart from `data/stats/{year}/stats.db` and
+`data/game_states/{year}/season.db`. Rows are kept **per-source and per-raw-stat**
+(`pass_yds`, `rec_tds`, `rush_att`, ...), not pre-averaged into one consensus number —
+a `points` column computed under this league's PPR scoring rides alongside for
+convenience, but the raw stat lines are what's kept so a different scoring system can
+be recomputed later without re-scraping.
+
+Three operations:
+- `make bootstrap-data-ffanalytics-refresh YEAR=Y WEEK=W` — current week + the week
+  after (plus preseason if that year has none yet). Meant to run every time weekly
+  data is fetched; wired into `update-scores.yml` as a non-critical step.
+- `make bootstrap-data-ffanalytics-backfill` — preseason + every played regular-season
+  week, for the last 5 years. Resumable (`skip_existing`, the default): an interrupted
+  run picks up where it stopped instead of redoing what's already fetched; pass
+  `--full-refresh` to force everything anyway. For the current calendar year, stops at
+  whatever week has actually been played (`_last_playable_week`) — the sources don't
+  have real data for weeks that haven't happened yet. Occasional/manual, never on a
+  schedule; ends by calling `repair` (below).
+- `make bootstrap-data-ffanalytics-repair` — re-runs the season.db write-back (below)
+  for any already-fetched `(year, week)` missing it, no re-scraping. Exists because
+  `skip_existing` only checks the raw ffanalytics cache, not whether write-back ever
+  succeeded — a week fetched before write-back existed (or where it failed) would
+  otherwise stay silently missing from season.db forever. Runs automatically at the
+  end of every backfill.
+
+**season.db write-back (`external_projections` table):** a bot only ever opens one
+database at runtime — the season.db the engine bind-mounts into its container — so it
+can't reach `data/ffanalytics/{year}/projections.db` directly. Every fetch also
+name-matches its rows against that year's `season.db` `players` table (normalized
+`(name, position)`, no shared player id between the two pipelines) and upserts into a
+new `external_projections` table (`fantasypros_id, year, week, position, source,
+points`) in that same file — skipped for years with no season.db yet. That's the table
+a bot (or `ux/`) should actually read from. See `bots/nfl2026/chris_bot.py` for an
+example — it reads `external_projections` filtered to `source = 'FantasySharks'`.
+
+### NFL schedule: `schedule` table in season.db
+`fetch_schedule.R` + `blitz_env/collect_schedule.py` (`make bootstrap-data-schedule
+YEAR=Y`) pull the full season schedule via `nflreadr::load_schedules()` — every week,
+played or not — into a `schedule` table (`year, week, team, opponent, is_home`) in
+that year's season.db. This is what lets `ux/`'s player profile show a real opponent
+for *future* weeks; `weekly_stats.opponent_team` only exists for games already played.
+Same team-abbreviation normalization as DST stats (`_TEAM_ABBR_TO_POOL` in
+`load_stats_nflreadr.py`, e.g. nflreadr's `LA` → the pool's `LAR`). Wired into
+`update-scores.yml` as a non-critical step alongside the ffanalytics refresh.
 
 ## 10. CI / GitHub Actions
 
 `.github/workflows/`: `update-scores.yml`, `weekly-fantasy.yml`, `finish-week.yml`,
-`download-weekly-data.yml`, `core-validations.yml`. Several scheduled triggers are disabled
-for the offseason. `update-scores` treats weekly **stats** as mission-critical (must succeed)
-and **projections/injuries** as best-effort (continue-on-failure).
+`core-validations.yml` (`download-weekly-data.yml`, the old pre-consolidation S3 pipeline,
+was removed in the 2026 season prep). `update-scores.yml`'s `schedule:` trigger is enabled
+(game-day cron windows, `PAST_DATE` set to the 2026-09-09 week-1 kickoff); `weekly-fantasy.yml`
+and `finish-week.yml` are still `workflow_dispatch`-only (manual) — `weekly-fantasy.yml` in
+particular still defaults to the engine's stale `-year 2025` flag if run without an explicit
+override, a known but unfixed gap since it's not scheduled. `update-scores` treats weekly
+**stats** as mission-critical (must succeed) and **projections/injuries/schedule** as
+best-effort (continue-on-failure).
 
 ## 11. Caveats
 
@@ -227,3 +341,13 @@ and **projections/injuries** as best-effort (continue-on-failure).
   committed.
 - ~120 MB of old binaries/DBs linger in git history (out of scope to purge; would need
   `git filter-repo` + force-push).
+- **Footgun, fixed but easy to reintroduce:** any pandas `read_csv` column that's numeric
+  with some missing values gets read as `float64` (can't hold `NaN` as `int`). If that
+  column is an id later compared against `players.id` (a plain string like `"11687"`),
+  writing the float straight to sqlite silently produces `"11687.0"` — a value that will
+  never equal `"11687"` in a join, with no error anywhere. This actually happened to
+  `player_id_crosswalk.py`'s `fantasypros_id`/`sleeper_id` and corrupted `fantasypros_id`
+  across most of `weekly_stats`/`season_stats`/`weekly_injuries` for a while (DST was
+  unaffected — it's matched a different way, straight from `players.id`). Fixed by
+  formatting those columns as clean integer strings right after the crosswalk loads. Any
+  new id column sourced this way needs the same treatment.

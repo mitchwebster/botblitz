@@ -8,9 +8,11 @@ toolchain are available.
 
 ## Prerequisites
 
-- **R + the `ffpros` package** (for `fetch_ranks.R`). Not required for any other
-  part of the engine; only for generating the rank CSV.
-- Network access to FantasyPros and NFL.com.
+- **R + the `ffpros` and `nflreadr` packages** (from the ffverse r-universe: `install.packages(c("ffpros","nflreadr"), repos="https://ffverse.r-universe.dev")`).
+  `ffpros` generates the rank CSV (`fetch_ranks.R`); `nflreadr` sources weekly
+  injuries (`fetch_injuries.R`), invoked automatically during `scrape`. Not
+  required for any other part of the engine.
+- Network access to FantasyPros and the nflverse-data GitHub releases.
 
 ## Steps
 
@@ -24,8 +26,9 @@ toolchain are available.
    any year that has a CSV — no code change needed to add a year.)
 
 2. **Scrape the reference data** into the scrape cache
-   `data/stats/Y/stats.db` (network; ~180 NFL.com requests for injuries, 5–10 min,
-   possible rate limiting):
+   `data/stats/Y/stats.db` (network; a few minutes, mostly stats/projections —
+   injuries are one nflverse request per season and need `Rscript` + the R
+   `nflreadr` package installed, same as `fetch_ranks.R`'s `ffpros`):
 
        make bootstrap-data-scrape YEAR=Y
 

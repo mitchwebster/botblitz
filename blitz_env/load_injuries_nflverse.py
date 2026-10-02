@@ -1,0 +1,55 @@
+"""Weekly injury reports sourced from nflverse (via R's nflreadr).
+
+Replaces the retired NFL.com HTML scraper: one network request per season
+(instead of one per team/week) via `fetch_injuries.R`, and an exact join on
+`gsis_id` against the ID crosswalk (instead of fuzzy name matching) to
+recover `fantasypros_id`.
+"""
+
+import os
+import subprocess
+import tempfile
+
+import pandas as pd
+
+from blitz_env.player_id_crosswalk import load_player_id_crosswalk
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_FETCH_SCRIPT = os.path.join(_REPO_ROOT, "fetch_injuries.R")
+
+
+def fetch_season_injuries(year: int) -> pd.DataFrame:
+    """Pull one season of nflverse injury reports, joined to FantasyPros IDs."""
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        out_path = tmp.name
+
+    try:
+        subprocess.run(
+            ["Rscript", _FETCH_SCRIPT, str(year), out_path],
+            check=True, capture_output=True, text=True, timeout=60,
+        )
+        if not os.path.isfile(out_path) or os.path.getsize(out_path) == 0:
+            return pd.DataFrame()
+        raw = pd.read_csv(out_path)
+    finally:
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+    if raw.empty:
+        return pd.DataFrame()
+
+    merged = raw.merge(load_player_id_crosswalk(), on="gsis_id", how="left")
+
+    return pd.DataFrame({
+        "year": merged["season"],
+        "week": merged["week"],
+        "team": merged["team"],
+        "position": merged["position"],
+        "player_name": merged["full_name"],
+        "injury": merged["report_primary_injury"],
+        "practice_status": merged["practice_status"],
+        "game_status": merged["report_status"],
+        "fantasypros_id": merged["fantasypros_id"],
+        "gsis_id": merged["gsis_id"],
+        "sleeper_id": merged["sleeper_id"],
+    })

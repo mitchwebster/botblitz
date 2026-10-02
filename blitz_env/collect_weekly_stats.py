@@ -2,9 +2,8 @@
 """
 Grab a weeks data and add it to the sqlite database.
 
-Requirements (import paths may need tweaking for your project):
-- load_nfl_projections_all_positions(year) -> pd.DataFrame
-- fp_seasonal_years(position: str, years: list[int]) -> pd.DataFrame
+Sourced from nflverse (R's nflreadr) via blitz_env/load_stats_nflreadr.py --
+see that module for the legacy-column alias policy.
 
 Usage:
   python collect_weekly_stats.py --db stats.db --year 2025 --week 1
@@ -18,8 +17,26 @@ from sqlalchemy import create_engine, inspect, MetaData, Table, text
 from sqlalchemy.dialects.sqlite import insert
 import os
 
-# --- Adjust these imports to your project structure if needed ---
-from blitz_env.download_stats import get_stats_for_week
+from blitz_env.load_stats_nflreadr import fetch_season_stats
+
+
+def get_stats_for_week(year: int, week: int) -> pd.DataFrame:
+    """Fetch offense + DST actuals for a specific week."""
+    offense, dst = fetch_season_stats(year, summary_level="week")
+    parts = [df[df["week"] == week] for df in (offense, dst) if df is not None and not df.empty]
+    parts = [df for df in parts if not df.empty]
+    if not parts:
+        return pd.DataFrame()
+    for i, df in enumerate(parts):
+        if "year" not in df.columns:
+            df = df.copy()
+            df["year"] = year
+            parts[i] = df
+    combined = pd.concat(parts, ignore_index=True, sort=False)
+    if "FPTS" in combined.columns:
+        combined.sort_values(by="FPTS", ascending=False, inplace=True)
+    return combined
+
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Add weekly data to stats.db for year and week")

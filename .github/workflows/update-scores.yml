@@ -2,21 +2,21 @@ name: BotBlitz Update Scores Workflow
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   # Thursday Night Football (+4h, Friday 12:15 AM ET → 05:15 UTC)
-  #   - cron: "15 5 * * 5"
+  schedule:
+    # Thursday Night Football (+4h, Friday 12:15 AM ET → 05:15 UTC)
+    - cron: "15 5 * * 5"
 
-  #   # Sunday 1 PM Game (+4h, 5 PM ET → 22:00 UTC)
-  #   - cron: "0 22 * * 0"
+    # Sunday 1 PM Game (+4h, 5 PM ET → 22:00 UTC)
+    - cron: "0 22 * * 0"
 
-  #   # Sunday 4:25 PM Game (+4h, 8:25 PM ET → 01:25 UTC Monday)
-  #   - cron: "25 1 * * 1"
+    # Sunday 4:25 PM Game (+4h, 8:25 PM ET → 01:25 UTC Monday)
+    - cron: "25 1 * * 1"
 
-  #   # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
-  #   - cron: "20 5 * * 1"
+    # Sunday Night Football (+4h, 12:20 AM ET Monday → 05:20 UTC Monday)
+    - cron: "20 5 * * 1"
 
-  #   # Monday Night Football (+4h, 12:20 AM ET Tuesday → 05:20 UTC Tuesday)
-  #   - cron: "20 5 * * 2"
+    # Monday Night Football (+4h, 12:20 AM ET Tuesday → 05:20 UTC Tuesday)
+    - cron: "20 5 * * 2"
 
 jobs:
   buildAndTest:
@@ -68,10 +68,19 @@ jobs:
         python3 -m pip install --upgrade pip
         pip3 install -r requirements.txt
 
+    - name: Set up R
+      uses: r-lib/actions/setup-r@v2
+
+    - name: Install R packages (ffverse)
+      run: |
+        Rscript -e 'install.packages(c("dplyr","readr","purrr","ffpros","nflreadr","remotes"), repos = c("https://ffverse.r-universe.dev", "https://cloud.r-project.org"))'
+        Rscript -e 'remotes::install_github("FantasyFootballAnalytics/ffanalytics", upgrade="never")'
+
     - name: Calculate current week and run scripts
       run: |
-        # Calculate the difference in seconds from September 4, 2025, 8 AM UTC
-        PAST_DATE=$(date -d '2025-09-04 08:00:00 UTC' +%s)
+        # Calculate the difference in seconds from September 9, 2026, 8 AM UTC
+        # (2026 week 1 kickoff, per nflreadr::load_schedules(2026))
+        PAST_DATE=$(date -d '2026-09-09 08:00:00 UTC' +%s)
         NOW=$(date +%s)
 
         # Calculate the number of weeks since the past date using integer division
@@ -85,14 +94,6 @@ jobs:
         # Append weekly stats directly into season.db (mission critical - must succeed)
         python3 -m blitz_env.collect_weekly_stats --year 2026 --week $CURRENT_WEEK --db data/game_states/2026/season.db
 
-        # Append weekly projections into season.db (important but not critical - continue on failure)
-        echo "Collecting weekly projections for week $(( CURRENT_WEEK + 1 ))..."
-        if python3 -m blitz_env.collect_weekly_projections --year 2026 --week $(( CURRENT_WEEK + 1 )) --db data/game_states/2026/season.db; then
-          echo "✓ Weekly projections collected successfully"
-        else
-          echo "⚠ Warning: Failed to collect weekly projections (non-critical, continuing)"
-        fi
-
         # Append weekly injuries into season.db (important but not critical - continue on failure)
         echo "Collecting weekly injuries..."
         if python3 -m blitz_env.collect_weekly_injuries --year 2026 --week $CURRENT_WEEK --db data/game_states/2026/season.db; then
@@ -100,7 +101,29 @@ jobs:
         else
           echo "⚠ Warning: Failed to collect weekly injuries (non-critical, continuing)"
         fi
-    
+
+        # Weekly projections: ffanalytics (FFToday + FantasySharks + ESPN),
+        # current + next week, stored separately in data/ffanalytics/2026/.
+        # Replaces the old FantasyPros-sourced weekly_projections fetch --
+        # FantasyPros' own projections page caps at ~10 rows/position
+        # regardless of year/week, a site-side limit confirmed via direct
+        # HTTP checks, so it's no longer fetched here at all.
+        echo "Collecting ffanalytics projections (current + next week)..."
+        if python3 -m blitz_env.collect_ffanalytics_projections refresh --year 2026 --week $CURRENT_WEEK; then
+          echo "✓ ffanalytics projections collected successfully"
+        else
+          echo "⚠ Warning: Failed to collect ffanalytics projections (non-critical, continuing)"
+        fi
+
+        # NFL schedule (every week, played or not) -- lets the UI show a real
+        # opponent for future weeks, not just ones with actuals already in.
+        echo "Collecting NFL schedule..."
+        if python3 -m blitz_env.collect_schedule --year 2026; then
+          echo "✓ Schedule collected successfully"
+        else
+          echo "⚠ Warning: Failed to collect schedule (non-critical, continuing)"
+        fi
+
     - name: Update fantasy week scores
       run: go run pkg/cmd/engine_bootstrap.go -game_mode=UpdateWeeklyScores -year=2026
 
@@ -113,6 +136,7 @@ jobs:
         commit-message: '[Automated] Weekly Score Updates'
         add-paths: |
             data/game_states/2026/season.db
+            data/ffanalytics/2026/projections.db
         branch: update-weekly-scores
         auto-merge-method: squash
     

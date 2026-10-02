@@ -2,6 +2,9 @@
 """
 Grab a week's projection data and add it to the sqlite database.
 
+Sourced from FantasyPros via R's ffpros (blitz_env/load_projections_ffpros.py) --
+see that module for the legacy-column alias policy.
+
 Usage:
   python collect_weekly_projections.py --db data/stats/2025/stats.db --year 2025 --week 1
 """
@@ -13,34 +16,19 @@ from sqlalchemy import create_engine, inspect, MetaData, Table, text
 from sqlalchemy.dialects.sqlite import insert
 import os
 
-from blitz_env.projections_db import fp_projections
+from blitz_env.load_projections_ffpros import fetch_projections
 
 
 def get_projections_for_week(year: int, week: int) -> pd.DataFrame:
     """Fetch weekly projections for a specific week"""
-    week_str = str(week)
-
-    all_positions = []
-
-    for pos in ("rb", "qb", "wr", "te", "k", "dst"):
-        try:
-            df = fp_projections(page=pos, sport='nfl', year=year, week=week_str, scoring='PPR')
-            if 'year' not in df.columns:
-                df['year'] = year
-            df['week'] = week
-            df['position'] = df['position'].str.upper()
-            all_positions.append(df)
-        except Exception as e:
-            print(f"Warning: Failed to get projections for {pos}: {e}")
-            continue
-
-    if not all_positions:
-        return pd.DataFrame()
-
-    combined_df = pd.concat(all_positions, ignore_index=True)
-    combined_df.sort_values(by="FPTS", ascending=False, inplace=True)
-
-    return combined_df
+    df = fetch_projections(year, [week])
+    if df.empty:
+        return df
+    if 'year' not in df.columns:
+        df['year'] = year
+    if "FPTS" in df.columns:
+        df.sort_values(by="FPTS", ascending=False, inplace=True)
+    return df
 
 
 def parse_args() -> argparse.Namespace:
