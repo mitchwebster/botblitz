@@ -16,15 +16,15 @@ def get_projections_df():
       "K": 13,
       "DST": 13
     }
-    # FantasySharks projections (via ffanalytics), matched into season.db's
+    # ESPN preseason projections (via ffanalytics), matched into season.db's
     # external_projections table. preseason_projections (FantasyPros/ffpros)
     # caps out at ~10 players/position regardless of year -- not usable here.
-    # FantasySharks was picked over ESPN specifically because ESPN's own DST
-    # scrape is broken (zero rows for that position); FantasySharks covers
-    # every position, DST included.
+    # ESPN's own DST scrape is broken (zero rows for that position) -- DST
+    # just won't appear in this table at all, handled below with a left join
+    # so DST players get a neutral value instead of vanishing from the pool.
     projections_df = pd.read_sql(
         f"SELECT fantasypros_id, position, points AS FPTS FROM external_projections "
-        f"WHERE year = {year} AND week = 0 AND source = 'FantasySharks'",
+        f"WHERE year = {year} AND week = 0 AND source = 'ESPN'",
         db.engine
     )
 

@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from "react";
 
+// Shared position color coding (draft board, players list, projections).
+const POSITION_COLORS = {
+  QB: "#3b6fd4",
+  RB: "#1f9e6d",
+  WR: "#d4732e",
+  TE: "#8b5fc9",
+  K: "#b8952e",
+  DST: "#5b6470",
+};
+
+function PositionPill({ position }) {
+  const color = POSITION_COLORS[position] || "#5b6470";
+  return <span style={{ color, fontWeight: 700 }}>{position}</span>;
+}
+
 // weekly_stats' curated legacy-alias columns (see blitz_env/load_stats_nflreadr.py) --
 // a player profile only shows whichever of these actually have a nonzero
 // value for that player, so QBs get passing stats, DST gets defensive stats, etc.
@@ -289,7 +304,7 @@ function App() {
     if (!db) return;
     if (activeTab === "projections" || activeTab === "players") {
       if (projWeek === null || projSource === null) return;
-    } else if (selectedWeek === null) {
+    } else if (activeTab !== "draftBoard" && selectedWeek === null) {
       return;
     }
 
@@ -321,6 +336,22 @@ function App() {
         botsExists = tableCheck.length > 0 && tableCheck[0].values.length > 0;
       } catch (e) {
         botsExists = false;
+      }
+    }
+
+    if (activeTab === "draftBoard") {
+      let mockDraftExists = false;
+      try {
+        const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='mock_draft_picks';");
+        mockDraftExists = tableCheck.length > 0 && tableCheck[0].values.length > 0;
+      } catch (e) {
+        mockDraftExists = false;
+      }
+      if (!mockDraftExists) {
+        setError("No mock draft has been run against this db yet. Run harness.cli_draft (writes to season.db's mock_draft_picks table by default).");
+        setColumns([]);
+        setData([]);
+        return;
       }
     }
 
@@ -470,6 +501,17 @@ function App() {
         LEFT JOIN weekly_injuries wi ON wi.fantasypros_id = p.id AND wi.week = ${projWeek} AND wi.year = ${CURRENT_SEASON_YEAR}
         ORDER BY actualPoints DESC
       `,
+      draftBoard: `
+        SELECT
+          mdp.pick, mdp.round, mdp.team_slot, mdp.team_name, mdp.team_owner, mdp.is_user,
+          mdp.fantasypros_id, mdp.player_name, mdp.position, mdp.nfl_team, mdp.bot_label,
+          COALESCE(ap.actualPoints, 0) AS actualPoints
+        FROM mock_draft_picks mdp
+        LEFT JOIN (
+          SELECT fantasypros_id, SUM(FPTS) AS actualPoints FROM weekly_stats WHERE year = ${CURRENT_SEASON_YEAR} GROUP BY fantasypros_id
+        ) ap ON ap.fantasypros_id = mdp.fantasypros_id
+        ORDER BY mdp.pick
+      `,
     };
 
     const query = queries[activeTab];
@@ -571,6 +613,7 @@ function App() {
     { key: "rosters", label: "Rosters" },
     { key: "projections", label: "Projections" },
     { key: "players", label: "Players" },
+    { key: "draftBoard", label: "Draft Board" },
   ];
 
   const handleSort = (col) => {
@@ -708,10 +751,10 @@ function App() {
                   style={{
                     border: `1px solid ${vars.border}`,
                     padding: "0.5rem",
-                    ...(isPlayerName ? { cursor: "pointer", color: vars.primary, textDecoration: "underline" } : {}),
+                    ...(isPlayerName ? { cursor: "pointer", textDecoration: "underline" } : {}),
                   }}
                 >
-                  {row[col]}
+                  {col === "position" && POSITION_COLORS[row[col]] ? <PositionPill position={row[col]} /> : row[col]}
                 </td>
               );
             })}
@@ -772,11 +815,11 @@ function App() {
             <tr key={row.id}>
               <td
                 onClick={() => setProfilePlayer({ id: row.id, name: row.player })}
-                style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", cursor: "pointer", color: vars.primary, textDecoration: "underline" }}
+                style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", cursor: "pointer", textDecoration: "underline" }}
               >
                 {row.player}
               </td>
-              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.position}</td>
+              <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}><PositionPill position={row.position} /></td>
               <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.team}</td>
               <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.fantasyTeam || "Undrafted"}</td>
               <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>
@@ -789,6 +832,107 @@ function App() {
           ))}
         </tbody>
       </table>
+    );
+  };
+
+  const renderDraftBoard = () => {
+    if (data.length === 0) return <p>No draft data.</p>;
+
+    const teamsMap = new Map();
+    data.forEach((r) => { if (!teamsMap.has(r.team_slot)) teamsMap.set(r.team_slot, r); });
+    const teams = [...teamsMap.values()].sort((a, b) => a.team_slot - b.team_slot);
+    const teamTotals = new Map();
+    data.forEach((r) => {
+      teamTotals.set(r.team_slot, (teamTotals.get(r.team_slot) || 0) + Number(r.actualPoints || 0));
+    });
+    const numRounds = Math.max(...data.map((r) => r.round));
+    const cellMap = new Map(data.map((r) => [`${r.round}-${r.team_slot}`, r]));
+    const botLabel = data[0]?.bot_label;
+    const leaderboard = [...teams]
+      .map((t) => ({ ...t, total: teamTotals.get(t.team_slot) || 0 }))
+      .sort((a, b) => b.total - a.total);
+
+    return (
+      <>
+        <table style={{ width: "100%", maxWidth: "480px", borderCollapse: "collapse", border: `1px solid ${vars.border}`, marginBottom: "1.5rem" }}>
+          <thead>
+            <tr>
+              <th style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", textAlign: "left" }}>Rank</th>
+              <th style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", textAlign: "left" }}>Team</th>
+              <th style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", textAlign: "right" }}>Total Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.map((t, idx) => (
+              <tr key={t.team_slot} style={{ background: t.is_user ? vars.primary : "transparent", color: t.is_user ? "#fff" : vars.foreground }}>
+                <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{idx + 1}</td>
+                <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{t.team_name} ({t.team_owner})</td>
+                <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", textAlign: "right", fontWeight: 600 }}>{t.total.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p style={{ marginBottom: "0.75rem" }}><strong>{botLabel}</strong>'s column is highlighted below.</p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", border: `1px solid ${vars.border}`, marginBottom: "2rem" }}>
+            <thead>
+              <tr>
+                <th style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", background: vars.muted }}>Round</th>
+                {teams.map((t) => (
+                  <th
+                    key={t.team_slot}
+                    style={{
+                      border: `1px solid ${vars.border}`,
+                      padding: "0.5rem",
+                      minWidth: "130px",
+                      background: t.is_user ? vars.primary : vars.muted,
+                      color: t.is_user ? "#fff" : vars.foreground,
+                    }}
+                  >
+                    <div>{t.team_name}</div>
+                    <div style={{ fontSize: "0.75rem", opacity: 0.85 }}>{t.team_owner}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: numRounds }, (_, i) => i + 1).map((round) => (
+                <tr key={round}>
+                  <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", fontWeight: "bold", background: vars.muted }}>R{round}</td>
+                  {teams.map((t) => {
+                    const cell = cellMap.get(`${round}-${t.team_slot}`);
+                    return (
+                      <td
+                        key={t.team_slot}
+                        style={{
+                          border: `1px solid ${vars.border}`,
+                          padding: "0.5rem",
+                          background: t.is_user ? vars.muted : "transparent",
+                        }}
+                      >
+                        {cell && cell.player_name ? (
+                          <>
+                            <div
+                              onClick={cell.fantasypros_id != null ? () => setProfilePlayer({ id: cell.fantasypros_id, name: cell.player_name }) : undefined}
+                              style={{ fontWeight: 600, ...(cell.fantasypros_id != null ? { cursor: "pointer", textDecoration: "underline" } : {}) }}
+                            >
+                              {cell.player_name}
+                            </div>
+                            <div style={{ fontSize: "0.75rem" }}><PositionPill position={cell.position} /> &middot; {cell.nfl_team}</div>
+                            <div style={{ fontSize: "0.75rem", fontWeight: 600 }}>{Number(cell.actualPoints || 0).toFixed(1)} pts</div>
+                            <div style={{ fontSize: "0.7rem", opacity: 0.6 }}>#{cell.pick}</div>
+                          </>
+                        ) : "-"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
     );
   };
 
@@ -1261,6 +1405,8 @@ function App() {
         )
       ) : activeTab === "players" ? (
         renderPlayersTable()
+      ) : activeTab === "draftBoard" ? (
+        renderDraftBoard()
       ) : (
         renderTable(sortData(data), columns)
       )}

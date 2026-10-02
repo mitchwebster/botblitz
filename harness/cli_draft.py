@@ -20,6 +20,7 @@ from rich.table import Table
 
 from blitz_env.models import Bot, DatabaseManager
 from harness.draft_board_html import write_html
+from harness.mock_draft_store import write_to_season_db
 from harness.simulate_draft import (
     default_draft_strategy,
     get_picking_team_index,
@@ -111,7 +112,8 @@ def main():
     parser.add_argument("--bot", required=True, help="Path to the bot .py file (must define draft_player()).")
     parser.add_argument("--year", type=int, default=2026, help="Season year to draft against (default 2026).")
     parser.add_argument("--bot-name", default=None, help="Bot name in the league to assign as the user's bot (default: derived from filename, e.g. chris_bot.py -> Chris).")
-    parser.add_argument("--html", default=None, help="Write a grid draft board (teams x rounds) to this HTML file instead of printing the round-by-round tables to the terminal.")
+    parser.add_argument("--html", default=None, help="Also write a grid draft board (teams x rounds) to this HTML file.")
+    parser.add_argument("--no-ui", action="store_true", help="Skip writing results into season.db's mock_draft_picks table (written by default -- that's what ux/'s Draft Board tab reads).")
     args = parser.parse_args()
 
     if not os.path.isfile(args.bot):
@@ -148,6 +150,10 @@ def main():
         print(f"Running draft: {user_bot.name} vs. {len(bots) - 1} default-strategy opponents...\n")
         run_draft(strategy_map)
         db.session.commit()
+
+        if not args.no_ui:
+            n = write_to_season_db(db, user_bot.id, args.year, bot_label=user_bot.name)
+            print(f"Wrote {n} picks to season.db's mock_draft_picks table -- see the Draft Board tab in ux/.")
 
         if args.html:
             out_path = write_html(db, user_bot.id, args.html)

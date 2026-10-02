@@ -53,6 +53,7 @@ def build_board_data(db: DatabaseManager, user_bot_id: str) -> dict:
                 row.append({
                     "pick": pick,
                     "team_id": bot.id if bot else None,
+                    "player_id": player.id,
                     "player": player.full_name,
                     "position": position,
                     "nfl_team": player.professional_team or "",
