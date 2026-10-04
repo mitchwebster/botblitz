@@ -30,12 +30,16 @@ const STAT_COLUMNS = [
 // weekly_stats/weekly_injuries hold every year (2017-2026) for the same
 // fantasypros_id -- a player profile has to scope to one season, or "week 18"
 // from a past year silently collides with "week 18" of the current one.
-const CURRENT_SEASON_YEAR = 2026;
+const CURRENT_SEASON_YEAR = 2026; // fallback only, while dbYear is still resolving
 
 function App() {
   const [db, setDb] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("current");
+  // Title: "Botblitz - {dbSourceLabel} ({dbYear})" -- which file is actually
+  // loaded, and its year read from the db itself rather than hardcoded.
+  const [dbSourceLabel, setDbSourceLabel] = useState(null);
+  const [dbYear, setDbYear] = useState(null);
   const [data, setData] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sortColumn, setSortColumn] = useState(null);
@@ -108,14 +112,20 @@ function App() {
         
         let dbUrl;
         if (useLocalDb) {
-          // Use local database from public folder
+          // Use local database from public folder. Whichever file
+          // `npm run start:local -- <path>` copied in (scripts/start-local.js)
+          // is recorded in REACT_APP_DB_SOURCE for display -- defaults to the
+          // live 2026 season.db when started with no path.
           dbUrl = '/season.db';
+          setDbSourceLabel(process.env.REACT_APP_DB_SOURCE || 'data/game_states/2026/season.db');
         } else {
           // Get branch from URL parameter (e.g., ?branch=chris-bot-add-drop)
           // Defaults to 'main' if not specified
           const urlParams = new URLSearchParams(window.location.search);
           const branch = urlParams.get('branch') || 'main';
-          dbUrl = `https://raw.githubusercontent.com/mitchwebster/botblitz/${branch}/data/game_states/2026/season.db`;
+          const dbPath = 'data/game_states/2026/season.db';
+          dbUrl = `https://raw.githubusercontent.com/mitchwebster/botblitz/${branch}/${dbPath}`;
+          setDbSourceLabel(branch === 'main' ? dbPath : `${dbPath} (${branch})`);
         }
 
         const response = await fetch(dbUrl);
@@ -151,6 +161,34 @@ function App() {
       console.error("Failed to fetch current week:", err);
     }
   }, [db, selectedWeek]);
+
+  // Year for the title, computed from the db itself rather than hardcoded --
+  // league_settings.year when a draft has actually been run, else whichever
+  // year this db's reference data covers (a stats-only db with no league
+  // state yet still has a real, computable year).
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const result = db.exec("SELECT year FROM league_settings LIMIT 1;");
+      if (result.length > 0 && result[0].values.length > 0) {
+        setDbYear(result[0].values[0][0]);
+        return;
+      }
+    } catch (err) {
+      // league_settings doesn't exist on a pure stats/reference db -- fall through.
+    }
+    for (const table of ["external_projections", "weekly_stats"]) {
+      try {
+        const result = db.exec(`SELECT MAX(year) FROM ${table};`);
+        if (result.length > 0 && result[0].values.length > 0 && result[0].values[0][0] != null) {
+          setDbYear(result[0].values[0][0]);
+          return;
+        }
+      } catch (err) {
+        // table doesn't exist either -- try the next one.
+      }
+    }
+  }, [db]);
 
   // Populate the Projections tab's week/source options from whatever rows
   // external_projections actually has (a table written by
@@ -227,7 +265,7 @@ function App() {
       try {
         const schedResult = db.exec(`
           SELECT week, opponent FROM schedule
-          WHERE team = '${playerTeam}' AND year = ${CURRENT_SEASON_YEAR}
+          WHERE team = '${playerTeam}' AND year = ${dbYear ?? CURRENT_SEASON_YEAR}
           ORDER BY week
         `);
         if (schedResult.length > 0) {
@@ -246,7 +284,7 @@ function App() {
       const statsResult = db.exec(`
         SELECT week, FPTS AS actual${statCols ? ", " + statCols : ""}
         FROM weekly_stats
-        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY week
       `);
       if (statsResult.length > 0) {
@@ -265,7 +303,7 @@ function App() {
       const projResult = db.exec(`
         SELECT week, source, points
         FROM external_projections
-        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY week
       `);
       if (projResult.length > 0) {
@@ -282,7 +320,7 @@ function App() {
       const injuryResult = db.exec(`
         SELECT week, injury, practice_status, game_status
         FROM weekly_injuries
-        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${CURRENT_SEASON_YEAR}
+        WHERE fantasypros_id = '${profilePlayer.id}' AND year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY week
       `);
       if (injuryResult.length > 0) {
@@ -298,7 +336,7 @@ function App() {
     }
 
     setProfileRows(Object.values(byWeek).sort((a, b) => a.week - b.week));
-  }, [db, profilePlayer, weeklyStatsCols]);
+  }, [db, profilePlayer, weeklyStatsCols, dbYear]);
 
   useEffect(() => {
     if (!db) return;
@@ -406,8 +444,8 @@ function App() {
         INNER JOIN bots as visitor_bot ON m.visitor_bot_id = visitor_bot.id
         INNER JOIN weekly_lineups wl ON wl.week = m.week AND (wl.bot_id = m.home_bot_id OR wl.bot_id = m.visitor_bot_id)
         INNER JOIN players p ON p.id = wl.player_id
-        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week AND ws.year = ${CURRENT_SEASON_YEAR}
-        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week AND wp.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week AND ws.year = ${dbYear ?? CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week AND wp.year = ${dbYear ?? CURRENT_SEASON_YEAR}
         WHERE m.week = ${selectedWeek}
         ORDER BY m.id, side,
           CASE wl.slot
@@ -447,7 +485,7 @@ function App() {
         WITH playerPoints AS (
           SELECT p.id, p.full_name, p.allowed_positions, p.current_bot_id, SUM(wk.FPTS) AS totalPoints
           FROM players AS p
-          INNER JOIN weekly_stats AS wk ON p.id = wk.fantasypros_id AND wk.year = ${CURRENT_SEASON_YEAR}
+          INNER JOIN weekly_stats AS wk ON p.id = wk.fantasypros_id AND wk.year = ${dbYear ?? CURRENT_SEASON_YEAR}
           GROUP BY 1,2,3,4
         )
         SELECT
@@ -460,8 +498,8 @@ function App() {
           wp.FPTS AS projected_points
         FROM playerPoints AS p
         LEFT JOIN bots AS b ON p.current_bot_id = b.id
-        LEFT JOIN weekly_injuries AS wi ON p.id = wi.fantasypros_id AND wi.week = ${selectedWeek} AND wi.year = ${CURRENT_SEASON_YEAR}
-        LEFT JOIN weekly_projections AS wp ON p.id = wp.fantasypros_id AND wp.week = ${selectedWeek} AND wp.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_injuries AS wi ON p.id = wi.fantasypros_id AND wi.week = ${selectedWeek} AND wi.year = ${dbYear ?? CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_projections AS wp ON p.id = wp.fantasypros_id AND wp.week = ${selectedWeek} AND wp.year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY b.name, p.full_name
       `,
       projections: `
@@ -476,7 +514,7 @@ function App() {
         JOIN players p ON p.id = ep.fantasypros_id
         WHERE ep.week = ${projWeek}
           AND ep.source = '${projSource}'
-          AND ep.year = ${CURRENT_SEASON_YEAR}
+          AND ep.year = ${dbYear ?? CURRENT_SEASON_YEAR}
           AND ep.position IN (${(projPositions.length ? projPositions : ["__none__"]).map((p) => `'${p}'`).join(",")})
         ORDER BY ep.points DESC
       `,
@@ -495,10 +533,10 @@ function App() {
         FROM players p
         ${botsExists ? "LEFT JOIN bots b ON p.current_bot_id = b.id" : ""}
         LEFT JOIN (
-          SELECT fantasypros_id, SUM(FPTS) AS actualPoints FROM weekly_stats WHERE year = ${CURRENT_SEASON_YEAR} GROUP BY fantasypros_id
+          SELECT fantasypros_id, SUM(FPTS) AS actualPoints FROM weekly_stats WHERE year = ${dbYear ?? CURRENT_SEASON_YEAR} GROUP BY fantasypros_id
         ) ap ON ap.fantasypros_id = p.id
-        LEFT JOIN external_projections ep ON ep.fantasypros_id = p.id AND ep.week = ${projWeek} AND ep.source = '${projSource}' AND ep.year = ${CURRENT_SEASON_YEAR}
-        LEFT JOIN weekly_injuries wi ON wi.fantasypros_id = p.id AND wi.week = ${projWeek} AND wi.year = ${CURRENT_SEASON_YEAR}
+        LEFT JOIN external_projections ep ON ep.fantasypros_id = p.id AND ep.week = ${projWeek} AND ep.source = '${projSource}' AND ep.year = ${dbYear ?? CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_injuries wi ON wi.fantasypros_id = p.id AND wi.week = ${projWeek} AND wi.year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY actualPoints DESC
       `,
       draftBoard: `
@@ -508,8 +546,8 @@ function App() {
           COALESCE(ap.actualPoints, 0) AS actualPoints
         FROM mock_draft_picks mdp
         LEFT JOIN (
-          SELECT fantasypros_id, SUM(FPTS) AS actualPoints FROM weekly_stats WHERE year = ${CURRENT_SEASON_YEAR} GROUP BY fantasypros_id
-        ) ap ON ap.fantasypros_id = mdp.fantasypros_id
+          SELECT fantasypros_id, year, SUM(FPTS) AS actualPoints FROM weekly_stats GROUP BY fantasypros_id, year
+        ) ap ON ap.fantasypros_id = mdp.fantasypros_id AND ap.year = mdp.year
         ORDER BY mdp.pick
       `,
     };
@@ -545,7 +583,7 @@ function App() {
         setError(`Query failed: ${err.message || err}`);
       }
     }
-  }, [db, activeTab, selectedWeek, projWeek, projSource, projPositions]);
+  }, [db, activeTab, selectedWeek, projWeek, projSource, projPositions, dbYear]);
 
   const lightVars = {
     background: "#ffffff",
@@ -1017,7 +1055,9 @@ function App() {
   return (
     <div style={{ padding: "2rem", fontFamily: "sans-serif", background: vars.background, color: vars.foreground, minHeight: "100vh", overflowX: "auto"}}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0 }}>Botblitz 2026</h1>
+        <h1 style={{ margin: 0 }}>
+          Botblitz{dbSourceLabel ? ` - ${dbSourceLabel}` : ""}{dbYear != null ? ` (${dbYear})` : ""}
+        </h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <label htmlFor="week-select" style={{ fontSize: "0.9rem" }}>Week:</label>
