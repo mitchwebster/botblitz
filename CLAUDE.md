@@ -136,6 +136,56 @@ speed optimizations that together cut a single-run evaluation from ~6 min to ~1-
 - Any bot that intentionally persists state across calls (the in-process path reuses the imported module, so module-level globals survive between picks/waiver rounds)
 - Multi-run averages meant to be trustworthy — cross-run state bleed can skew results
 
+### Running a mock draft (fast, visual, no Docker)
+
+`python3 -m harness.cli_draft --bot bots/nfl2026/<bot>.py --year 2025` is the quickest
+way to see how a bot drafts: it runs the bot's `draft_player` against 12
+`default_draft_strategy` opponents for `--year`'s league settings, then prints the
+full draft board + the bot's roster in the terminal. Useful flags:
+
+- `--bot-name NAME` — which league bot slot to assign your bot to (default: derived
+  from the filename, e.g. `chris_bot.py` → `Chris`).
+- `--simulate-season` — after the draft, also simulates the season on the drafted
+  rosters (see below) and prints a week-by-week matchup log + final standings.
+- `--no-ui` — skip writing to `mock_draft_picks` (see below); useful for a quick
+  terminal-only check.
+- `--html out.html` — also export a static HTML grid draft board instead of printing
+  the round-by-round terminal tables.
+
+**Season simulation (`--simulate-season`, `harness/simulate_season.py`):** rosters are
+frozen exactly as the mock draft left them — no add/drops — and only weeks with real
+`weekly_stats` for `--year` are simulated (e.g. 3 weeks for the current in-progress
+season, all played weeks for a finished one). The matchup schedule and best-lineup
+logic are 1:1 ports of the Go engine's authoritative versions, so results match what
+the real engine would produce for the same roster/scores:
+`generate_schedule` ← `pkg/gamestate/handler.go`'s `generateSchedule` (circle-method
+round robin, same bye handling for an odd team count); `best_lineup` ←
+`pkg/engine/EndOfWeekHandler.go`'s `scoreTeam`/`convertSlotToPositionMap` (players
+filled into slots highest-score-first, narrowest-eligibility slot first).
+
+**Visualizing in `ux/` (the Draft Board / Matchup Details / Leaderboard tabs):** by
+default (unless `--no-ui`), the draft (and the season sim, if run) is written into a
+**gitignored scratch copy** of that year's season.db —
+`data/mock_drafts/{year}/season.db` (`harness/mock_draft_store.py`) — never the
+tracked `data/game_states/{year}/season.db`. The scratch copy gets `mock_draft_picks`
+(what the Draft Board tab reads) plus `bots`/`league_settings`/`game_statuses` always,
+and `matchups`/`weekly_lineups` too when `--simulate-season` was passed (so Matchup
+Details/Current Week/Last Week/Leaderboard have something to show — those tables
+don't exist in the tracked season.db at all, see §9's "League state" note). The
+command prints the exact next step, e.g.:
+```
+Wrote mock_draft_picks to a scratch copy: data/mock_drafts/2025/season.db
+To view it: cd ux && npm run start:local -- ../data/mock_drafts/2025/season.db
+```
+Run that `npm run start:local -- <path>` command (path relative to `ux/`) to open the
+dev server pointed at that scratch db — it copies the file to `ux/public/season.db`
+and starts `react-scripts start`. Omit the path (just `npm run start:local`) to view
+the live tracked `data/game_states/2026/season.db` instead. The page title
+(`Botblitz - {path} ({year})`) and every query's year are both computed from the
+loaded db itself (`league_settings.year`, falling back to `MAX(year)` over
+stats/projections tables), not hardcoded — so this works for any year's db, mock or
+real.
+
 ## 8. Verification (how to actually prove a change works)
 
 - **Build ≠ proof.** Building the wheel/image does not exercise the runtime path.
