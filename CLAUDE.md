@@ -198,7 +198,9 @@ Referenced by function name (grep for them — line numbers drift, names don't):
 - Season: `LoadGameStateForWeeklyFantasy` opens the same file; `initSeason` builds
   matchups.
 - Weekly scoring reads `weekly_stats` straight from `season.db`
-  (`GetPlayerScoresForCurrentWeek`).
+  (`GetPlayerScoresForCurrentWeek`), scoped to the latest `year` in the table —
+  `weekly_stats` also holds prior seasons, and the league year can't be used because
+  evaluation replays under scratch year 2999.
 
 ### Constants
 ```go

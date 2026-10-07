@@ -921,6 +921,8 @@ func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeekly
 		INNER JOIN weekly_stats AS w
 			ON p.id = w.fantasypros_id
 		WHERE w.week = ?
+		-- weekly_stats also holds prior seasons; score only the season in play (its latest year).
+		AND w.year = (SELECT MAX(year) FROM weekly_stats)
 		AND p.current_bot_id IS NOT NULL
 		GROUP BY 1, 2, 3, 4
 		ORDER BY FPTS desc

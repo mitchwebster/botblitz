@@ -58,10 +58,13 @@ func buildFixtureSeasonDB(t *testing.T) string {
 
 	// reference stats table (as build-season copies from the scrape cache). Raw SQL:
 	// it is not a GORM model. Columns mirror what GetPlayerScoresForCurrentWeek reads.
-	if err := db.Exec(`CREATE TABLE weekly_stats (fantasypros_id TEXT, week INTEGER, FPTS REAL);`).Error; err != nil {
+	// Like the real table, it holds prior seasons too; only the latest year is in play.
+	if err := db.Exec(`CREATE TABLE weekly_stats (fantasypros_id TEXT, year INTEGER, week INTEGER, FPTS REAL);`).Error; err != nil {
 		t.Fatalf("create weekly_stats: %v", err)
 	}
-	if err := db.Exec(`INSERT INTO weekly_stats (fantasypros_id, week, FPTS) VALUES ('19788', 1, 25.0);`).Error; err != nil {
+	if err := db.Exec(`INSERT INTO weekly_stats (fantasypros_id, year, week, FPTS) VALUES
+		('19788', 2026, 1, 25.0),
+		('19788', 2021, 1, 40.0);`).Error; err != nil {
 		t.Fatalf("seed weekly_stats: %v", err)
 	}
 
@@ -173,6 +176,38 @@ func TestSeasonLoadRunsInitSeasonOnSameFile(t *testing.T) {
 		t.Fatalf("GetPlayerScoresForCurrentWeek: %v", err)
 	}
 	_ = scores // current week is 1; the fixture row may or may not be on a roster — call must just succeed
+}
+
+func TestWeeklyScoresUseOnlyCurrentSeasonStats(t *testing.T) {
+	_ = buildFixtureSeasonDB(t)
+	bots, settings := testBotsAndSettings()
+
+	draftHandler, err := gamestate.NewGameStateHandlerForDraft(bots, settings)
+	if err != nil {
+		t.Fatalf("draft handler: %v", err)
+	}
+	sqlDB, _ := draftHandler.GetDB().DB()
+	sqlDB.Close()
+
+	seasonHandler, err := gamestate.LoadGameStateForWeeklyFantasy(testSeasonYear)
+	if err != nil {
+		t.Fatalf("LoadGameStateForWeeklyFantasy: %v", err)
+	}
+	if err := seasonHandler.GetDB().Exec(`UPDATE players SET current_bot_id = '0' WHERE id = '19788'`).Error; err != nil {
+		t.Fatalf("roster player: %v", err)
+	}
+
+	scores, _, err := seasonHandler.GetPlayerScoresForCurrentWeek()
+	if err != nil {
+		t.Fatalf("GetPlayerScoresForCurrentWeek: %v", err)
+	}
+	if len(scores) != 1 {
+		t.Fatalf("expected 1 rostered score, got %d", len(scores))
+	}
+	// 25.0 is the 2026 week-1 score; 40.0 (2021, same week) must not leak in.
+	if scores[0].FPTS != 25.0 {
+		t.Errorf("expected current-season score 25.0, got %v", scores[0].FPTS)
+	}
 }
 
 func TestDraftErrorsWhenSeasonDbMissing(t *testing.T) {

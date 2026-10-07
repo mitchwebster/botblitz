@@ -297,6 +297,8 @@ func getPlayerScoresForWeek(handler *gamestate.GameStateHandler, week int) ([]ga
 		FROM players AS p
 		INNER JOIN weekly_stats AS w
 		ON p.id = w.fantasypros_id AND w.week = ?
+		-- weekly_stats also holds prior seasons; score only the season in play (its latest year).
+		AND w.year = (SELECT MAX(year) FROM weekly_stats)
 		GROUP BY p.id
 		ORDER BY FPTS desc
 	`, week).Scan(&results).Error

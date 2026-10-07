@@ -33,8 +33,8 @@ var (
 )
 
 // scratchYear is a throwaway season the engine drafts/replays against so the tracked
-// season.db is never mutated. weekly_stats are matched by week (not year), so copying the
-// real data here preserves scoring.
+// season.db is never mutated. Scoring reads the latest year in weekly_stats (not the
+// league year), so copying the real data here preserves scoring.
 const scratchYear = uint32(2999)
 
 const botUnderTestID = "0"
