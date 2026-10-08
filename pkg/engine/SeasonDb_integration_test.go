@@ -58,13 +58,14 @@ func buildFixtureSeasonDB(t *testing.T) string {
 
 	// reference stats table (as build-season copies from the scrape cache). Raw SQL:
 	// it is not a GORM model. Columns mirror what GetPlayerScoresForCurrentWeek reads.
-	// Like the real table, it holds prior seasons too; only the latest year is in play.
+	// Like the real table, it holds other seasons too; only the league's year is scored.
 	if err := db.Exec(`CREATE TABLE weekly_stats (fantasypros_id TEXT, year INTEGER, week INTEGER, FPTS REAL);`).Error; err != nil {
 		t.Fatalf("create weekly_stats: %v", err)
 	}
 	if err := db.Exec(`INSERT INTO weekly_stats (fantasypros_id, year, week, FPTS) VALUES
-		('19788', 2026, 1, 25.0),
-		('19788', 2021, 1, 40.0);`).Error; err != nil {
+		('19788', ?, 1, 25.0),
+		('19788', ?, 1, 40.0),
+		('19788', ?, 1, 50.0);`, testSeasonYear, testSeasonYear-5, testSeasonYear+1).Error; err != nil {
 		t.Fatalf("seed weekly_stats: %v", err)
 	}
 
@@ -204,9 +205,10 @@ func TestWeeklyScoresUseOnlyCurrentSeasonStats(t *testing.T) {
 	if len(scores) != 1 {
 		t.Fatalf("expected 1 rostered score, got %d", len(scores))
 	}
-	// 25.0 is the 2026 week-1 score; 40.0 (2021, same week) must not leak in.
+	// 25.0 is the league year's week-1 score; the earlier (40.0) and later (50.0)
+	// seasons' week 1 must not leak in.
 	if scores[0].FPTS != 25.0 {
-		t.Errorf("expected current-season score 25.0, got %v", scores[0].FPTS)
+		t.Errorf("expected league-year score 25.0, got %v", scores[0].FPTS)
 	}
 }
 

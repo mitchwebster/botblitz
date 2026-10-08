@@ -285,9 +285,14 @@ func validateAgainstMatchups(handler *gamestate.GameStateHandler) error {
 }
 
 func getPlayerScoresForWeek(handler *gamestate.GameStateHandler, week int) ([]gamestate.PlayerWeeklyScore, error) {
+	settings, err := handler.GetLeagueSettings()
+	if err != nil {
+		return nil, err
+	}
+
 	var results []gamestate.PlayerWeeklyScore
 
-	err := handler.GetDB().Raw(`
+	err = handler.GetDB().Raw(`
 		SELECT
 			p.id,
 			p.full_name,
@@ -296,12 +301,10 @@ func getPlayerScoresForWeek(handler *gamestate.GameStateHandler, week int) ([]ga
 			max(w.FPTS) as FPTS
 		FROM players AS p
 		INNER JOIN weekly_stats AS w
-		ON p.id = w.fantasypros_id AND w.week = ?
-		-- weekly_stats also holds prior seasons; score only the season in play (its latest year).
-		AND w.year = (SELECT MAX(year) FROM weekly_stats)
+		ON p.id = w.fantasypros_id AND w.week = ? AND w.year = ?
 		GROUP BY p.id
 		ORDER BY FPTS desc
-	`, week).Scan(&results).Error
+	`, week, settings.Year).Scan(&results).Error
 
 	if err != nil {
 		return nil, err

@@ -111,8 +111,9 @@ a Datasette browser on a dev snapshot. The harness imports `blitz_env` and takes
 `py_grpc_server` image, then runs the bot through the **real engine** over a full
 historical season — draft, weekly waivers + scoring, playoffs — against a baseline
 field of containerized `standard-bot` opponents, and prints where it finished. Each
-run copies `season.db` to a scratch year (2999, gitignored) so the tracked DB is
-never mutated. This is the source of truth for "is my bot good"; the Python `harness/`
+run copies `season.db` to a gitignored scratch folder (`data/eval_scratch/{year}/`,
+via `SetSaveFolderRelativePath`) and keeps the real league year, so the tracked DB is
+never mutated and bots see the same `league_settings.year` as in production. This is the source of truth for "is my bot good"; the Python `harness/`
 (`simulate_draft`, `score_game`, `SimulateDraft.ipynb`) remains only an interactive dev
 aid, not an evaluator. Entry: `pkg/cmd/evaluate/main.go`; season loop + standings:
 `pkg/engine/SeasonReplayHandler.go` (`ReplaySeason`, `FinalStandings`).
@@ -198,9 +199,8 @@ Referenced by function name (grep for them — line numbers drift, names don't):
 - Season: `LoadGameStateForWeeklyFantasy` opens the same file; `initSeason` builds
   matchups.
 - Weekly scoring reads `weekly_stats` straight from `season.db`
-  (`GetPlayerScoresForCurrentWeek`), scoped to the latest `year` in the table —
-  `weekly_stats` also holds prior seasons, and the league year can't be used because
-  evaluation replays under scratch year 2999.
+  (`GetPlayerScoresForCurrentWeek`), scoped to `league_settings.year` —
+  `weekly_stats` also holds other seasons.
 
 ### Constants
 ```go

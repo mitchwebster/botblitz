@@ -50,8 +50,8 @@ func buildReplayFixture(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		id := string(rune('A' + i))
 		for wk := 1; wk <= 17; wk++ {
-			if err := db.Exec(`INSERT INTO weekly_stats (fantasypros_id, year, week, FPTS) VALUES (?, 2026, ?, ?);`,
-				id, wk, float64((8-i)*10)).Error; err != nil {
+			if err := db.Exec(`INSERT INTO weekly_stats (fantasypros_id, year, week, FPTS) VALUES (?, ?, ?, ?);`,
+				id, replayTestYear, wk, float64((8-i)*10)).Error; err != nil {
 				t.Fatalf("seed weekly_stats: %v", err)
 			}
 		}

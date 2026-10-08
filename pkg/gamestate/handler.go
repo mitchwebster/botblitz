@@ -15,7 +15,11 @@ import (
 
 const AppDatabaseName = "gamestate" + fileSuffix
 
-const saveFolderRelativePath = "data/game_states"
+const defaultSaveFolderRelativePath = "data/game_states"
+
+// saveFolderRelativePath is where per-season DBs live. Overridable so tools like the
+// evaluator can replay a season against a scratch copy without changing the league year.
+var saveFolderRelativePath = defaultSaveFolderRelativePath
 const fileSuffix = ".db"
 const seasonDatabaseFileName = "season" + fileSuffix
 const singleRowTableId = 1
@@ -717,6 +721,12 @@ func populateGameStatusTable(db *gorm.DB, bots []*common.Bot) error {
 	return nil
 }
 
+// SetSaveFolderRelativePath points every subsequent season.db open at
+// <folder>/{year}/season.db instead of the default data/game_states.
+func SetSaveFolderRelativePath(folder string) {
+	saveFolderRelativePath = folder
+}
+
 func getSaveFileName(year uint32) (string, error) {
 	absFolderPath, err := getSaveFolderPath(year)
 	if err != nil {
@@ -908,9 +918,14 @@ func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeekly
 		return nil, -1, result.Error
 	}
 
+	settings, err := handler.GetLeagueSettings()
+	if err != nil {
+		return nil, -1, err
+	}
+
 	var results []PlayerWeeklyScore
 
-	err := handler.db.Raw(`
+	err = handler.db.Raw(`
 		SELECT 
 			p.id, 
 			p.full_name, 
@@ -921,12 +936,11 @@ func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeekly
 		INNER JOIN weekly_stats AS w
 			ON p.id = w.fantasypros_id
 		WHERE w.week = ?
-		-- weekly_stats also holds prior seasons; score only the season in play (its latest year).
-		AND w.year = (SELECT MAX(year) FROM weekly_stats)
+		AND w.year = ?
 		AND p.current_bot_id IS NOT NULL
 		GROUP BY 1, 2, 3, 4
 		ORDER BY FPTS desc
-	`, gameStatus.CurrentFantasyWeek).Scan(&results).Error
+	`, gameStatus.CurrentFantasyWeek, settings.Year).Scan(&results).Error
 
 	if err != nil {
 		return nil, -1, err
