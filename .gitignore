@@ -58,7 +58,7 @@ dist/*
 /stats.db
 
 # scratch season DB used by `make evaluate-bot` (pkg/cmd/evaluate)
-/data/game_states/2999/
+/data/eval_scratch/
 
 # local db copy for `npm run start:local` (ux/) -- large, regenerated on demand
 /ux/public/season.db

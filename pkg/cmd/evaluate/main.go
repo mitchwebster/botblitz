@@ -32,15 +32,16 @@ var (
 			"across phases and across runs that are meant to be independent seasons. Use only to speed up local runs.")
 )
 
-// scratchYear is a throwaway season the engine drafts/replays against so the tracked
-// season.db is never mutated. weekly_stats are matched by week (not year), so copying the
-// real data here preserves scoring.
-const scratchYear = uint32(2999)
+// scratchFolder is where each run's throwaway copy of season.db lives, so the tracked
+// data/game_states/<year>/season.db is never mutated. The league keeps the real year,
+// so scoring and bots that read league_settings.year see the same data as production.
+const scratchFolder = "data/eval_scratch"
 
 const botUnderTestID = "0"
 
 func main() {
 	flag.Parse()
+	gamestate.SetSaveFolderRelativePath(scratchFolder)
 	defer cleanupScratch()
 
 	// In the default (prod-matching) mode sharedContainers stays nil and each run/phase
@@ -126,7 +127,7 @@ func runOneSeason(ctx context.Context, sharedContainers map[string]*engine.BotCo
 	}
 
 	bots, srcMap := buildLeague()
-	settings := engine.BuildDefaultLeagueSettings(scratchYear, uint32(*numTeams))
+	settings := engine.BuildDefaultLeagueSettings(uint32(*dataYear), uint32(*numTeams))
 
 	// ---- Draft phase (containers) ----
 	draftPhaseDone := engine.LogElapsed("draft phase (setup + draft + teardown)")
@@ -168,7 +169,7 @@ func runOneSeason(ctx context.Context, sharedContainers map[string]*engine.BotCo
 	seasonPhaseDone := engine.LogElapsed("season replay phase (setup + replay + teardown)")
 	defer seasonPhaseDone()
 
-	seasonHandler, err := gamestate.LoadGameStateForWeeklyFantasy(scratchYear)
+	seasonHandler, err := gamestate.LoadGameStateForWeeklyFantasy(uint32(*dataYear))
 	if err != nil {
 		return nil, err
 	}
@@ -238,14 +239,14 @@ func mustRead(p string) []byte {
 }
 
 // resetScratchSeasonDB copies data/game_states/<dataYear>/season.db to
-// data/game_states/<scratchYear>/season.db so each run starts from a pristine, undrafted
+// <scratchFolder>/<dataYear>/season.db so each run starts from a pristine, undrafted
 // season without mutating the tracked file.
 func resetScratchSeasonDB(dataYear uint32) error {
 	src, err := common.BuildLocalAbsolutePath(fmt.Sprintf("/data/game_states/%d/season.db", dataYear))
 	if err != nil {
 		return err
 	}
-	dst, err := common.BuildLocalAbsolutePath(fmt.Sprintf("/data/game_states/%d/season.db", scratchYear))
+	dst, err := common.BuildLocalAbsolutePath(fmt.Sprintf("/%s/%d/season.db", scratchFolder, dataYear))
 	if err != nil {
 		return err
 	}
@@ -282,9 +283,9 @@ func cleanupContainers() {
 	}
 }
 
-// cleanupScratch removes the scratch-year directory created for isolation.
+// cleanupScratch removes the scratch directory created for isolation.
 func cleanupScratch() {
-	dir, err := common.BuildLocalAbsolutePath(fmt.Sprintf("/data/game_states/%d", scratchYear))
+	dir, err := common.BuildLocalAbsolutePath("/" + scratchFolder)
 	if err != nil {
 		return
 	}
