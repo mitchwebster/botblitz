@@ -1,7 +1,8 @@
-"""Verify the shipped bot through the actual server/subprocess path, without Docker.
+"""Verify the shipped bot through the actual server/subprocess path.
 
 Build the wheel first, then run with the project Python. This checks compatibility
-and legal actions, not competitiveness, Docker isolation, or Go scoring.
+and legal actions, not competitiveness or Go scoring. --docker-image additionally
+checks Linux containers and real gRPC transport using the built production image.
 """
 import argparse
 import hashlib
@@ -21,15 +22,22 @@ SLOTS = {"QB": 1, "RB": 2, "WR": 2, "SUPERFLEX": 1,
          "FLEX": 1, "K": 1, "DST": 1, "BENCH": 3}
 
 DRIVER = '''
-import json, sys
+import json, os, sys
 from google.protobuf.empty_pb2 import Empty
-from server import AgentServiceServicer
-service = AgentServiceServicer()
+if os.environ.get("BOTBLITZ_VERIFY_RPC_TARGET"):
+    import grpc
+    from agent_pb2_grpc import AgentServiceStub
+    channel = grpc.insecure_channel(os.environ["BOTBLITZ_VERIFY_RPC_TARGET"])
+    grpc.channel_ready_future(channel).result(timeout=30)
+    service = AgentServiceStub(channel)
+else:
+    from server import AgentServiceServicer
+    service = AgentServiceServicer()
 if sys.argv[1] == "draft":
-    result = service.DraftPlayer(Empty(), None)
+    result = service.DraftPlayer(Empty(), timeout=60) if os.environ.get("BOTBLITZ_VERIFY_RPC_TARGET") else service.DraftPlayer(Empty(), None)
     response = {"player_id": result.player_id}
 else:
-    result = service.PerformWeeklyFantasyActions(Empty(), None)
+    result = service.PerformWeeklyFantasyActions(Empty(), timeout=60) if os.environ.get("BOTBLITZ_VERIFY_RPC_TARGET") else service.PerformWeeklyFantasyActions(Empty(), None)
     response = {"claims": [{"add": c.player_to_add_id, "drop": c.player_to_drop_id,
                             "bid": c.bid_amount} for c in result.waiver_claims]}
 print("VERIFIED_RESPONSE=" + json.dumps(response))
@@ -76,6 +84,11 @@ def invoke(runtime, action):
     env = dict(os.environ)
     env.pop("BOTBLITZ_EVAL_INLINE", None)  # always use production subprocess isolation
     env["PYTHONPATH"] = str(runtime)
+    target_file = runtime / "rpc-target.txt"
+    if target_file.exists():
+        env["BOTBLITZ_VERIFY_RPC_TARGET"] = target_file.read_text().strip()
+    else:
+        env.pop("BOTBLITZ_VERIFY_RPC_TARGET", None)
     env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.defpath
     started = time.monotonic()
     process = subprocess.run([sys.executable, "verify_driver.py", action], cwd=runtime,
@@ -179,12 +192,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wheel", type=Path, default=ROOT / "dist/blitz_env-0.1.0-py3-none-any.whl")
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--docker-image", help="Built production image, e.g. py_grpc_server")
     args = parser.parse_args()
     require(args.wheel.is_file(), "Build the runtime SDK wheel first (make build-py-module)")
     report = {"bot_sha256": sha256(ROOT / "bots/nfl2025/jon_bot.py"),
               "wheel_sha256": sha256(args.wheel), "execution": "production server methods + isolated subprocesses; no Docker or socket transport",
               "seasons": []}
-    with tempfile.TemporaryDirectory(prefix="jon-bot-runtime-") as folder:
+    if args.docker_image:
+        report["execution"] = "production Docker image + gRPC + isolated subprocesses; controlled fixtures, no Go engine"
+        report["docker_image"] = {"name": args.docker_image, "id": subprocess.check_output(
+            ["docker", "image", "inspect", "--format", "{{.Id}}", args.docker_image], text=True).strip()}
+        # Colima mounts the repository; its guest does not share macOS /tmp.
+        (ROOT / "tmp").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="jon-bot-runtime-", dir=ROOT / "tmp" if args.docker_image else None) as folder:
         runtime = Path(folder)
         with zipfile.ZipFile(args.wheel) as wheel:
             wheel.extractall(runtime)
@@ -195,7 +215,24 @@ def main():
             shutil.copyfile(runtime / "blitz_env" / filename, runtime / filename)
         (runtime / "verify_driver.py").write_text(DRIVER)
         for year in (2025, 2026):
-            report["seasons"].append(verify_year(runtime, year))
+            container_id = None
+            try:
+                if args.docker_image:
+                    (runtime / "gamestate.db").touch()
+                    resources = runtime / "resources"
+                    resources.mkdir(exist_ok=True)
+                    shutil.copyfile(runtime / "bot.py", resources / "bot.py")
+                    container_id = subprocess.check_output([
+                        "docker", "run", "-d", "-p", "127.0.0.1::8080",
+                        "-v", str(resources) + ":/botblitz:ro",
+                        "-v", str(runtime / "gamestate.db") + ":/app/py_grpc_server/gamestate.db:ro",
+                        args.docker_image], text=True).strip()
+                    target = subprocess.check_output(["docker", "port", container_id, "8080/tcp"], text=True).strip()
+                    (runtime / "rpc-target.txt").write_text(target)
+                report["seasons"].append(verify_year(runtime, year))
+            finally:
+                if container_id:
+                    subprocess.run(["docker", "rm", "-f", container_id], check=True, stdout=subprocess.DEVNULL)
     output = json.dumps(report, indent=2)
     if args.report:
         args.report.write_text(output + "\n")

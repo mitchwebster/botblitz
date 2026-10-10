@@ -1,0 +1,457 @@
+{
+  "bot_sha256": "ad91809fccd751380e4805ccc882dc484252271459e708adc5fbc003fdaa84ef",
+  "wheel_sha256": "953aa0d8b8e4ed7b8d49f4eeaf39e98129ecf717d01829447269182842765295",
+  "execution": "production Docker image + gRPC + isolated subprocesses; controlled fixtures, no Go engine",
+  "seasons": [
+    {
+      "year": 2025,
+      "status": "PASS",
+      "draft_picks": [
+        {
+          "pick": 1,
+          "id": "17233",
+          "name": "Lamar Jackson"
+        },
+        {
+          "pick": 2,
+          "id": "17298",
+          "name": "Josh Allen"
+        },
+        {
+          "pick": 3,
+          "id": "19788",
+          "name": "Ja'Marr Chase"
+        },
+        {
+          "pick": 4,
+          "id": "23133",
+          "name": "Bijan Robinson"
+        },
+        {
+          "pick": 5,
+          "id": "17240",
+          "name": "Saquon Barkley"
+        },
+        {
+          "pick": 6,
+          "id": "22968",
+          "name": "Jahmyr Gibbs"
+        },
+        {
+          "pick": 7,
+          "id": "19202",
+          "name": "CeeDee Lamb"
+        },
+        {
+          "pick": 8,
+          "id": "8090",
+          "name": "Denver Broncos"
+        },
+        {
+          "pick": 9,
+          "id": "19058",
+          "name": "Chase McLaughlin"
+        },
+        {
+          "pick": 10,
+          "id": "22902",
+          "name": "Jayden Daniels"
+        },
+        {
+          "pick": 11,
+          "id": "19275",
+          "name": "Jalen Hurts"
+        },
+        {
+          "pick": 12,
+          "id": "19196",
+          "name": "Joe Burrow"
+        }
+      ],
+      "waiver_runs": [
+        {
+          "week": 4,
+          "budget": 100,
+          "claims": [
+            {
+              "add": "17233",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "17298",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "19275",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "16393",
+              "drop": "25983",
+              "bid": 5
+            },
+            {
+              "add": "23180",
+              "drop": "25983",
+              "bid": 5
+            },
+            {
+              "add": "23133",
+              "drop": "25983",
+              "bid": 5
+            }
+          ],
+          "maximum_possible_spend": 35,
+          "seconds": 1.533
+        },
+        {
+          "week": 4,
+          "budget": 1,
+          "claims": [
+            {
+              "add": "17233",
+              "drop": "27263",
+              "bid": 1
+            },
+            {
+              "add": "17298",
+              "drop": "27263",
+              "bid": 1
+            },
+            {
+              "add": "19275",
+              "drop": "27263",
+              "bid": 1
+            },
+            {
+              "add": "16393",
+              "drop": "25983",
+              "bid": 0
+            },
+            {
+              "add": "23180",
+              "drop": "25983",
+              "bid": 0
+            },
+            {
+              "add": "23133",
+              "drop": "25983",
+              "bid": 0
+            }
+          ],
+          "maximum_possible_spend": 1,
+          "seconds": 1.527
+        },
+        {
+          "week": 4,
+          "budget": 0,
+          "claims": [
+            {
+              "add": "17233",
+              "drop": "27263",
+              "bid": 0
+            },
+            {
+              "add": "17298",
+              "drop": "27263",
+              "bid": 0
+            },
+            {
+              "add": "19275",
+              "drop": "27263",
+              "bid": 0
+            },
+            {
+              "add": "16393",
+              "drop": "25983",
+              "bid": 0
+            },
+            {
+              "add": "23180",
+              "drop": "25983",
+              "bid": 0
+            },
+            {
+              "add": "23133",
+              "drop": "25983",
+              "bid": 0
+            }
+          ],
+          "maximum_possible_spend": 0,
+          "seconds": 1.571
+        },
+        {
+          "week": 17,
+          "budget": 100,
+          "claims": [
+            {
+              "add": "23180",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "19780",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "23133",
+              "drop": "27263",
+              "bid": 30
+            },
+            {
+              "add": "9451",
+              "drop": "25334",
+              "bid": 30
+            },
+            {
+              "add": "17298",
+              "drop": "25334",
+              "bid": 30
+            },
+            {
+              "add": "19196",
+              "drop": "25334",
+              "bid": 30
+            }
+          ],
+          "maximum_possible_spend": 60,
+          "seconds": 1.67
+        }
+      ],
+      "max_invocation_seconds": 1.67,
+      "source_database_sha256": "8875c2d2538d9fcde7a046f25126297522e5947cf168db5eb635408097d292fc",
+      "source_database_unchanged": true
+    },
+    {
+      "year": 2026,
+      "status": "PASS",
+      "draft_picks": [
+        {
+          "pick": 1,
+          "id": "22968",
+          "name": "Jahmyr Gibbs"
+        },
+        {
+          "pick": 2,
+          "id": "17298",
+          "name": "Josh Allen"
+        },
+        {
+          "pick": 3,
+          "id": "23133",
+          "name": "Bijan Robinson"
+        },
+        {
+          "pick": 4,
+          "id": "16393",
+          "name": "Christian McCaffrey"
+        },
+        {
+          "pick": 5,
+          "id": "19788",
+          "name": "Ja'Marr Chase"
+        },
+        {
+          "pick": 6,
+          "id": "17233",
+          "name": "Lamar Jackson"
+        },
+        {
+          "pick": 7,
+          "id": "23070",
+          "name": "Jaxon Smith-Njigba"
+        },
+        {
+          "pick": 8,
+          "id": "8120",
+          "name": "Houston Texans"
+        },
+        {
+          "pick": 9,
+          "id": "27291",
+          "name": "Andy Borregales"
+        },
+        {
+          "pick": 10,
+          "id": "23046",
+          "name": "Drake Maye"
+        },
+        {
+          "pick": 11,
+          "id": "19275",
+          "name": "Jalen Hurts"
+        },
+        {
+          "pick": 12,
+          "id": "23160",
+          "name": "Jaxson Dart"
+        }
+      ],
+      "waiver_runs": [
+        {
+          "week": 4,
+          "budget": 100,
+          "claims": [
+            {
+              "add": "22968",
+              "drop": "24214",
+              "bid": 30
+            },
+            {
+              "add": "17298",
+              "drop": "24214",
+              "bid": 30
+            },
+            {
+              "add": "23070",
+              "drop": "24214",
+              "bid": 30
+            },
+            {
+              "add": "23133",
+              "drop": "14191",
+              "bid": 5
+            },
+            {
+              "add": "19799",
+              "drop": "14191",
+              "bid": 5
+            },
+            {
+              "add": "19788",
+              "drop": "14191",
+              "bid": 5
+            }
+          ],
+          "maximum_possible_spend": 35,
+          "seconds": 1.629
+        },
+        {
+          "week": 4,
+          "budget": 1,
+          "claims": [
+            {
+              "add": "22968",
+              "drop": "24214",
+              "bid": 1
+            },
+            {
+              "add": "17298",
+              "drop": "24214",
+              "bid": 1
+            },
+            {
+              "add": "23070",
+              "drop": "24214",
+              "bid": 1
+            },
+            {
+              "add": "23133",
+              "drop": "14191",
+              "bid": 0
+            },
+            {
+              "add": "19799",
+              "drop": "14191",
+              "bid": 0
+            },
+            {
+              "add": "19788",
+              "drop": "14191",
+              "bid": 0
+            }
+          ],
+          "maximum_possible_spend": 1,
+          "seconds": 1.629
+        },
+        {
+          "week": 4,
+          "budget": 0,
+          "claims": [
+            {
+              "add": "22968",
+              "drop": "24214",
+              "bid": 0
+            },
+            {
+              "add": "17298",
+              "drop": "24214",
+              "bid": 0
+            },
+            {
+              "add": "23070",
+              "drop": "24214",
+              "bid": 0
+            },
+            {
+              "add": "23133",
+              "drop": "14191",
+              "bid": 0
+            },
+            {
+              "add": "19799",
+              "drop": "14191",
+              "bid": 0
+            },
+            {
+              "add": "19788",
+              "drop": "14191",
+              "bid": 0
+            }
+          ],
+          "maximum_possible_spend": 0,
+          "seconds": 1.628
+        },
+        {
+          "week": 17,
+          "budget": 100,
+          "claims": [
+            {
+              "add": "22968",
+              "drop": "14191",
+              "bid": 30
+            },
+            {
+              "add": "17298",
+              "drop": "14191",
+              "bid": 30
+            },
+            {
+              "add": "23070",
+              "drop": "14191",
+              "bid": 30
+            },
+            {
+              "add": "23133",
+              "drop": "24214",
+              "bid": 30
+            },
+            {
+              "add": "19797",
+              "drop": "24214",
+              "bid": 30
+            },
+            {
+              "add": "16393",
+              "drop": "24214",
+              "bid": 30
+            }
+          ],
+          "maximum_possible_spend": 60,
+          "seconds": 1.653
+        }
+      ],
+      "max_invocation_seconds": 1.653,
+      "source_database_sha256": "611113055a07ce52bddbad14d8288b483e7c09c5de3631c28da44b3252ba4b02",
+      "source_database_unchanged": true
+    }
+  ],
+  "docker_image": {
+    "name": "py_grpc_server",
+    "id": "sha256:9b93fa02e9275e2d97a4d3affc9c1a7b63320dab6529b2ad6a7a6219f42136db"
+  }
+}

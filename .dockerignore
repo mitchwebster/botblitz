@@ -1,0 +1,12 @@
+# The production Dockerfile copies only these runtime inputs. Keep local VMs,
+# virtual environments, season databases, and Git history out of the context.
+**
+!.dockerignore
+!py-server-dockerfile
+!requirements.txt
+!dist/
+!dist/blitz_env-0.1.0-py3-none-any.whl
+!py_grpc_server/
+!py_grpc_server/**
+py_grpc_server/__pycache__/
+py_grpc_server/*.db

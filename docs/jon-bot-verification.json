@@ -1,6 +1,6 @@
 {
   "bot_sha256": "ad91809fccd751380e4805ccc882dc484252271459e708adc5fbc003fdaa84ef",
-  "wheel_sha256": "16441599e1184bea0204ee3fd3e4016d620bc245ac6cc161a3feacd49c4482c2",
+  "wheel_sha256": "953aa0d8b8e4ed7b8d49f4eeaf39e98129ecf717d01829447269182842765295",
   "execution": "production server methods + isolated subprocesses; no Docker or socket transport",
   "seasons": [
     {
@@ -105,7 +105,7 @@
             }
           ],
           "maximum_possible_spend": 35,
-          "seconds": 1.536
+          "seconds": 1.412
         },
         {
           "week": 4,
@@ -143,7 +143,7 @@
             }
           ],
           "maximum_possible_spend": 1,
-          "seconds": 1.613
+          "seconds": 1.423
         },
         {
           "week": 4,
@@ -181,7 +181,7 @@
             }
           ],
           "maximum_possible_spend": 0,
-          "seconds": 1.711
+          "seconds": 1.433
         },
         {
           "week": 17,
@@ -219,10 +219,10 @@
             }
           ],
           "maximum_possible_spend": 60,
-          "seconds": 1.615
+          "seconds": 1.515
         }
       ],
-      "max_invocation_seconds": 1.711,
+      "max_invocation_seconds": 1.515,
       "source_database_sha256": "8875c2d2538d9fcde7a046f25126297522e5947cf168db5eb635408097d292fc",
       "source_database_unchanged": true
     },
@@ -328,7 +328,7 @@
             }
           ],
           "maximum_possible_spend": 35,
-          "seconds": 1.576
+          "seconds": 1.5
         },
         {
           "week": 4,
@@ -366,7 +366,7 @@
             }
           ],
           "maximum_possible_spend": 1,
-          "seconds": 1.574
+          "seconds": 1.504
         },
         {
           "week": 4,
@@ -404,7 +404,7 @@
             }
           ],
           "maximum_possible_spend": 0,
-          "seconds": 1.586
+          "seconds": 1.515
         },
         {
           "week": 17,
@@ -442,10 +442,10 @@
             }
           ],
           "maximum_possible_spend": 60,
-          "seconds": 1.585
+          "seconds": 1.518
         }
       ],
-      "max_invocation_seconds": 1.586,
+      "max_invocation_seconds": 1.518,
       "source_database_sha256": "611113055a07ce52bddbad14d8288b483e7c09c5de3631c28da44b3252ba4b02",
       "source_database_unchanged": true
     }
