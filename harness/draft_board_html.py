@@ -42,7 +42,13 @@ def build_board_data(db: DatabaseManager, user_bot_id: str) -> dict:
 
     grid = []
     for round_num in range(num_rounds):
-        row = []
+        # Indexed by team_index (0-based draft-order position), not raw
+        # pick-in-round order -- in a snake draft's reversed rounds those two
+        # differ (team_index = num_teams - 1 - pos_in_round), and every
+        # consumer of this grid assumes row[i] is teams[i]'s pick for this
+        # round. Building it in pos_in_round order silently mislabeled which
+        # team every pick in every reversed (even) round belonged to.
+        row = [None] * num_teams
         for pos_in_round in range(num_teams):
             pick = round_num * num_teams + pos_in_round + 1
             team_index = get_picking_team_index(pick)
@@ -50,16 +56,16 @@ def build_board_data(db: DatabaseManager, user_bot_id: str) -> dict:
             player = picks_by_number.get(pick)
             if player:
                 position = player.allowed_positions[0] if player.allowed_positions else "N/A"
-                row.append({
+                row[team_index] = {
                     "pick": pick,
                     "team_id": bot.id if bot else None,
                     "player_id": player.id,
                     "player": player.full_name,
                     "position": position,
                     "nfl_team": player.professional_team or "",
-                })
+                }
             else:
-                row.append({"pick": pick, "team_id": bot.id if bot else None, "player": None})
+                row[team_index] = {"pick": pick, "team_id": bot.id if bot else None, "player": None}
         grid.append(row)
 
     user_bot = next((b for b in sorted_bots if b.id == user_bot_id), None)

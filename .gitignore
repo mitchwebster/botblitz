@@ -62,3 +62,7 @@ dist/*
 
 # local db copy for `npm run start:local` (ux/) -- large, regenerated on demand
 /ux/public/season.db
+
+# scratch copies written by harness.cli_draft's mock drafts (harness/mock_draft_store.py)
+# -- disposable, regenerated fresh on every run, never the tracked season.db
+/data/mock_drafts/

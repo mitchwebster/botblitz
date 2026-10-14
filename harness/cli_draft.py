@@ -20,13 +20,14 @@ from rich.table import Table
 
 from blitz_env.models import Bot, DatabaseManager
 from harness.draft_board_html import write_html
-from harness.mock_draft_store import write_to_season_db
+from harness.mock_draft_store import write_league_state, write_to_season_db
 from harness.simulate_draft import (
     default_draft_strategy,
     get_picking_team_index,
     init_database,
     run_draft,
 )
+from harness.simulate_season import simulate_season
 
 
 def load_bot_module(bot_path: str):
@@ -107,6 +108,53 @@ def print_roster(db: DatabaseManager, bot: Bot) -> None:
     console.print(table)
 
 
+def print_standings(db: DatabaseManager, result: dict) -> None:
+    """Final win/loss standings from a simulate_season() result, plus a
+    week-by-week matchup log (same shape as print_draft_board)."""
+    console = Console(force_terminal=True)
+    bots_by_id = {b.id: b for b in db.get_all_bots()}
+    weeks = result["weeks"]
+
+    console.rule(f"[bold]Mock Season - weeks {weeks[0]}-{weeks[-1]}[/bold]")
+
+    for week_entry in result["weekly_results"]:
+        table = Table(title=f"Week {week_entry['week']}", box=SQUARE, show_lines=False)
+        table.add_column("Home")
+        table.add_column("Score", justify="right")
+        table.add_column("Away")
+        table.add_column("Score", justify="right")
+        table.add_column("Winner")
+        for m in week_entry["matchups"]:
+            home_bot, away_bot = bots_by_id[m["home"]], bots_by_id[m["away"]]
+            winner_name = bots_by_id[m["winner"]].name if m["winner"] else "TIE"
+            table.add_row(
+                home_bot.name, f"{m['home_score']:.2f}",
+                away_bot.name, f"{m['away_score']:.2f}",
+                winner_name,
+            )
+        console.print(table)
+
+    standings_table = Table(title="Final Standings", box=SQUARE)
+    standings_table.add_column("Rank", justify="right")
+    standings_table.add_column("Team")
+    standings_table.add_column("W", justify="right")
+    standings_table.add_column("L", justify="right")
+    standings_table.add_column("T", justify="right")
+    standings_table.add_column("Points For", justify="right")
+    standings_table.add_column("Points Against", justify="right")
+
+    for rank, bot_id in enumerate(result["standings"], start=1):
+        bot = bots_by_id[bot_id]
+        record = result["records"][bot_id]
+        standings_table.add_row(
+            str(rank), bot.name,
+            str(record["wins"]), str(record["losses"]), str(record["ties"]),
+            f"{record['points_for']:.2f}", f"{record['points_against']:.2f}",
+        )
+
+    console.print(standings_table)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run a mock draft with a bot against default-strategy opponents.")
     parser.add_argument("--bot", required=True, help="Path to the bot .py file (must define draft_player()).")
@@ -114,6 +162,7 @@ def main():
     parser.add_argument("--bot-name", default=None, help="Bot name in the league to assign as the user's bot (default: derived from filename, e.g. chris_bot.py -> Chris).")
     parser.add_argument("--html", default=None, help="Also write a grid draft board (teams x rounds) to this HTML file.")
     parser.add_argument("--no-ui", action="store_true", help="Skip writing results into season.db's mock_draft_picks table (written by default -- that's what ux/'s Draft Board tab reads).")
+    parser.add_argument("--simulate-season", action="store_true", help="After the draft, simulate the season (matchups + best-lineup scoring, no add/drops) over whatever weeks have real weekly_stats for --year, and print standings.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.bot):
@@ -151,9 +200,18 @@ def main():
         run_draft(strategy_map)
         db.session.commit()
 
+        season_result = simulate_season(db, args.year) if args.simulate_season else None
+
         if not args.no_ui:
-            n = write_to_season_db(db, user_bot.id, args.year, bot_label=user_bot.name)
-            print(f"Wrote {n} picks to season.db's mock_draft_picks table -- see the Draft Board tab in ux/.")
+            scratch_path = write_to_season_db(db, user_bot.id, args.year, bot_label=user_bot.name)
+            if scratch_path:
+                write_league_state(scratch_path, db, args.year, season_result=season_result)
+                ux_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ux")
+                rel_from_ux = os.path.relpath(scratch_path, start=ux_dir)
+                print(f"Wrote mock_draft_picks to a scratch copy: {os.path.relpath(scratch_path)}")
+                print(f"To view it: cd ux && npm run start:local -- {rel_from_ux}")
+            else:
+                print(f"Warning: no tracked season.db for year {args.year}, skipped writing the Draft Board data.")
 
         if args.html:
             out_path = write_html(db, user_bot.id, args.html)
@@ -166,6 +224,10 @@ def main():
             print_draft_board(db, user_bot.id)
             print()
             print_roster(db, user_bot)
+
+        if season_result is not None:
+            print()
+            print_standings(db, season_result)
     finally:
         db.close()
 

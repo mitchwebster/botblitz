@@ -7,7 +7,7 @@ import json
 def get_projections_df():
     db = DatabaseManager()
     year = db.get_league_settings().year
-    
+
     expected_draft_count = {
       "RB": 52,
       "WR": 60,
@@ -16,17 +16,52 @@ def get_projections_df():
       "K": 13,
       "DST": 13
     }
-    # ESPN preseason projections (via ffanalytics), matched into season.db's
-    # external_projections table. preseason_projections (FantasyPros/ffpros)
-    # caps out at ~10 players/position regardless of year -- not usable here.
-    # ESPN's own DST scrape is broken (zero rows for that position) -- DST
-    # just won't appear in this table at all, handled below with a left join
-    # so DST players get a neutral value instead of vanishing from the pool.
-    projections_df = pd.read_sql(
-        f"SELECT fantasypros_id, position, points AS FPTS FROM external_projections "
+
+    # Canonical position per player straight from the draftable pool, rather
+    # than from any one of the three signals below -- avoids gaps/mismatches
+    # where a player is missing from one source but present in another.
+    players_pos = pd.read_sql("SELECT id AS fantasypros_id, allowed_positions FROM players", db.engine)
+    players_pos["position"] = players_pos["allowed_positions"].apply(lambda x: json.loads(x)[0].upper())
+
+    # Three equal-weight signals -- ESPN's preseason (full-season) and week 4
+    # projections, plus actual results from weeks 1-3 (already played) --
+    # matched into season.db's external_projections/weekly_stats tables.
+    # Put on a comparable per-game basis before averaging: the preseason
+    # projection is a 17-game total and the weeks 1-3 actuals are a 3-game
+    # total, while week 4's projection is already a single game. Without
+    # that the season total would just dominate by scale instead of the
+    # three actually "scoring equally".
+    season_proj = pd.read_sql(
+        f"SELECT fantasypros_id, points AS season_pts FROM external_projections "
         f"WHERE year = {year} AND week = 0 AND source = 'ESPN'",
         db.engine
     )
+    week4_proj = pd.read_sql(
+        f"SELECT fantasypros_id, points AS week4_pts FROM external_projections "
+        f"WHERE year = {year} AND week = 4 AND source = 'ESPN'",
+        db.engine
+    )
+    actual_3wk = pd.read_sql(
+        f"SELECT fantasypros_id, SUM(FPTS) AS actual_3wk_pts FROM weekly_stats "
+        f"WHERE year = {year} AND week IN (1, 2, 3) GROUP BY fantasypros_id",
+        db.engine
+    )
+
+    projections_df = players_pos[["fantasypros_id", "position"]].copy()
+    projections_df = projections_df.merge(season_proj, on="fantasypros_id", how="left")
+    projections_df = projections_df.merge(week4_proj, on="fantasypros_id", how="left")
+    projections_df = projections_df.merge(actual_3wk, on="fantasypros_id", how="left")
+
+    per_game_signals = pd.DataFrame({
+        "season": projections_df["season_pts"] / 17,
+        "actual_3wk": projections_df["actual_3wk_pts"] / 3,
+        "week4": projections_df["week4_pts"],
+    })
+    # skipna: ESPN has zero DST coverage (its own scrape is broken there), so
+    # DST's composite is just whichever of the three signals it does have
+    # (usually actual_3wk alone) rather than being wiped out by two NaNs.
+    projections_df["FPTS"] = per_game_signals.mean(axis=1, skipna=True)
+    projections_df = projections_df.dropna(subset=["FPTS"])
 
     def avg_top_by_position(group: pd.DataFrame) -> float:
         n = expected_draft_count.get(group.name.upper(), 0)
@@ -60,8 +95,9 @@ def get_my_team():
 
 def get_players_df_with_value():
     db = DatabaseManager()
+    year = db.get_league_settings().year
     players_df = pd.read_sql("SELECT * FROM players", db.engine)
-    
+
     # subtract predicted points from average drafted
     projections_df = get_projections_df()
     kept_columns = ["fantasypros_id", "FPTS", "Value"]
@@ -70,6 +106,15 @@ def get_players_df_with_value():
     df = players_df.merge(projections_df[kept_columns], left_on="id", right_on="fantasypros_id", how="left")
     df["FPTS"] = df["FPTS"].fillna(0)
     df["Value"] = df["Value"].fillna(0)
+
+    # Disqualify -- not just devalue -- anyone ruled Out for week 4 (the
+    # upcoming week). They're removed from the pool entirely rather than
+    # just scored low, so they can never be the top pick regardless of value.
+    out_df = pd.read_sql(
+        f"SELECT fantasypros_id FROM weekly_injuries WHERE year = {year} AND week = 4 AND game_status = 'Out'",
+        db.engine
+    )
+    df = df[~df["id"].isin(out_df["fantasypros_id"])]
 
     position_count_map = get_position_counts_map()
     set_position(df)
