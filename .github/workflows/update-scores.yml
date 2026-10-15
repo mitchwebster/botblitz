@@ -72,6 +72,15 @@ jobs:
       uses: r-lib/actions/setup-r@v2
 
     - name: Install R packages (ffverse)
+      # GITHUB_PAT: remotes::install_github() hits the GitHub API to resolve
+      # the repo/tarball; unauthenticated requests share a 60/hour rate limit
+      # across the whole Actions runner IP pool, which this was silently
+      # hitting on every single scheduled run (100% failure, always at this
+      # exact step -- confirmed via `gh run list`; the package itself
+      # installs fine, reproduced locally with a fresh `force=TRUE` install).
+      # The job already has a GITHUB_TOKEN; just needs to be handed to R.
+      env:
+        GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       run: |
         Rscript -e 'install.packages(c("dplyr","readr","purrr","ffpros","nflreadr","remotes"), repos = c("https://ffverse.r-universe.dev", "https://cloud.r-project.org"))'
         Rscript -e 'remotes::install_github("FantasyFootballAnalytics/ffanalytics", upgrade="never")'
