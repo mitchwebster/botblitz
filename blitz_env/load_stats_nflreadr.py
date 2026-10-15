@@ -36,6 +36,42 @@ _FETCH_SCRIPT = os.path.join(_REPO_ROOT, "fetch_stats.R")
 _TEAM_ABBR_TO_POOL = {"JAX": "JAC", "LA": "LAR"}
 
 
+def _normalize_name(name) -> str:
+    """Lowercase, alphanumeric-only key for matching names across sources that
+    format them differently (nflreadr's "player_display_name" vs the player
+    pool's "full_name") -- strips punctuation/spacing/suffix differences like
+    "A.J. Brown" vs "AJ Brown" or "Michael Pittman Jr." vs "Michael Pittman"."""
+    if not isinstance(name, str):
+        return ""
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def _name_team_crosswalk(year: int) -> pd.DataFrame:
+    """Fallback for players load_player_id_crosswalk() has no gsis_id match
+    for (a nflreadr/nflverse ID-table gap -- seen for a handful of kickers
+    and other fringe players, not limited to any one position) -- matches on
+    normalized (full_name, team) against this year's draftable pool instead.
+    Same fallback-year behavior as _dst_team_crosswalk if `year`'s pool CSV
+    isn't shipped."""
+    from blitz_env.load_players import load_players
+
+    try:
+        players = load_players(year)
+    except FileNotFoundError:
+        import glob
+        candidates = sorted(glob.glob(os.path.join(_REPO_ROOT, "blitz_env", "player_ranks_*.csv")))
+        if not candidates:
+            return pd.DataFrame(columns=["_name_key", "team", "fantasypros_id"])
+        fallback_year = int(os.path.basename(candidates[-1]).removeprefix("player_ranks_").removesuffix(".csv"))
+        players = load_players(fallback_year)
+
+    rows = [
+        {"_name_key": _normalize_name(p.full_name), "team": p.professional_team, "fantasypros_id": p.id}
+        for p in players
+    ]
+    return pd.DataFrame(rows).drop_duplicates(subset=["_name_key", "team"])
+
+
 def _dst_team_crosswalk(year: int) -> pd.DataFrame:
     """
     team abbreviation -> fantasypros_id, from the player ranks pool (DST rows).
@@ -187,6 +223,29 @@ def fetch_season_stats(year: int, summary_level: str = "week") -> tuple[pd.DataF
         ids = load_player_id_crosswalk()
         offense = offense.rename(columns={"player_id": "gsis_id"})
         offense = offense.merge(ids, on="gsis_id", how="left")
+
+        # The gsis_id crosswalk doesn't cover every player (an nflverse ID-table
+        # gap, not specific to any one position) -- for whatever's left unmatched,
+        # fall back to a name+team match against this year's draftable pool rather
+        # than leaving fantasypros_id blank. A blank id can never join back to
+        # players.id, so those rows would otherwise silently score 0 forever no
+        # matter how well the player actually did.
+        #
+        # Only applicable at the weekly level: the season-aggregate ("reg")
+        # frame has no single "team" (a player who changed teams mid-season
+        # has no one answer), just "recent_team" -- too unreliable to match a
+        # specific week's team against, so skip the fallback there rather than
+        # risk a wrong match.
+        still_missing = offense["fantasypros_id"].isna()
+        if still_missing.any() and "team" in offense.columns and "player_display_name" in offense.columns:
+            fallback = _name_team_crosswalk(year)
+            name_key = offense["player_display_name"].apply(_normalize_name)
+            team_pool = offense["team"].replace(_TEAM_ABBR_TO_POOL)
+            lookup = dict(zip(zip(fallback["_name_key"], fallback["team"]), fallback["fantasypros_id"]))
+            offense.loc[still_missing, "fantasypros_id"] = [
+                lookup.get((n, t)) for n, t in zip(name_key[still_missing], team_pool[still_missing])
+            ]
+
         offense = _add_offense_fumbles_lost(offense)
         offense = _add_legacy_aliases(offense, _OFFENSE_LEGACY_ALIASES)
         if "FPTS" in offense.columns:
