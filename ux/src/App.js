@@ -377,8 +377,15 @@ function App() {
       }
     }
 
+    // Draft Board works from either source: a harness mock draft
+    // (mock_draft_picks, written by harness.cli_draft) or a real engine draft
+    // (no such table -- just players.pick_chosen/current_bot_id set directly).
+    // Prefer mock_draft_picks when both happen to be present, since harness
+    // runs are meant to be disposable/frequent and shouldn't be shadowed by
+    // whatever real draft the tracked season.db also carries.
+    let mockDraftExists = false;
+    let realDraftExists = false;
     if (activeTab === "draftBoard") {
-      let mockDraftExists = false;
       try {
         const tableCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='mock_draft_picks';");
         mockDraftExists = tableCheck.length > 0 && tableCheck[0].values.length > 0;
@@ -386,7 +393,15 @@ function App() {
         mockDraftExists = false;
       }
       if (!mockDraftExists) {
-        setError("No mock draft has been run against this db yet. Run harness.cli_draft (writes to season.db's mock_draft_picks table by default).");
+        try {
+          const realCheck = db.exec("SELECT 1 FROM players WHERE pick_chosen IS NOT NULL LIMIT 1;");
+          realDraftExists = realCheck.length > 0 && realCheck[0].values.length > 0;
+        } catch (e) {
+          realDraftExists = false;
+        }
+      }
+      if (!mockDraftExists && !realDraftExists) {
+        setError("No draft has been run against this db yet -- neither a real engine draft (players.pick_chosen) nor a harness mock draft (mock_draft_picks).");
         setColumns([]);
         setData([]);
         return;
@@ -539,7 +554,7 @@ function App() {
         LEFT JOIN weekly_injuries wi ON wi.fantasypros_id = p.id AND wi.week = ${projWeek} AND wi.year = ${dbYear ?? CURRENT_SEASON_YEAR}
         ORDER BY actualPoints DESC
       `,
-      draftBoard: `
+      draftBoard: mockDraftExists ? `
         SELECT
           mdp.pick, mdp.round, mdp.team_slot, mdp.team_name, mdp.team_owner, mdp.is_user,
           mdp.fantasypros_id, mdp.player_name, mdp.position, mdp.nfl_team, mdp.bot_label,
@@ -549,6 +564,56 @@ function App() {
           SELECT fantasypros_id, year, SUM(FPTS) AS actualPoints FROM weekly_stats GROUP BY fantasypros_id, year
         ) ap ON ap.fantasypros_id = mdp.fantasypros_id AND ap.year = mdp.year
         ORDER BY mdp.pick
+      ` : `
+        -- Real engine draft: there's no mock_draft_picks table at all, just
+        -- players.pick_chosen/current_bot_id. Reconstruct the same grid shape
+        -- (pick/round/team_slot/...) straight from that, using the same snake
+        -- math as harness.simulate_draft.get_picking_team_index and the Go
+        -- engine's DraftHandler -- team_slot is "which position this team
+        -- picked in round 1", which stays that team's fixed column for every
+        -- later round regardless of snake reversal.
+        WITH num_teams_cte AS (SELECT COUNT(*) AS n FROM bots),
+        picks AS (
+          SELECT
+            p.pick_chosen AS pick,
+            p.id AS fantasypros_id,
+            p.full_name AS player_name,
+            trim(replace(replace(replace(p.allowed_positions, '[', ''), ']', ''), '"', '')) AS position,
+            p.professional_team AS nfl_team,
+            p.current_bot_id AS bot_id
+          FROM players p
+          WHERE p.pick_chosen IS NOT NULL
+        ),
+        slotted AS (
+          SELECT picks.*, nt.n AS num_teams,
+            ((pick - 1) / nt.n) + 1 AS round,
+            (pick - 1) % nt.n AS pos_in_round
+          FROM picks, num_teams_cte nt
+        ),
+        withslot AS (
+          SELECT *,
+            CASE WHEN round % 2 = 1 THEN pos_in_round ELSE (num_teams - 1 - pos_in_round) END AS team_slot
+          FROM slotted
+        ),
+        slot_to_bot AS (
+          SELECT team_slot, bot_id FROM withslot WHERE round = 1
+        )
+        SELECT
+          w.pick, w.round, w.team_slot,
+          b.name AS team_name,
+          b.owner AS team_owner,
+          0 AS is_user,
+          w.fantasypros_id, w.player_name, w.position, w.nfl_team,
+          b.name AS bot_label,
+          COALESCE(ap.actualPoints, 0) AS actualPoints
+        FROM withslot w
+        JOIN slot_to_bot st ON st.team_slot = w.team_slot
+        JOIN bots b ON b.id = st.bot_id
+        LEFT JOIN (
+          SELECT fantasypros_id, year, SUM(FPTS) AS actualPoints FROM weekly_stats
+          WHERE year = ${dbYear ?? CURRENT_SEASON_YEAR} GROUP BY fantasypros_id, year
+        ) ap ON ap.fantasypros_id = w.fantasypros_id
+        ORDER BY w.pick
       `,
     };
 
@@ -911,7 +976,9 @@ function App() {
           </tbody>
         </table>
 
-        <p style={{ marginBottom: "0.75rem" }}><strong>{botLabel}</strong>'s column is highlighted below.</p>
+        {teams.some((t) => t.is_user) && (
+          <p style={{ marginBottom: "0.75rem" }}><strong>{botLabel}</strong>'s column is highlighted below.</p>
+        )}
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", border: `1px solid ${vars.border}`, marginBottom: "2rem" }}>
             <thead>
