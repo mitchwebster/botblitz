@@ -208,10 +208,18 @@ def fetch_season_stats(year: int, summary_level: str = "week") -> tuple[pd.DataF
         dst_week = os.path.join(tmpdir, "dst_week.csv")
         dst_season = os.path.join(tmpdir, "dst_season.csv")
 
-        subprocess.run(
-            ["Rscript", _FETCH_SCRIPT, str(year), off_week, off_season, dst_week, dst_season],
-            check=True, capture_output=True, text=True, timeout=300,
-        )
+        try:
+            subprocess.run(
+                ["Rscript", _FETCH_SCRIPT, str(year), off_week, off_season, dst_week, dst_season],
+                check=True, capture_output=True, text=True, timeout=300,
+            )
+        except subprocess.CalledProcessError as e:
+            # capture_output hides Rscript's own stderr/stdout from the
+            # caller entirely -- on CI this showed only a bare "returned
+            # non-zero exit status 1" with zero information about why.
+            # Print what R actually said before failing the same way.
+            print(f"fetch_stats.R failed (exit {e.returncode}). stdout:\n{e.stdout}\nstderr:\n{e.stderr}")
+            raise
 
         off_path = off_week if summary_level == "week" else off_season
         dst_path = dst_week if summary_level == "week" else dst_season
