@@ -384,6 +384,11 @@ def _draft(db) -> str:
 
     order = market_order(pool)
     need = unfilled_required(slots_cfg, list(mine["pos"]))
+    # Never roster a backup K/DST: in best ball a bench RB/WR's weekly upside is
+    # worth more than a second DST's bye-week cover.
+    capped = {p for p in DEFERRABLE
+              if list(mine["pos"]).count(p) >= int(slots_cfg.get(p, 0))}
+    pool = pool[~pool["pos"].isin(capped)]
     cand_pool = pool
     deferred = set()
     if need and picks_left <= sum(need.values()):
