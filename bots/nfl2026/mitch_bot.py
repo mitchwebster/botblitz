@@ -1,15 +1,18 @@
 """mitch_bot — a value-based bot for the BotBlitz 2026 mid-season superflex draft.
 
 The 2026 league drafts mid-season and scores every week from week 1 (best-ball
-lineups on actual points). Players are valued on rest-of-season points; their weeks 1-5
-production enters through the points-per-game blend rather than being added in full.
-Evaluated on a 2025 replay, adding banked weeks 1-5 points outright drafted worse
-(141 vs 149 starter pts/week over weeks 1-14): it overpaid for hot starts whose
-points mostly sat on a bench, while the blend already favours early performers.
+lineups on actual points). A player is valued on rest-of-season points plus HALF the
+points he has already scored: those weeks count, but only points that would have
+started, and other teams chase hot starts too. Against the other 2026 bots (2026 wks
+1-5), half weight lifted starter pts/week from 129.6 to 140.6 vs ignoring banked
+points; on a 2025 replay (wks 1-14) it scored 153.0 vs 150.8, where full weight
+overpaid for hot starts and fell to 141.5.
 
-  * draft_player          — Value-Over-Replacement drafting on rest-of-season points:
-                            blended points-per-game x remaining games (byes excluded,
-                            minus a game for anyone listed Out), plus a bonus for
+  * draft_player          — Value-Over-Replacement drafting on season value:
+                            0.5 x points already scored + blended points-per-game x
+                            remaining games (byes excluded, minus a game for anyone
+                            listed Out; a player no source projects this week while
+                            his team plays counts as projected 0), plus a bonus for
                             positional outliers and for players with a big drop-off
                             to what's left at my next pick. Diminishing returns past
                             the startable slots keep the roster balanced; K/DST are
@@ -43,7 +46,12 @@ REPLAY_DRAFT_WEEK = 6
 # per-position optima and beat every input alone, so it's kept simple rather than
 # tuned per position on one season. Missing inputs are dropped and the rest reweighted.
 PPG_WEIGHTS = {"weekly": 0.50, "actual": 0.25, "pre": 0.25}
-MIN_GAMES_FOR_ACTUAL = 2  # fewer games than this and actual PPG is too noisy to use
+MIN_GAMES_FOR_ACTUAL = 2
+
+# Share of points already scored (weeks before the draft) added to a player's value.
+# Those weeks are scored, but only the points that would have STARTED count, and other
+# teams chase hot starts too -- so it's partial, not the full banked total.
+BANKED_WEIGHT = 0.5  # fewer games than this and actual PPG is too noisy to use
 
 # Roster construction targets / floors.
 MAX_AT_POSITION = {"QB": 3, "RB": 5, "WR": 6, "TE": 2, "K": 1, "DST": 1}
@@ -158,13 +166,28 @@ def _ppg_estimates(db, year, week):
     """id -> blended points-per-game going forward, from next week's projection, actual
     PPG so far (weeks < `week`, games played only), and preseason projection / 17."""
     ext = pd.read_sql(
-        f"SELECT fantasypros_id AS id, CAST(week AS INTEGER) AS week, points FROM external_projections "
-        f"WHERE year = {year} AND CAST(week AS INTEGER) IN (0, {week})",
+        f"SELECT fantasypros_id AS id, CAST(week AS INTEGER) AS week, position, points "
+        f"FROM external_projections WHERE year = {year} AND CAST(week AS INTEGER) IN (0, {week})",
         db.engine,
     )
     ext["id"] = ext["id"].astype(str)
-    weekly = ext[ext["week"] == week].groupby("id")["points"].mean()
-    pre = ext[ext["week"] == 0].groupby("id")["points"].mean() / 17.0
+    this_week = ext[ext["week"] == week]
+    weekly = this_week.groupby("id")["points"].mean()
+    pre_rows = ext[ext["week"] == 0]
+    pre = pre_rows.groupby("id")["points"].mean() / 17.0
+
+    # No projection this week from any source means "not expected to play" (injured,
+    # IR, benched) -- count it as 0 rather than falling back to the preseason number.
+    # Exceptions: his team is on bye (no one on it is projected this week), or no source
+    # covers his position this week; then it's just missing and the blend reweights.
+    teams = pd.read_sql("SELECT id, professional_team FROM players", db.engine)
+    team_of = dict(zip(teams["id"].astype(str), teams["professional_team"]))
+    playing_teams = {team_of.get(pid) for pid in this_week["id"]}
+    covered_positions = set(this_week["position"])
+    for pid, pos in pre_rows.groupby("id")["position"].first().items():
+        if (pid not in weekly.index and pos in covered_positions
+                and team_of.get(pid) in playing_teams):
+            weekly.loc[pid] = 0.0
 
     stats = pd.read_sql(
         f"SELECT fantasypros_id AS id, FPTS FROM weekly_stats "
@@ -181,6 +204,18 @@ def _ppg_estimates(db, year, week):
     num = sum(df[k].fillna(0.0) * w for k, w in PPG_WEIGHTS.items())
     den = sum(df[k].notna() * w for k, w in PPG_WEIGHTS.items())
     return (num / den).dropna().to_dict()
+
+
+def _banked_points(db, year, week):
+    """id -> points already scored this season (weeks before `week`)."""
+    df = pd.read_sql(
+        f"SELECT fantasypros_id AS id, FPTS FROM weekly_stats "
+        f"WHERE year = {year} AND CAST(week AS INTEGER) < {week} AND fantasypros_id IS NOT NULL",
+        db.engine,
+    )
+    df["id"] = df["id"].astype(str)
+    df["FPTS"] = pd.to_numeric(df["FPTS"], errors="coerce").fillna(0.0)
+    return df.groupby("id")["FPTS"].sum().to_dict()
 
 
 def _out_ids(db, year, week):
@@ -296,7 +331,10 @@ def draft_player() -> str:
             max(0, games.get(team, default_games) - (1 if str(pid) in out else 0))
             for pid, team in zip(everyone["id"], everyone["professional_team"])
         ]
-        everyone["ros"] = everyone["ppg"] * everyone["games"]
+        forward = everyone["ppg"] * everyone["games"]
+        past = everyone["id"].astype(str).map(_banked_points(db, year, week))
+        everyone["ros"] = forward.fillna(0.0) + BANKED_WEIGHT * past.fillna(0.0)
+        everyone.loc[forward.isna() & past.isna(), "ros"] = float("nan")  # nothing known
         outlier = _outlier_bonus(everyone, settings["num_teams"])
 
         avail = everyone[everyone["availability"] == "AVAILABLE"].copy()
