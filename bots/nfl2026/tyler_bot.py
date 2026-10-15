@@ -8,6 +8,7 @@ import datetime
 import json
 import os
 import re
+import threading
 import time
 
 import numpy as np
@@ -698,29 +699,57 @@ def _llm_pick(shortlist: pd.DataFrame, model: Model, mine: pd.DataFrame, round_n
         "changes, trades) and pick the one who will score the most fantasy points for the rest of "
         'the season. Reply with only JSON: {"id": "<id>", "reason": "<15 words max>"}'
     )
-    client = OpenAI(api_key=key, timeout=max(5.0, time_left - 4.0), max_retries=0)
-    try:
+    deadline_s = max(5.0, time_left - 4.0)
+
+    def call():
+        client = OpenAI(api_key=key, timeout=deadline_s, max_retries=0)
         resp = client.responses.create(
-            model=os.getenv("TYLER_BOT_LLM_MODEL", "gpt-5-mini"),
+            model=os.getenv("TYLER_BOT_LLM_MODEL", "gpt-6.1-sol"),
             input=prompt,
             tools=[{"type": "web_search"}],
-            reasoning={"effort": "low"},
+            reasoning={"effort": os.getenv("TYLER_BOT_LLM_REASONING", "high")},
         )
-        text = resp.output_text or ""
-    except Exception as e:  # noqa: BLE001
-        print(f"{TAG} LLM call failed: {e!r}")
-        return None
-    match = re.search(r"\{.*\}", text, re.S)
+        return resp.output_text or ""
+
+    t0 = time.time()
     try:
+        text = _call_with_deadline(call, deadline_s)
+    except Exception as e:  # noqa: BLE001 - bad key, network, API or timeout: keep the model's pick
+        print(f"{TAG} LLM call failed after {time.time() - t0:.1f}s: {e!r}")
+        return None
+    elapsed = time.time() - t0
+    try:
+        match = re.search(r"\{.*\}", text, re.S)
         answer = json.loads(match.group(0)) if match else {}
-    except json.JSONDecodeError:
-        answer = {}
-    pid = str(answer.get("id", ""))
+        pid = str(answer.get("id", "")) if isinstance(answer, dict) else ""
+    except Exception:  # noqa: BLE001
+        answer, pid = {}, ""
     if pid in shortlist.index:
-        print(f"{TAG} LLM picked {shortlist.at[pid, 'full_name']}: {answer.get('reason', '')}")
+        print(f"{TAG} LLM picked {shortlist.at[pid, 'full_name']} in {elapsed:.1f}s: {answer.get('reason', '')}")
         return pid
-    print(f"{TAG} LLM answer unusable: {text[:200]!r}")
+    print(f"{TAG} LLM answer unusable after {elapsed:.1f}s: {str(text)[:200]!r}")
     return None
+
+
+def _call_with_deadline(fn, timeout_s: float):
+    """Run fn() with a hard wall-clock limit. The worker is a daemon thread, so a hung
+    request can't keep the per-pick process alive past the engine's deadline."""
+    result = {}
+
+    def run():
+        try:
+            result["value"] = fn()
+        except BaseException as e:  # noqa: BLE001
+            result["error"] = e
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(timeout_s)
+    if worker.is_alive():
+        raise TimeoutError(f"no response within {timeout_s:.0f}s")
+    if "error" in result:
+        raise result["error"]
+    return result["value"]
 
 
 # --------------------------------------------------------------------------- draft
@@ -853,8 +882,12 @@ def _pick(db, started: float) -> str:
         close = candidates["score"] >= candidates["score"].iloc[0] - LLM_MARGIN_POINTS
     shortlist = candidates[close].head(LLM_MAX_CHOICES)
     if len(shortlist) > 1:
-        llm = _llm_pick(shortlist, model, mine, (pick_no - 1) // num_teams + 1, num_teams,
-                        PICK_BUDGET_S - (time.time() - started))
+        try:
+            llm = _llm_pick(shortlist, model, mine, (pick_no - 1) // num_teams + 1, num_teams,
+                            PICK_BUDGET_S - (time.time() - started))
+        except Exception as e:  # noqa: BLE001 - never let the LLM path cost us the model's pick
+            print(f"{TAG} LLM tiebreak failed ({e!r}); keeping the model's pick")
+            llm = None
         if llm:
             choice = llm
     print(f"{TAG} drafting {df.at[choice, 'full_name']} ({df.at[choice, 'position']}) "
