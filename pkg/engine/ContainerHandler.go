@@ -142,6 +142,13 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 		return err
 	}
 
+	if snapshotPath, ok := e.dbSnapshotPaths[containerId]; ok {
+		if removeErr := os.Remove(snapshotPath); removeErr != nil && !os.IsNotExist(removeErr) {
+			fmt.Printf("Warning: failed to remove db snapshot %q: %v\n", snapshotPath, removeErr)
+		}
+		delete(e.dbSnapshotPaths, containerId)
+	}
+
 	return nil
 }
 
@@ -225,6 +232,62 @@ func cleanBotResources() error {
 	return nil
 }
 
+// refreshDbSnapshot overwrites the CONTENTS of the already-mounted
+// snapshotPath file with the current state of the live DB, in place (same
+// inode) rather than deleting and recreating it at that path.
+//
+// This matters because a bot's container gets reused across every pick it
+// makes for the rest of the draft (see getOrCreateBotContainer) -- a Docker
+// bind mount of a single file is pinned to the inode present at mount time,
+// so a container's very first pick sees a correct, fresh snapshot, but every
+// later pick on that same (reused) container would otherwise keep seeing
+// that exact same frozen, round-1-era snapshot forever: bots kept trying to
+// re-draft players they (or someone else) had already taken in round 2+.
+// Truncating and rewriting the existing file's content -- rather than
+// swapping in a new file at the same path -- keeps the already-established
+// mount pointed at live data on every call, not just the first.
+//
+// VACUUM INTO can't target a path that already exists, so the fresh snapshot
+// is built at a scratch path first and then copied over the existing
+// (mounted) file. Uses the engine's normal shared DB connection -- there was
+// no actual reason this needed its own dedicated connection, that was a
+// wrong theory from an earlier pass at this bug.
+func (e *BotEngine) refreshDbSnapshot(snapshotPath string) error {
+	tmpFile, err := os.CreateTemp("", "botblitz-db-snapshot-refresh-*.db")
+	if err != nil {
+		return fmt.Errorf("unable to create refresh temp file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	if err := os.Remove(tmpPath); err != nil {
+		return fmt.Errorf("unable to clear refresh temp file: %v", err)
+	}
+	defer os.Remove(tmpPath)
+
+	if err := e.gameStateHandler.GetDB().Exec("VACUUM INTO ?", tmpPath).Error; err != nil {
+		return fmt.Errorf("unable to snapshot database: %v", err)
+	}
+
+	data, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return fmt.Errorf("unable to read refreshed snapshot: %v", err)
+	}
+
+	return os.WriteFile(snapshotPath, data, 0644)
+}
+
+// refreshDbSnapshotForContainer refreshes the DB snapshot bind-mounted into
+// containerId, if one is tracked for it. A no-op (not an error) for a
+// container with no tracked snapshot, which shouldn't normally happen since
+// every container created by createAndStartContainer gets one.
+func (e *BotEngine) refreshDbSnapshotForContainer(containerId string) error {
+	snapshotPath, ok := e.dbSnapshotPaths[containerId]
+	if !ok {
+		return nil
+	}
+	return e.refreshDbSnapshot(snapshotPath)
+}
+
 func (e *BotEngine) createAndStartContainer(env []string, port int) (string, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -268,6 +331,25 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 
 	databaseFilePath := appServerFolderPath + "/" + gamestate.AppDatabaseName
 
+	// Bind-mount a disposable per-container snapshot file instead of the live DB
+	// directly. The host keeps writing picks to the live file between containers,
+	// and Docker Desktop's macOS file-sharing layer doesn't reliably propagate
+	// POSIX file locks across the host<->container boundary for a bind mount -- so
+	// a container could otherwise start reading at the exact moment the host is
+	// mid-write and catch a torn page, which SQLite reports as "database disk
+	// image is malformed" even though the file is fine a moment later.
+	//
+	// Just needs to exist for Docker to mount; refreshDbSnapshot (called before
+	// every RPC, see startContainerAndPerformDraftAction) fills in and keeps
+	// refreshing its real content for as long as this container lives --
+	// cleaned up in shutDownAndCleanBotServer.
+	snapshotFile, err := os.CreateTemp("", "botblitz-db-snapshot-*.db")
+	if err != nil {
+		return "", fmt.Errorf("unable to create db snapshot file: %v", err)
+	}
+	snapshotPath := snapshotFile.Name()
+	snapshotFile.Close()
+
 	createResponse, err := apiClient.ContainerCreate(
 		context.Background(),
 		&container.Config{
@@ -287,7 +369,7 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 				{
 					Type:     mount.TypeBind,
 					ReadOnly: true,
-					Source:   e.gameStateHandler.GetDBSaveFilePath(),
+					Source:   snapshotPath,
 					Target:   databaseFilePath,
 				},
 			},
@@ -298,8 +380,11 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 		"",
 	)
 	if err != nil {
+		os.Remove(snapshotPath)
 		return "", fmt.Errorf("unable to create container: %v", err)
 	}
+
+	e.dbSnapshotPaths[createResponse.ID] = snapshotPath
 
 	err = apiClient.ContainerStart(context.Background(), createResponse.ID, container.StartOptions{})
 	if err != nil {
@@ -504,6 +589,14 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		return "", err
 	}
 
+	// Refresh on every call, not just the first: this container may be a
+	// reused one from an earlier pick (see getOrCreateBotContainer), whose
+	// bind-mounted snapshot would otherwise still reflect the DB as it stood
+	// when the container was first created.
+	if err := e.refreshDbSnapshotForContainer(containerInfo.ContainerID); err != nil {
+		return "", err
+	}
+
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
@@ -525,6 +618,10 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 func (e *BotEngine) startContainerAndPerformWeeklyFantasyActions(ctx context.Context, bot *gamestate.Bot) (selections *common.AttemptedFantasyActions, returnError error) {
 	containerInfo, err := e.getOrCreateBotContainer(bot)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := e.refreshDbSnapshotForContainer(containerInfo.ContainerID); err != nil {
 		return nil, err
 	}
 

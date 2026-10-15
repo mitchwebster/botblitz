@@ -234,15 +234,6 @@ func fetchBotList() []*common.Bot {
 			FantasyTeamName: "Justin's team",
 		},
 		{
-			Id:              "3",
-			SourceType:      common.Bot_LOCAL,
-			SourcePath:      "/bots/nfl2025/ryan_bot.py",
-			Owner:           "Ryan",
-			FantasyTeamName: "Ryan's team",
-			EnvPath:         "/bots/nfl/envs/ryan.env",
-			GithubEnvName:   "RYAN_ENV",
-		},
-		{
 			Id:              "4",
 			SourceType:      common.Bot_LOCAL,
 			SourcePath:      "/bots/nfl2026/philip_bot.py",
@@ -257,20 +248,6 @@ func fetchBotList() []*common.Bot {
 			SourcePath:      "/bots/nfl2026/chrish_bot.py",
 			Owner:           "Chris H",
 			FantasyTeamName: "Chris H's team",
-		},
-		{
-			Id:              "6",
-			SourceType:      common.Bot_LOCAL,
-			SourcePath:      "/bots/nfl2025/parker_bot.py",
-			Owner:           "Parker",
-			FantasyTeamName: "Parker's team",
-		},
-		{
-			Id:              "7",
-			SourceType:      common.Bot_LOCAL,
-			SourcePath:      "/bots/nfl2025/standard-bot.py",
-			Owner:           "Claude",
-			FantasyTeamName: "Standard Bot",
 		},
 		{
 			Id:              "14",
@@ -432,8 +409,16 @@ func fetchEnvVars(bot *common.Bot) ([]string, error) {
 			return env, err
 		}
 
-		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time
-		env = append(strings.Split(string(envContent), "\n"))
+		// Assuming env file is formatted properly (key=value), TODO: Add validation at a later time.
+		// Blank lines are skipped -- an empty/placeholder env file would otherwise split into a
+		// single "" entry, which Docker rejects outright as an invalid environment variable,
+		// failing every pick for that bot.
+		for _, line := range strings.Split(string(envContent), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				env = append(env, line)
+			}
+		}
 		fmt.Printf("Retrieved env vars from local file system: %s\n", bot.EnvPath)
 	}
 
