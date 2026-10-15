@@ -104,10 +104,10 @@ WAIVER_CANDIDATES = 40  # free agents considered, by rest-of-season value
 WAIVER_CANDIDATES_PER_POS = 3  # plus the best few at every position (bye-week K/DST streams)
 WAIVER_SIMS = 200
 WAIVER_MIN_GAIN = 3.0  # expected season points a swap must add to be worth a claim
-WAIVER_UPGRADE_PTS_PER_WEEK = 8.0  # prices a point of gain: budget / (weighted weeks left x this)
-WAIVER_MAX_BID_FRAC = 0.5  # never bid more than this share of the remaining budget at once
-WAIVER_CONTESTED_TOP_N = 5  # free agents in the top N by value or rank are likely contested
-WAIVER_UNCONTESTED_DISCOUNT = 0.4
+# Bid a share of the REMAINING budget by the target's rank among this week's upgrades (best
+# gain first): top target 30%, next two 15%, next five 8%, the rest 4%. Won head-to-head
+# 2025 tournaments vs. gain-priced bidding (1x-3x) and other tier strengths.
+WAIVER_BID_TIERS = ((1, 0.30), (3, 0.15), (8, 0.08), (None, 0.04))
 MAX_CLAIMS = 10
 MAX_CLAIMS_PER_ADD = 2  # best drop + one fallback drop per target
 DEFAULT_WAIVER_BUDGET = 100
@@ -1040,17 +1040,12 @@ def _waiver_claims(db) -> list:
         return []
     pairs.sort(reverse=True)
 
-    # Price a point of gain from the budget left and the (weighted) weeks it has to cover.
-    dollars_per_point = budget / max(20.0, week_w.sum() * WAIVER_UPGRADE_PTS_PER_WEEK)
-    rank = pd.to_numeric(free["rank"], errors="coerce")
-    contested = set(free.head(WAIVER_CONTESTED_TOP_N).index) | set(rank.nsmallest(WAIVER_CONTESTED_TOP_N).index)
-    best_gain = {}
-    for gain, a, _ in pairs:
-        best_gain.setdefault(a, gain)
+    targets = list(dict.fromkeys(a for _, a, _ in pairs))  # by best gain
 
     def bid_for(a):
-        bid = best_gain[a] * dollars_per_point * (1.0 if a in contested else WAIVER_UNCONTESTED_DISCOUNT)
-        return int(max(1, min(round(bid), budget * WAIVER_MAX_BID_FRAC, budget)))
+        rank = targets.index(a) + 1
+        frac = next(f for cap, f in WAIVER_BID_TIERS if cap is None or rank <= cap)
+        return int(min(budget, max(1, round(budget * frac))))
 
     # Best pairs first; later pairs reusing a won add or a used drop become the engine-side
     # fallbacks (it voids claims whose add was won or whose drop already left).
