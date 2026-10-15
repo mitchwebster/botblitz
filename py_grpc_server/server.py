@@ -1,11 +1,19 @@
 from concurrent import futures
 import logging
-import subprocess, os, json
+import subprocess, os, json, hmac
 from google.protobuf.json_format import ParseDict
 from blitz_env import DraftSelection, AttemptedFantasyActions
 
 import grpc
 from agent_pb2_grpc import AgentServiceServicer, add_AgentServiceServicer_to_server
+
+# Per-container secret from the engine (BOTBLITZ_RPC_TOKEN, see ContainerHandler.go).
+# Every RPC must carry it, so another bot that can reach this port (e.g. via
+# host.docker.internal on Docker Desktop) can't call — or flood — this bot. Popped
+# before any bot code is imported just to keep it out of the bot's way; a bot can only
+# ever learn its own container's token, which grants nothing.
+_RPC_TOKEN = os.environ.pop("BOTBLITZ_RPC_TOKEN", "")
+_RPC_TOKEN_METADATA_KEY = "x-botblitz-token"
 
 # When BOTBLITZ_EVAL_INLINE=1 is set (evaluation path only), the bot module is imported
 # once at server startup so subsequent calls pay no Python cold-start cost. The
@@ -14,6 +22,23 @@ _INLINE = os.getenv("BOTBLITZ_EVAL_INLINE") == "1"
 if _INLINE:
     import bot as _bot_module
     print("BOTBLITZ_EVAL_INLINE: bot module loaded, using in-process execution")
+
+
+class _RequireTokenInterceptor(grpc.ServerInterceptor):
+    def __init__(self, token):
+        self._token = token.encode()
+
+        def deny(request, context):
+            context.abort(grpc.StatusCode.UNAUTHENTICATED, "missing or invalid rpc token")
+
+        self._deny_handler = grpc.unary_unary_rpc_method_handler(deny)
+
+    def intercept_service(self, continuation, handler_call_details):
+        metadata = dict(handler_call_details.invocation_metadata or ())
+        supplied = metadata.get(_RPC_TOKEN_METADATA_KEY, "").encode()
+        if hmac.compare_digest(supplied, self._token):
+            return continuation(handler_call_details)
+        return self._deny_handler
 
 class AgentServiceServicer(AgentServiceServicer):
 
@@ -70,7 +95,10 @@ class AgentServiceServicer(AgentServiceServicer):
         return ParseDict(result_dict, AttemptedFantasyActions())
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    # Without a token (running server.py by hand) there's nothing to check against;
+    # the engine always sets one.
+    interceptors = [_RequireTokenInterceptor(_RPC_TOKEN)] if _RPC_TOKEN else []
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), interceptors=interceptors)
     add_AgentServiceServicer_to_server(
         AgentServiceServicer(), server
     )

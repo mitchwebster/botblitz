@@ -67,6 +67,15 @@ the draft/scoring data model to **SQLite**.
 So the user's `bot.py` overwrites the default `py_grpc_server/bot.py` at runtime, and every
 bot runs against the current wheel.
 
+**Bot-to-bot isolation** (`createAndStartContainer`, `ensureBotNetwork` in
+`ContainerHandler.go`): containers join the `botblitz_bots` bridge network with
+inter-container communication disabled (internet egress still works — some bots call
+external APIs), publish their gRPC port on `127.0.0.1` only, and have a `PidsLimit`.
+Because Docker Desktop's `host.docker.internal` still reaches the host's loopback (and so
+every bot's port), each container also gets a random `BOTBLITZ_RPC_TOKEN` that
+`py_grpc_server/server.py` requires on every RPC — another bot can reach the port but
+can't call it.
+
 ## 5. Build & codegen
 
 - `make gen` — regenerates proto for **both** Go (`pkg/common/agent*.pb.go`) and Python.
