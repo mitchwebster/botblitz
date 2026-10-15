@@ -25,9 +25,15 @@ Projection (per player, per week):
 Draft: value-based drafting done against the real lineup. Each pick takes the player
 who adds the most best-lineup points over weeks 1-17 to the roster so far, with open
 slots filled at replacement level. That covers position scarcity (SUPERFLEX makes QBs
-scarce), team needs and bye overlap at once. K and DST wait for the last rounds, and
-one of each is guaranteed. If PHILIP_TOKEN holds an OpenAI key, the model breaks
-near-ties among the top few picks; it can never pick outside that shortlist.
+scarce), team needs and bye overlap at once. Points already scored this season are
+credited at full value (they count the moment the player is drafted), so a hot start
+is banked, not just a signal. K and DST wait for the last rounds, and one of each is
+guaranteed. Near-ties go to the player with the better consensus rank, since he is
+the one least likely to come back at the next pick.
+
+Fully deterministic and offline: no AI or network calls, and any missing optional
+table (projections, schedule, injuries) just falls back to the next data source. If
+the model itself fails, the pick falls back to best available by consensus rank.
 
 Weekly: FAAB add/drops judged on the weeks still to play, using only weeks before
 the current fantasy week. Each target gets a backup claim with the same drop
@@ -37,7 +43,6 @@ whose drop player is already gone).
 
 import ast
 import json
-import os
 import zlib
 from typing import Dict, List, Optional
 
@@ -47,11 +52,6 @@ from sqlalchemy import text
 
 from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
-
-try:  # optional: the bot runs fine without OpenAI
-    from openai import OpenAI
-except Exception:  # pragma: no cover
-    OpenAI = None
 
 
 SEASON_WEEKS = 17
@@ -76,8 +76,8 @@ REFERENCE_TEAMS = 14
 MAX_DRAFTED = {"QB": 3, "TE": 2, "K": 1, "DST": 1}
 MIN_DRAFTED = {"K": 1, "DST": 1}
 SPECIALIST_ROUNDS = 3  # K/DST only in the last N rounds (unless forced)
-AI_SHORTLIST = 5
-AI_BAND = 0.04  # candidates within 4% of the best gain are "near-ties"
+TIE_BAND = 0.02  # within 2% (or 2 points) of the best gain counts as a near-tie
+TIE_POINTS = 2.0
 
 # Weekly guardrails.
 MAX_CLAIMS = 10
@@ -121,39 +121,33 @@ def norm_id(value) -> Optional[str]:
 
 class PhilipFantasyBot:
     """
-    Philip's Fantasy Football AI Bot (2026 edition)
+    Philip's Fantasy Football Bot (2026 edition)
 
     Strategy:
     - Value-based drafting measured as best-lineup points added
     - Position scarcity through replacement levels (SUPERFLEX-aware)
     - Team needs, byes and injuries handled by the lineup simulation
-    - Optional AI tiebreaker among near-equal picks
+    - Near-ties broken by consensus rank
     - Risk management: K/DST late, position caps, conservative FAAB
     """
 
     def __init__(self):
         self.db = DatabaseManager()
-        self.openai_client = None
-        self.setup_openai()
-
-    def setup_openai(self):
-        """Initialize OpenAI client if token is available"""
-        token = os.environ.get("PHILIP_TOKEN")
-        if token and OpenAI is not None:
-            try:
-                self.openai_client = OpenAI(api_key=token, timeout=25.0, max_retries=0)
-                print("OpenAI client initialized")
-            except Exception as e:
-                print(f"Failed to initialize OpenAI client: {e}")
-                self.openai_client = None
-        else:
-            print("No OpenAI token found; using the algorithm only")
 
     def close(self):
         if self.db:
             self.db.close()
 
     # ------------------------------------------------------------------ data
+
+    def _read(self, sql: str, columns: List[str]) -> pd.DataFrame:
+        """Optional table read: an empty frame (with the expected columns) on any error,
+        so a missing or malformed table degrades the projection instead of the pick."""
+        try:
+            return pd.read_sql(sql, self.db.engine)
+        except Exception as e:
+            print(f"Could not read optional data ({e.__class__.__name__}); continuing without it")
+            return pd.DataFrame(columns=columns)
 
     def load(self, known_upto: Optional[int] = None) -> Dict:
         """Read everything once. Weeks after `known_upto` are treated as unplayed."""
@@ -173,10 +167,10 @@ class PhilipFantasyBot:
         players = players[players["pos"].isin(POSITIONS) & players["pid"].notna()].copy()
         players = players.drop_duplicates("pid").reset_index(drop=True)
 
-        stats = pd.read_sql(
+        stats = self._read(
             f"SELECT fantasypros_id, year, week, team, FPTS FROM weekly_stats "
             f"WHERE year IN ({year - 1}, {year})",
-            engine,
+            ["fantasypros_id", "year", "week", "team", "FPTS"],
         )
         stats["pid"] = stats["fantasypros_id"].map(norm_id)
         stats["week"] = pd.to_numeric(stats["week"], errors="coerce")
@@ -198,33 +192,35 @@ class PhilipFantasyBot:
         last_year = stats[stats["year"] == year - 1].groupby("pid")["FPTS"].agg(["mean", "count"])
         prev_rate = (last_year[last_year["count"] >= 4]["mean"] * 0.9).to_dict()
 
-        ext = pd.read_sql(
+        ext = self._read(
             f"SELECT fantasypros_id, source, position, points FROM external_projections "
             f"WHERE year = {year} AND week = 0",
-            engine,
+            ["fantasypros_id", "source", "position", "points"],
         )
         ext["pid"] = ext["fantasypros_id"].map(norm_id)
         # FFToday's kicker season totals leave out field goals.
         ext = ext[~((ext["position"] == "K") & (ext["source"] == "FFToday"))]
-        ext_rate = (ext.groupby("pid")["points"].mean() / SEASON_WEEKS).to_dict()
+        ext_rate = (pd.to_numeric(ext["points"], errors="coerce").groupby(ext["pid"]).mean()
+                    / SEASON_WEEKS).dropna().to_dict()
 
-        pre = pd.read_sql(
-            f"SELECT fantasypros_id, FPTS FROM preseason_projections WHERE year = {year}", engine
+        pre = self._read(
+            f"SELECT fantasypros_id, FPTS FROM preseason_projections WHERE year = {year}",
+            ["fantasypros_id", "FPTS"],
         )
         pre["pid"] = pre["fantasypros_id"].map(norm_id)
         pre_rate = (pd.to_numeric(pre["FPTS"], errors="coerce").groupby(pre["pid"]).mean()
                     / SEASON_WEEKS).dropna().to_dict()
 
-        sched = pd.read_sql(f"SELECT team, week FROM schedule WHERE year = {year}", engine)
+        sched = self._read(f"SELECT team, week FROM schedule WHERE year = {year}", ["team", "week"])
         team_games: Dict[str, set] = {}
         for team, week in zip(sched["team"], sched["week"]):
             if team and pd.notna(week):
                 team_games.setdefault(team, set()).add(int(week))
 
-        inj = pd.read_sql(
+        inj = self._read(
             f"SELECT fantasypros_id, week, game_status FROM weekly_injuries "
             f"WHERE year = {year} AND week <= {max(known_upto, 1)}",
-            engine,
+            ["fantasypros_id", "week", "game_status"],
         )
         injuries: Dict[str, Dict[int, str]] = {}
         for pid, week, gs in zip(inj["fantasypros_id"].map(norm_id), inj["week"], inj["game_status"]):
@@ -457,14 +453,10 @@ class PhilipFantasyBot:
             print(f"  {info.at[pid, 'full_name']} ({info.at[pid, 'pos']}) +{g:.1f} "
                   f"rate {proj['rate'][pid]:.1f} avail {proj['avail'][pid]:.2f} rank {info.at[pid, 'rank']}")
 
+        # Near-ties: take the one the rest of the league will grab first.
         best_gain = gains[0][0]
-        band = [pid for g, pid in gains[:AI_SHORTLIST] if g >= best_gain - max(3.0, AI_BAND * abs(best_gain))]
-        choice = gains[0][1]
-        if len(band) > 1:
-            ai = self.get_ai_draft_recommendation(band, dict((p, g) for g, p in gains), info, proj, mine,
-                                                  data, current_round)
-            if ai:
-                choice = ai
+        band = [pid for g, pid in gains if g >= best_gain - max(TIE_POINTS, TIE_BAND * abs(best_gain))]
+        choice = min(band, key=lambda pid: (np.nan_to_num(info.at[pid, "rank"], nan=1e9), band.index(pid)))
         print(f"Drafting {info.at[choice, 'full_name']} ({info.at[choice, 'pos']}) (ID: {choice})")
         return choice
 
@@ -476,49 +468,6 @@ class PhilipFantasyBot:
             return k if rnd % 2 == 0 else num_teams - 1 - k
         me = seat(pick)
         return sum(1 for p in range(pick, num_teams * total_rounds + 1) if seat(p) == me)
-
-    def get_ai_draft_recommendation(self, band, gains, info, proj, mine, data, current_round) -> Optional[str]:
-        """Ask the model to break a near-tie. Only ids from `band` are accepted."""
-        if not self.openai_client:
-            return None
-        try:
-            known = data["known_upto"]
-            lines = []
-            for pid in band:
-                pts = [data["actual"].get((pid, w)) for w in range(1, known + 1)]
-                pts = ", ".join("-" if p is None else f"{p:.1f}" for p in pts)
-                lines.append(
-                    f"- {info.at[pid, 'full_name']} | {info.at[pid, 'pos']} | {info.at[pid, 'professional_team']} | "
-                    f"weeks 1-{known}: [{pts}] | projected pts/game rest of season: {proj['rate'][pid]:.1f} | "
-                    f"chance to play each week: {proj['avail'][pid]:.0%} | model value: +{gains[pid]:.1f}"
-                )
-            roster = ", ".join(f"{n} ({p})" for n, p in zip(mine["full_name"], mine["pos"])) or "empty"
-            prompt = (
-                f"You are a fantasy football expert drafting in the {data['year']} season. The draft is "
-                f"happening after week {known}; weeks already played count toward the season.\n"
-                f"League: {data['num_teams']} teams, PPR, starters QB, 2 RB, 2 WR, FLEX (RB/WR/TE), "
-                f"SUPERFLEX (QB/RB/WR/TE), K, DST, 3 bench. No TE slot. Best lineup is set automatically "
-                f"each week after scores are known.\n"
-                f"Round {current_round} of {data['total_rounds']}. My roster: {roster}.\n"
-                f"My model rates these players as close. Pick the one with the best rest-of-season outlook "
-                f"(role, health, schedule, recent news):\n" + "\n".join(lines) +
-                "\nReturn ONLY the player's name exactly as written."
-            )
-            response = self.openai_client.chat.completions.create(
-                model=os.environ.get("PHILIP_OPENAI_MODEL", "gpt-5"),
-                messages=[{"role": "user", "content": prompt}],
-            )
-            answer = response.choices[0].message.content.strip().strip('"').lower()
-            print(f"AI response: {answer}")
-            for pid in band:
-                if info.at[pid, "full_name"].lower() == answer:
-                    return pid
-            for pid in band:  # tolerate extra words around the name
-                if info.at[pid, "full_name"].lower() in answer:
-                    return pid
-        except Exception as e:
-            print(f"AI recommendation failed: {e}")
-        return None
 
     def fallback_pick(self) -> str:
         """Best available by consensus rank, K/DST last."""
