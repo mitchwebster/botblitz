@@ -60,7 +60,12 @@ MIN_AT_POSITION = {"QB": 2, "RB": 2, "WR": 2, "K": 1, "DST": 1}  # must be met b
 # Replacement level per position, as startable players PER TEAM (scaled by league
 # size): QB+SUPERFLEX => ~2 QB/team; RB/WR get 2 dedicated starters + a share of
 # FLEX/SUPERFLEX. VOR = rest-of-season points - points of the player at that rank.
-REPLACEMENT_PER_TEAM = {"QB": 2.0, "RB": 2.5, "WR": 2.5, "TE": 0.86, "K": 1.0, "DST": 1.0}
+REPLACEMENT_PER_TEAM = {"QB": 2.0, "RB": 2.5, "WR": 2.5, "K": 1.0, "DST": 1.0}
+
+# Positions with no dedicated lineup slot. A TE only starts in FLEX (SUPERFLEX goes to
+# a QB -- even a mid-tier one outscores almost every TE), so he is measured against
+# the replacement RB/WR he'd displace there, not against other TEs.
+FLEX_ONLY_POSITIONS = ("TE",)
 
 # Diminishing returns past the realistic number of starters at a position: each
 # further body is bench depth worth a fraction of its raw VOR. A 3rd QB almost never
@@ -72,7 +77,7 @@ DEPTH_DECAY = {"QB": 0.20, "RB": 0.55, "WR": 0.62, "TE": 0.30, "K": 0.10, "DST":
 # weekly edge nobody else can field. Anyone whose PPG sits OUTLIER_Z standard
 # deviations above that pool's mean earns OUTLIER_WEIGHT x his rest-of-season points
 # above that threshold, on top of VOR.
-OUTLIER_POSITIONS = ("QB", "RB", "WR", "TE")
+OUTLIER_POSITIONS = ("QB", "RB", "WR")  # TE: no slot of his own to dominate
 OUTLIER_Z = 1.5
 OUTLIER_WEIGHT = 1.0
 
@@ -257,6 +262,9 @@ def _replacement_values(avail, num_teams):
         else:
             rank = max(1, round(per_team * num_teams))
             replacement[pos] = float(pts.iloc[min(rank, len(pts)) - 1])
+    flex = max(replacement["RB"], replacement["WR"])
+    for pos in FLEX_ONLY_POSITIONS:
+        replacement[pos] = flex
     return replacement
 
 
@@ -304,6 +312,8 @@ def _vona(avail, replacement, picks_between):
         for i, (pid, r) in enumerate(zip(pts["id"], pts["ros"])):
             rest = pts["ros"].iloc[[j for j in range(len(pts)) if j != i]]
             survivor = rest.iloc[k] if k < len(rest) else replacement.get(pos, 0.0)
+            if pos in FLEX_ONLY_POSITIONS:  # fallback is a flex RB/WR, not the next TE
+                survivor = max(survivor, replacement.get(pos, 0.0))
             out[str(pid)] = max(0.0, r - survivor)
     return out
 
