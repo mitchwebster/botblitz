@@ -1,0 +1,166 @@
+{
+  "verified_at": "2026-10-10",
+  "status": "PASS",
+  "tested_branch_head": "1d07046",
+  "bot_commit": "1759af3",
+  "upstream_main": "0bfee07",
+  "bot_sha256": "ad91809fccd751380e4805ccc882dc484252271459e708adc5fbc003fdaa84ef",
+  "engine_binary_sha256": "0f4f3fc1f5c6c3d9f118c1ee09c145743c13f93144889587fc5319beeb51fb80",
+  "docker_image": {
+    "name": "py_grpc_server",
+    "id": "sha256:9b93fa02e9275e2d97a4d3affc9c1a7b63320dab6529b2ad6a7a6219f42136db"
+  },
+  "command": "venv/bin/botblitz-evaluate -bot=bots/nfl2025/jon_bot.py -year=2025 -teams=14 -runs=1",
+  "execution": "production mode: fresh container set per phase, isolated subprocess per decision; no fast flag",
+  "season": 2025,
+  "teams": 14,
+  "runs": 1,
+  "draft_picks": [
+    {
+      "pick": 8,
+      "name": "Lamar Jackson",
+      "id": "17233",
+      "positions": [
+        "QB"
+      ]
+    },
+    {
+      "pick": 21,
+      "name": "Josh Allen",
+      "id": "17298",
+      "positions": [
+        "QB"
+      ]
+    },
+    {
+      "pick": 36,
+      "name": "Alvin Kamara",
+      "id": "16421",
+      "positions": [
+        "RB"
+      ]
+    },
+    {
+      "pick": 49,
+      "name": "James Conner",
+      "id": "16447",
+      "positions": [
+        "RB"
+      ]
+    },
+    {
+      "pick": 64,
+      "name": "Jerry Jeudy",
+      "id": "19201",
+      "positions": [
+        "WR"
+      ]
+    },
+    {
+      "pick": 77,
+      "name": "Tyrone Tracy Jr.",
+      "id": "22980",
+      "positions": [
+        "RB"
+      ]
+    },
+    {
+      "pick": 92,
+      "name": "Michael Pittman Jr.",
+      "id": "19278",
+      "positions": [
+        "WR"
+      ]
+    },
+    {
+      "pick": 105,
+      "name": "Denver Broncos",
+      "id": "8090",
+      "positions": [
+        "DST"
+      ]
+    },
+    {
+      "pick": 120,
+      "name": "Chase McLaughlin",
+      "id": "19058",
+      "positions": [
+        "K"
+      ]
+    },
+    {
+      "pick": 133,
+      "name": "Bryce Young",
+      "id": "22900",
+      "positions": [
+        "QB"
+      ]
+    },
+    {
+      "pick": 148,
+      "name": "Matthew Stafford",
+      "id": "9451",
+      "positions": [
+        "QB"
+      ]
+    },
+    {
+      "pick": 161,
+      "name": "Cam Ward",
+      "id": "24755",
+      "positions": [
+        "QB"
+      ]
+    }
+  ],
+  "draft_roster_legal": true,
+  "candidate_draft_fallbacks": 0,
+  "weeks_replayed": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "candidate_weekly_responses": 17,
+  "candidate_valid_claims": 69,
+  "candidate_no_claim_responses": 1,
+  "candidate_invalid_claims": 0,
+  "candidate_rpc_failures": 0,
+  "regular_season_rank": 5,
+  "record": {
+    "wins": 8,
+    "losses": 6
+  },
+  "regular_season_points": 1651.5,
+  "made_playoffs": true,
+  "champion": false,
+  "elapsed_seconds": 201.897,
+  "source_databases_unchanged": true,
+  "source_database_sha256": {
+    "/Users/jonoikawa/Documents/ChatGPT/Botblitz/data/game_states/2025/season.db": "8875c2d2538d9fcde7a046f25126297522e5947cf168db5eb635408097d292fc",
+    "/Users/jonoikawa/Documents/ChatGPT/Botblitz/data/game_states/2026/season.db": "611113055a07ce52bddbad14d8288b483e7c09c5de3631c28da44b3252ba4b02"
+  },
+  "raw_log": "tmp/jon-bot-verification/engine-2025.log",
+  "raw_log_sha256": "bd0dbef28693464e1f78432fb3e0c8592dd00b86bce0e8750b5d4e0c099ceb1c",
+  "baseline_invalid_selection_lines": 192,
+  "baseline_rpc_failures": 29,
+  "limitations": [
+    "One randomized draft and schedule against standard-bot opponents, not the submitted competition field.",
+    "Standard bots submit empty example claims and fail opponent lookup when they have no playoff matchup.",
+    "2026 container compatibility passed separately; only weeks 1\u20133 have actual stats in the shipped 2026 database."
+  ],
+  "candidate_winning_claims": 30
+}
