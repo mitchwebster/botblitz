@@ -14,7 +14,9 @@ so existing bots keep working. A few legacy columns have no nflreadr equivalent
 and are intentionally dropped — no bot in bots/nfl2025 reads them (verified before
 this migration). DST `YDS AGN` (yards allowed) is also dropped for the same reason;
 DST `FPTS` is approximated with a standard sacks/turnovers/points-allowed formula
-since nflreadr has no fantasy-scoring endpoint for team defenses.
+since nflreadr has no fantasy-scoring endpoint for team defenses. Kicker `FPTS`
+adds FG/PAT points on top of `fantasy_points_ppr`, which leaves kicking out
+(see `_KICKING_POINTS`); the native column is left as nflverse reports it.
 """
 
 import os
@@ -104,6 +106,31 @@ def _pa_points(points_allowed: float) -> float:
     return _PA_TIERS[-1][1]
 
 
+# nflverse's fantasy_points_ppr is an offense-only formula, so kickers score 0
+# there. Kicking is added on top using ffanalytics' default kicker scoring (the
+# same rules behind external_projections' K points): FG 0-39 = 3, 40-49 = 4,
+# 50+ = 5, PAT = 1, misses = 0.
+_KICKING_POINTS = {
+    "fg_made_0_19": 3,
+    "fg_made_20_29": 3,
+    "fg_made_30_39": 3,
+    "fg_made_40_49": 4,
+    "fg_made_50_59": 5,
+    "fg_made_60_": 5,
+    "pat_made": 1,
+}
+
+
+def _add_kicking_points(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    kicking = pd.Series(0.0, index=df.index)
+    for col, points in _KICKING_POINTS.items():
+        if col in df.columns:
+            kicking += df[col].fillna(0) * points
+    df["FPTS"] = df["FPTS"].add(kicking, fill_value=0)
+    return df
+
+
 def _free_case_collision(df: pd.DataFrame, legacy_name: str) -> None:
     """See the identical helper in load_projections_ffpros.py: SQLite column
     names are case-insensitive, so a native column can't coexist with a
@@ -162,6 +189,8 @@ def fetch_season_stats(year: int, summary_level: str = "week") -> tuple[pd.DataF
         offense = offense.merge(ids, on="gsis_id", how="left")
         offense = _add_offense_fumbles_lost(offense)
         offense = _add_legacy_aliases(offense, _OFFENSE_LEGACY_ALIASES)
+        if "FPTS" in offense.columns:
+            offense = _add_kicking_points(offense)
         if "position" in offense.columns:
             offense["position"] = offense["position"].str.upper()
 

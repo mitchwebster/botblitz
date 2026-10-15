@@ -276,7 +276,10 @@ dropping the old NFL.com scraper's fuzzy name matching, which could silently mis
 `season_stats`/`weekly_stats` (actuals, including DST) are sourced from nflverse via
 `nflreadr::load_player_stats`/`load_team_stats` (`fetch_stats.R`,
 `blitz_env/load_stats_nflreadr.py`); DST FPTS is an approximated standard scoring
-formula since nflreadr has no fantasy-points endpoint for team defenses. The old
+formula since nflreadr has no fantasy-points endpoint for team defenses. Kicker
+FPTS is `fantasy_points_ppr` (which has no kicking, so it's ~0 for K) plus FG/PAT
+points under ffanalytics' default kicker scoring: FG 0–39 = 3, 40–49 = 4, 50+ = 5,
+PAT = 1, misses 0 (`_KICKING_POINTS`). The old
 `blitz_env/stats_db.py`/`projections_db.py` FantasyPros HTML scrapers (and the
 `download_stats.py`/`download_projections.py`/`download-weekly-data.yml` S3 path
 that depended on them) were removed in the 2026 season prep.
