@@ -925,19 +925,26 @@ func (handler *GameStateHandler) GetPlayerScoresForCurrentWeek() ([]PlayerWeekly
 
 	var results []PlayerWeeklyScore
 
+	// LEFT JOIN, not INNER: a rostered player with no weekly_stats row for this
+	// week (inactive/healthy scratch, not necessarily a bye) must still be
+	// considered for lineup scoring and still show up in weekly_lineups, just
+	// with 0 points -- an INNER JOIN here silently drops them from the entire
+	// pipeline instead, which is indistinguishable in the UI from a player who
+	// genuinely scored 0 (that one DOES have a row, so it passes either join).
+	// That inconsistency -- some zero-point players visible, others invisible,
+	// depending on whether nflreadr happened to emit a row for them -- is
+	// exactly what COALESCE(..., 0) here resolves.
 	err = handler.db.Raw(`
-		SELECT 
-			p.id, 
-			p.full_name, 
-			p.allowed_positions, 
+		SELECT
+			p.id,
+			p.full_name,
+			p.allowed_positions,
 			p.current_bot_id,
-			max(w.FPTS) as FPTS
+			COALESCE(max(w.FPTS), 0) as FPTS
 		FROM players AS p
-		INNER JOIN weekly_stats AS w
-			ON p.id = w.fantasypros_id
-		WHERE w.week = ?
-		AND w.year = ?
-		AND p.current_bot_id IS NOT NULL
+		LEFT JOIN weekly_stats AS w
+			ON p.id = w.fantasypros_id AND w.week = ? AND w.year = ?
+		WHERE p.current_bot_id IS NOT NULL
 		GROUP BY 1, 2, 3, 4
 		ORDER BY FPTS desc
 	`, gameStatus.CurrentFantasyWeek, settings.Year).Scan(&results).Error

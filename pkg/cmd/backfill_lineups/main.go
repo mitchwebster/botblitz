@@ -292,15 +292,19 @@ func getPlayerScoresForWeek(handler *gamestate.GameStateHandler, week int) ([]ga
 
 	var results []gamestate.PlayerWeeklyScore
 
+	// LEFT JOIN, not INNER: see the identical fix + comment in
+	// gamestate.GetPlayerScoresForCurrentWeek -- a player with no weekly_stats
+	// row for this week (inactive, not necessarily on bye) must still score 0
+	// rather than vanish from the lineup entirely.
 	err = handler.GetDB().Raw(`
 		SELECT
 			p.id,
 			p.full_name,
 			p.allowed_positions,
 			p.current_bot_id,
-			max(w.FPTS) as FPTS
+			COALESCE(max(w.FPTS), 0) as FPTS
 		FROM players AS p
-		INNER JOIN weekly_stats AS w
+		LEFT JOIN weekly_stats AS w
 		ON p.id = w.fantasypros_id AND w.week = ? AND w.year = ?
 		GROUP BY p.id
 		ORDER BY FPTS desc
