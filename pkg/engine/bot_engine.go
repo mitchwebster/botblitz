@@ -29,6 +29,7 @@ type BotEngineSettings struct {
 type BotContainerInfo struct {
 	ContainerID string
 	Port        string
+	RPCToken    string // secret the container's gRPC server requires on every call
 }
 
 type BotEngine struct {

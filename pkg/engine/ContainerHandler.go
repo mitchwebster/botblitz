@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
@@ -20,6 +23,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -30,6 +34,25 @@ const botFileRelativePath = botResourceFolderName + "/bot.py" // source code nam
 const containerServerPort = "8080"
 const botResourceFolderNameInContainer = "/botblitz"
 const appServerFolderPath = "/app/py_grpc_server"
+
+// botNetworkName is the bridge network every bot container joins. Inter-container
+// communication is disabled on it, so a bot can still reach the internet (some call
+// external APIs) but cannot reach another bot's gRPC server to spy on or flood it.
+const botNetworkName = "botblitz_bots"
+
+// botContainerPidsLimit caps processes/threads per container so a bot can't fork-bomb
+// its container (or the host) — generous enough for the gRPC thread pool, the
+// per-call python3 subprocess, and numeric libraries' worker threads.
+const botContainerPidsLimit int64 = 256
+
+// rpcTokenEnvVar / rpcTokenMetadataKey carry a per-container secret: the engine hands it
+// to the container at start and sends it on every RPC, and the container's gRPC server
+// rejects calls without it. Keep in sync with py_grpc_server/server.py. This is what
+// stops one bot from calling another's server where the network can't block it — e.g.
+// Docker Desktop, where host.docker.internal forwards into the host's loopback and so
+// reaches every bot's published port.
+const rpcTokenEnvVar = "BOTBLITZ_RPC_TOKEN"
+const rpcTokenMetadataKey = "x-botblitz-token"
 
 func (e *BotEngine) saveBotLogsToFile(bot *common.Bot, containerId string) error {
 	// Connect to docker api.
@@ -122,7 +145,7 @@ func (e *BotEngine) shutDownAndCleanBotServer(containerId string) error {
 	return nil
 }
 
-func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port int) (string, error) {
+func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port int, rpcToken string) (string, error) {
 	if e.settings.VerboseLoggingEnabled {
 		fmt.Printf("Bootstrapping server for bot (%s)\n", bot.ID)
 	}
@@ -163,6 +186,9 @@ func (e *BotEngine) startBotContainer(bot *gamestate.Bot, port int) (string, err
 	if e.settings.InlineExecution {
 		env = append(env, "BOTBLITZ_EVAL_INLINE=1")
 	}
+
+	// Copy rather than append onto the cached slice, which other calls share.
+	env = append(append([]string{}, env...), rpcTokenEnvVar+"="+rpcToken)
 
 	containerId, err := e.createAndStartContainer(env, port)
 	if err != nil {
@@ -208,15 +234,24 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 
 	apiClient.NegotiateAPIVersion(context.Background())
 
+	if err := ensureBotNetwork(apiClient); err != nil {
+		return "", err
+	}
+
+	// Bind to loopback only: the engine dials localhost, and nothing else (other
+	// containers via the bridge gateway, or other hosts on the network) should be
+	// able to reach a bot's gRPC server.
 	hostBinding := nat.PortBinding{
-		HostIP:   "0.0.0.0",
+		HostIP:   "127.0.0.1",
 		HostPort: strconv.Itoa(port),
 	}
 
 	// Define resource limits
+	pidsLimit := botContainerPidsLimit
 	resources := container.Resources{
-		Memory:   512 * 1024 * 1024, // 512 MB
-		NanoCPUs: 1e9,               // 1 CPU
+		Memory:    512 * 1024 * 1024, // 512 MB
+		NanoCPUs:  1e9,               // 1 CPU
+		PidsLimit: &pidsLimit,
 	}
 
 	containerPort, err := nat.NewPort("tcp", containerServerPort)
@@ -241,6 +276,7 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 		},
 		&container.HostConfig{
 			PortBindings: portBinding,
+			NetworkMode:  container.NetworkMode(botNetworkName),
 			Mounts: []mount.Mount{
 				{
 					Type:     mount.TypeBind,
@@ -275,7 +311,32 @@ func (e *BotEngine) createAndStartContainer(env []string, port int) (string, err
 	return createResponse.ID, nil
 }
 
-func (e *BotEngine) callWeeklyFantasyActionsRPC(ctx context.Context, port string) (*common.AttemptedFantasyActions, error) {
+// ensureBotNetwork creates the shared bot network (with inter-container communication
+// disabled) if it doesn't already exist.
+func ensureBotNetwork(apiClient *client.Client) error {
+	ctx := context.Background()
+	_, err := apiClient.NetworkInspect(ctx, botNetworkName, types.NetworkInspectOptions{})
+	if err == nil {
+		return nil
+	}
+	if !errdefs.IsNotFound(err) {
+		return fmt.Errorf("unable to inspect network %s: %v", botNetworkName, err)
+	}
+
+	_, err = apiClient.NetworkCreate(ctx, botNetworkName, types.NetworkCreate{
+		Driver: "bridge",
+		Options: map[string]string{
+			"com.docker.network.bridge.enable_icc": "false",
+		},
+	})
+	if err != nil && !errdefs.IsConflict(err) {
+		return fmt.Errorf("unable to create network %s: %v", botNetworkName, err)
+	}
+
+	return nil
+}
+
+func (e *BotEngine) callWeeklyFantasyActionsRPC(ctx context.Context, port string, rpcToken string) (*common.AttemptedFantasyActions, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -292,6 +353,7 @@ func (e *BotEngine) callWeeklyFantasyActionsRPC(ctx context.Context, port string
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
+	ctx = metadata.AppendToOutgoingContext(ctx, rpcTokenMetadataKey, rpcToken)
 	selection, err := client.PerformWeeklyFantasyActions(ctx, nil)
 	if err != nil {
 		fmt.Println("Failed calling bot")
@@ -301,7 +363,7 @@ func (e *BotEngine) callWeeklyFantasyActionsRPC(ctx context.Context, port string
 	return selection, nil
 }
 
-func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.DraftSelection, error) {
+func (e *BotEngine) callDraftRPC(ctx context.Context, port string, rpcToken string) (*common.DraftSelection, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
@@ -319,6 +381,7 @@ func (e *BotEngine) callDraftRPC(ctx context.Context, port string) (*common.Draf
 	client := common.NewAgentServiceClient(conn)
 
 	ctx, _ = context.WithTimeout(ctx, 60*time.Second)
+	ctx = metadata.AppendToOutgoingContext(ctx, rpcTokenMetadataKey, rpcToken)
 	selections, err := client.DraftPlayer(ctx, &emptypb.Empty{})
 	if err != nil {
 		fmt.Println("Failed calling bot")
@@ -343,6 +406,14 @@ func (e *BotEngine) isContainerRunning(containerId string) (bool, error) {
 	}
 
 	return containerInfo.State.Running, nil
+}
+
+func newRPCToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("unable to generate rpc token: %v", err)
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func findAvailablePort() (int, error) {
@@ -406,7 +477,12 @@ func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerIn
 	// container-reuse path this fires once per bot, so it isolates true container-start
 	// cost (vs. the RPC time that dominates once a container is warm).
 	buildDone := LogElapsed("container build for bot %s", bot.ID)
-	containerId, err := e.startBotContainer(bot, port)
+	rpcToken, err := newRPCToken()
+	if err != nil {
+		buildDone()
+		return nil, err
+	}
+	containerId, err := e.startBotContainer(bot, port, rpcToken)
 	buildDone()
 	if err != nil {
 		return nil, err
@@ -415,6 +491,7 @@ func (e *BotEngine) getOrCreateBotContainer(bot *gamestate.Bot) (*BotContainerIn
 	containerInfo := &BotContainerInfo{
 		ContainerID: containerId,
 		Port:        strconv.Itoa(port),
+		RPCToken:    rpcToken,
 	}
 	e.botContainers[bot.ID] = containerInfo
 
@@ -431,7 +508,7 @@ func (e *BotEngine) startContainerAndPerformDraftAction(ctx context.Context, bot
 		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
 
-	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port)
+	draftPick, err := e.callDraftRPC(ctx, containerInfo.Port, containerInfo.RPCToken)
 	if err != nil {
 		return "", err
 	}
@@ -455,7 +532,7 @@ func (e *BotEngine) startContainerAndPerformWeeklyFantasyActions(ctx context.Con
 		fmt.Printf("Setup bot: %s\n", bot.ID)
 	}
 
-	selections, err = e.callWeeklyFantasyActionsRPC(ctx, containerInfo.Port)
+	selections, err = e.callWeeklyFantasyActionsRPC(ctx, containerInfo.Port, containerInfo.RPCToken)
 	if err != nil {
 		return nil, err
 	}
