@@ -40,6 +40,7 @@ NEXT_POOL_PER_POS = 8
 TIME_BUDGET_S = 60
 
 EXTERNAL_PROJ_FIRST_WEEK = 6
+DEFERRABLE = ("K", "DST")  # one-slot, flat positions we fill as late as is safe
 FLEX_ELIGIBILITY = {
     "FLEX": ("RB", "WR", "TE"),
     "SUPERFLEX": ("QB", "RB", "WR", "TE"),
@@ -247,6 +248,70 @@ def unfilled_required(slots_cfg: dict, roster_pos: list) -> dict:
     return need
 
 
+def market_order(pool: pd.DataFrame) -> list:
+    """Opponent model: available ids in the order we expect them to go. Blend of our
+    value order and the site's rank (ADP). pool must be sorted by value desc."""
+    mkt = pool[["id", "rank"]].copy()
+    mkt["r_ours"] = range(len(mkt))
+    mkt["r_adp"] = mkt["rank"].rank(method="first", na_option="bottom")
+    mkt["m"] = W_MARKET_OURS * mkt["r_ours"] + (1 - W_MARKET_OURS) * mkt["r_adp"]
+    return list(mkt.sort_values("m")["id"])
+
+
+def positions_to_defer(need, remaining_picks, current_pick, pool, order, gain_of,
+                       pos_of, other_counts, slots_cfg) -> set:
+    """For K/DST we still need: compare taking one now and a skill player at our
+    deadline pick vs the reverse. The deadline is the latest pick we can fill the
+    remaining K/DST slots with. Expected K/DST taken by others before then comes from
+    the draft so far: their share of picks at that position (so a run raises it),
+    capped by how many teams still need one; best ones go first. The rest of their
+    picks before our deadline are skill players in market order.
+
+    Take K now iff  K_now - K_deadline  >  S_now - S_deadline."""
+    defer_need = {p: n for p, n in need.items() if p in DEFERRABLE}
+    n_defer = sum(defer_need.values())
+    if not defer_need or len(remaining_picks) <= n_defer:
+        return set()
+    deadline = remaining_picks[-n_defer]
+    ours_between = sum(1 for p in remaining_picks if current_pick < p < deadline)
+    opp_picks = deadline - current_pick - 1 - ours_between
+
+    n_other_picks = sum(sum(c.values()) for c in other_counts)
+    taken = {}
+    for pos in defer_need:
+        demand = sum(1 for c in other_counts if c.get(pos, 0) < int(slots_cfg.get(pos, 1)))
+        rate = sum(c.get(pos, 0) for c in other_counts) / n_other_picks if n_other_picks else 0.0
+        taken[pos] = min(demand, opp_picks, round(opp_picks * rate))
+
+    skill = pool[~pool["pos"].isin(DEFERRABLE)]
+    top_skill = list(skill.groupby("pos", sort=False).head(NEXT_POOL_PER_POS)["id"])
+    s_now = max((gain_of(pid) for pid in top_skill), default=0.0)
+    n_skill_gone = max(0, opp_picks - sum(taken.values()))
+    gone = []
+    for pid in order:
+        if len(gone) >= n_skill_gone:
+            break
+        if pos_of[pid] not in DEFERRABLE:
+            gone.append(pid)
+    gone = set(gone)
+    left = skill[~skill["id"].isin(gone)]
+    s_later = max((gain_of(pid) for pid in left.groupby("pos", sort=False)
+                   .head(NEXT_POOL_PER_POS)["id"]), default=0.0)
+    skill_wait = s_now - s_later
+
+    defer = set()
+    for pos in defer_need:
+        ids = list(pool.loc[pool["pos"] == pos, "id"])
+        now = max((gain_of(pid) for pid in ids[:3]), default=0.0)
+        later = max((gain_of(pid) for pid in ids[taken[pos]:taken[pos] + 3]), default=0.0)
+        if now - later <= skill_wait:
+            defer.add(pos)
+        log(f"  defer check {pos}: wait cost {now - later:.1f} (now {now:.1f}, "
+            f"deadline pick {deadline} {later:.1f}, {taken[pos]} taken) vs skill "
+            f"{skill_wait:.1f} -> {'defer' if pos in defer else 'consider now'}")
+    return defer
+
+
 def draft_player() -> str:
     db = DatabaseManager()
     try:
@@ -320,27 +385,38 @@ def _draft(db) -> str:
 
     # Must-fill guard: if remaining picks only just cover empty single-position
     # slots, only consider those positions.
+    def gain_of(pid):
+        return season_score(slots, roster + [(pos_of[pid], values[pid])]) - base
+
+    order = market_order(pool)
     need = unfilled_required(slots_cfg, list(mine["pos"]))
     cand_pool = pool
+    deferred = set()
     if need and picks_left <= sum(need.values()):
         cand_pool = pool[pool["pos"].isin(need)]
         log(f"must fill {need} with {picks_left} picks left")
+    else:
+        drafted = players[players["current_bot_id"].notna()]
+        other_counts = [
+            drafted.loc[drafted["current_bot_id"].astype(str) == str(b.id), "pos"]
+            .value_counts().to_dict()
+            for b in bots if str(b.id) != my_id
+        ]
+        deferred = positions_to_defer(
+            need, [current_pick] + later, current_pick, pool, order, gain_of,
+            pos_of, other_counts, slots_cfg,
+        )
+        cand_pool = pool[~pool["pos"].isin(deferred)]
 
     candidates = list(cand_pool.groupby("pos", sort=False).head(CANDIDATES_PER_POS)["id"])
-    gains = {
-        c: season_score(slots, roster + [(pos_of[c], values[c])]) - base for c in candidates
-    }
+    gains = {c: gain_of(c) for c in candidates}
     scores = dict(gains)
 
     if LOOKAHEAD and next_pick is not None:
         k = next_pick - current_pick - 1
-        # Opponent model: blend of our value order and the site's rank (ADP).
-        mkt = pool[["id", "rank"]].copy()
-        mkt["r_ours"] = range(len(mkt))
-        mkt["r_adp"] = mkt["rank"].rank(method="first", na_option="bottom")
-        mkt["m"] = W_MARKET_OURS * mkt["r_ours"] + (1 - W_MARKET_OURS) * mkt["r_adp"]
-        market_order = list(mkt.sort_values("m")["id"])
-        by_pos = {pos: list(g["id"]) for pos, g in pool.groupby("pos", sort=False)}
+        market = order
+        by_pos = {pos: list(g["id"]) for pos, g in pool.groupby("pos", sort=False)
+                  if pos not in deferred}
 
         # Evaluate in greedy-gain order; if the time budget runs out, only compare
         # the candidates that got a lookahead score.
@@ -350,7 +426,7 @@ def _draft(db) -> str:
                 log("time budget hit; skipping remaining candidates")
                 break
             gone = set()
-            for pid in market_order:
+            for pid in market:
                 if len(gone) >= k:
                     break
                 if pid != c:
