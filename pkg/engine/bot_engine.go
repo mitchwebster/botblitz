@@ -39,6 +39,7 @@ type BotEngine struct {
 	gameStateHandler *gamestate.GameStateHandler
 	sheetsClient     *SheetsClient
 	botContainers    map[string]*BotContainerInfo // map of bot ID to container info
+	dbSnapshotPaths  map[string]string            // map of container ID to its disposable DB snapshot file, see createAndStartContainer
 }
 
 func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngineSettings, sheetsClient *SheetsClient, sourceCodeCache map[string][]byte, envVarsCache map[string][]string) *BotEngine {
@@ -49,6 +50,7 @@ func NewBotEngine(gameStateHandler *gamestate.GameStateHandler, settings BotEngi
 		gameStateHandler: gameStateHandler,
 		sheetsClient:     sheetsClient,
 		botContainers:    make(map[string]*BotContainerInfo),
+		dbSnapshotPaths:  make(map[string]string),
 	}
 }
 
