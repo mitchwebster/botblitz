@@ -33,7 +33,6 @@ PPR = 1.0              # points per reception (embedded projections are std + re
 W_EARLY = 0.25         # weight on our trimmed early-season PPG vs expert projections
 W_PRESEASON = 0.0      # weight on preseason PPG (external_projections week 0)
 W_MARKET_OURS = 0.5    # opponent model: blend of our value rank vs players.rank (ADP)
-VALUE_KICKERS = True   # weekly_stats K FPTS is 0; False = treat K as worthless (still fills the slot)
 SEASON_WEEKS = 17
 CANDIDATES_PER_POS = 10
 NEXT_POOL_PER_POS = 8
@@ -119,7 +118,7 @@ def load_actuals(db, year: int):
     """{pid: {week: points}} for played weeks, and the last played week."""
     df = pd.read_sql(
         "SELECT fantasypros_id, CAST(week AS INTEGER) AS week, position, "
-        "fantasy_points, receptions, FPTS, FG, XPT "
+        "fantasy_points, receptions, FPTS "
         f"FROM weekly_stats WHERE year = {int(year)} AND fantasypros_id IS NOT NULL",
         db.engine,
     )
@@ -130,10 +129,8 @@ def load_actuals(db, year: int):
         if week < 1 or week > SEASON_WEEKS:
             continue
         last_week = max(last_week, week)
-        if r.position == "K":
-            # Kicker FPTS is 0 in the data; compute a simple 3/FG + 1/XP so K values
-            # line up with the K projections.
-            pts = r.FPTS if r.FPTS else 3.0 * (r.FG or 0) + (r.XPT or 0)
+        if r.position in ("K", "DST"):
+            pts = r.FPTS or 0.0
         elif pd.notna(r.fantasy_points):
             pts = r.fantasy_points + PPR * (r.receptions or 0)
         else:
@@ -213,10 +210,6 @@ def build_values(players: pd.DataFrame, actuals: dict, last_week: int,
             for w, v in future.items():
                 if v > 0:
                     future[w] = max(0.0, v + shift)
-
-        if p.pos == "K" and not VALUE_KICKERS:
-            values[pid] = [0.0] * SEASON_WEEKS
-            continue
 
         weekly = []
         for w in range(1, SEASON_WEEKS + 1):
@@ -391,6 +384,11 @@ def _draft(db) -> str:
 
     order = market_order(pool)
     need = unfilled_required(slots_cfg, list(mine["pos"]))
+    # Never roster a backup K/DST: in best ball a bench RB/WR's weekly upside is
+    # worth more than a second DST's bye-week cover.
+    capped = {p for p in DEFERRABLE
+              if list(mine["pos"]).count(p) >= int(slots_cfg.get(p, 0))}
+    pool = pool[~pool["pos"].isin(capped)]
     cand_pool = pool
     deferred = set()
     if need and picks_left <= sum(need.values()):
