@@ -62,7 +62,18 @@ def main():
 
     # Check if table exists
     insp = inspect(engine)
-    if insp.has_table(table_name):
+    if df.empty:
+        # Nothing to upsert -- e.g. this week's games haven't been played (or
+        # posted by nflverse) yet. Must no-op here rather than fall through:
+        # an empty `records` list makes SQLAlchemy emit a degenerate
+        # "INSERT ... DEFAULT VALUES", which then breaks when combined with
+        # on_conflict_do_update's "excluded.col" references (nothing was
+        # actually inserted to reference) -- `near "ON": syntax error`. This
+        # case is routine, not exceptional: update-scores.yml fires 5x/week
+        # specifically to catch a week's games as they finish, so some of
+        # those fires legitimately happen before any data exists yet.
+        print(f"[weekly_stats] no data available yet for year={year} week={week}, skipping")
+    elif insp.has_table(table_name):
         # Table exists → append
         # df.to_sql(table_name, con=engine, if_exists="append", index=False)
 
