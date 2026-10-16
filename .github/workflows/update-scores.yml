@@ -68,6 +68,22 @@ jobs:
         python3 -m pip install --upgrade pip
         pip3 install -r requirements.txt
 
+    - name: Install R system dependencies
+      # Every R package install was failing from a completely different
+      # root cause than the GITHUB_PAT rate-limit fix above: install.packages()
+      # here never uses binary packages (no RSPM/PPM binary repo in the repos
+      # list), so curl/httr/xml2/openssl compile from source, and this
+      # runner doesn't ship their headers by default. The actual error,
+      # only visible once collect_weekly_stats's subprocess output stopped
+      # being swallowed (see load_stats_nflreadr.py): "fatal error:
+      # curl/curl.h: No such file or directory" -- configuration failed for
+      # the curl package, which cascaded into V8/httr/nflreadr/rvest/ffpros
+      # all failing too (every one of them depends on curl transitively).
+      # install.packages() with a package vector doesn't hard-fail the whole
+      # Rscript call when one package in it fails, so this step still showed
+      # green while leaving nflreadr completely unavailable.
+      run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+
     - name: Set up R
       uses: r-lib/actions/setup-r@v2
 
