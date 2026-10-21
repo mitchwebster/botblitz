@@ -95,6 +95,13 @@ def main():
         )
 
         with engine.begin() as conn:
+            # SQLite treats NULLs as distinct in a unique index, so rows with
+            # no fantasypros_id never conflict and would be re-appended on
+            # every run (update-scores fires 5x/week). Replace them instead.
+            conn.execute(
+                text(f"DELETE FROM {table_name} WHERE year = :year AND week = :week AND fantasypros_id IS NULL"),
+                {"year": year, "week": week},
+            )
             conn.execute(upsert_stmt)
 
     else:
