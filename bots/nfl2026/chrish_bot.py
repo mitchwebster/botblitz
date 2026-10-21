@@ -2,6 +2,10 @@
 from blitz_env.models import DatabaseManager, Player, Bot, GameStatus
 from blitz_env import AttemptedFantasyActions, WaiverClaim
 import pandas as pd
+import numpy as np
+import requests
+from sqlalchemy import inspect as sa_inspect
+import io
 import json
 
 QB_ROUNDS = [5, 8, 10, 20]
@@ -550,5 +554,235 @@ def draft_player() -> str:
     finally:
         db.close()
 
+# Weekly vibes check. Mostly astrology.
+
+WEATHER_FEED = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
+NICKNAMES = {"LA": "LAR", "JAX": "JAC"}
+NICE_NUMBER = 22.0
+
+# Groceries. Do not question the groceries.
+GROCERY_LIST = {
+    "18239": [("18219", 41)],
+    "27339": [
+        ("19245", 8),
+        ("24346", 3),
+        ("27520", 1),
+    ],
+    "20094": [
+        ("15623", 1),
+    ],
+}
+TIP_JAR = 2
+ENTHUSIASM = 0.75
+ATTENTION_SPAN = 2
+PLAN_B = 2
+COIN_FLIPS = 4000
+
+# Horoscope compatibility table (Chris's sign is the default)
+LUCKY_NUMBERS = {
+    "QB": (1.123, 0.215, 0.527),
+    "K": (3.759, 0.115, 0.152),
+    "DST": (14.041, 0.025, -0.398),
+}
+MOOD_SWINGS = {"QB": 7.4, "RB": 6.65, "WR": 6.5, "TE": 5.3, "K": 4.5, "DST": 4.85}
+FIRST_IMPRESSIONS = {"QB": 14.0, "RB": 6.0, "WR": 7.0, "TE": 6.0, "K": 8.0, "DST": 5.5}
+FEELINGS = {"Out": 0.0, "Doubtful": 0.25, "Questionable": 0.8}
+
+def check_the_weather(db, year, week):
+    """Outdoor games only. Domes are a scam."""
+    forecast = None
+    columns = {c["name"] for c in sa_inspect(db.engine).get_columns("schedule")}
+    if {"spread_line", "total_line"} <= columns:
+        forecast = pd.read_sql(
+            "SELECT team, is_home, spread_line, total_line FROM schedule WHERE year = ? AND week = ?",
+            db.engine, params=(year, week),
+        ).dropna()
+    if forecast is None or forecast.empty:
+        try:
+            response = requests.get(WEATHER_FEED, timeout=20)
+            response.raise_for_status()
+            games = pd.read_csv(io.StringIO(response.text))
+            games = games[(games["season"] == year) & (games["week"] == week)].dropna(subset=["total_line"])
+            home = games.assign(team=games["home_team"], is_home=True)
+            away = games.assign(team=games["away_team"], is_home=False)
+            forecast = pd.concat([home, away])[["team", "is_home", "spread_line", "total_line"]]
+            forecast["team"] = forecast["team"].replace(NICKNAMES)
+        except Exception:
+            return {}
+
+    weather = {}
+    for row in forecast.itertuples():
+        # wind chill
+        margin = row.spread_line if row.is_home else -row.spread_line
+        weather[row.team] = ((row.total_line + margin) / 2, (row.total_line - margin) / 2)
+    return weather
+
+def what_day_is_it(db, year):
+    status = db.get_game_status()
+    last_played = pd.read_sql(
+        "SELECT MAX(week) AS week FROM weekly_stats WHERE year = ?", db.engine, params=(year,)
+    ).iloc[0]["week"]
+    return max(int(status.current_fantasy_week or 1), int(last_played or 0) + 1)
+
+def read_tea_leaves(db, year, week):
+    """Ranks players by how much they remind Chris of himself."""
+    players = pd.read_sql("SELECT id, full_name, professional_team, allowed_positions, current_bot_id FROM players", db.engine)
+    players["position"] = players["allowed_positions"].apply(lambda x: json.loads(x)[0] if x else None)
+    players = players[players["position"].isin(REAL_POSITIONS)].copy()
+
+    stats = load_weekly_stats(db, year)
+    stats = stats[stats["week"] < week]
+    players["snacks"] = players["id"].map(stats.groupby("id")["FPTS"].mean())
+    players["snacks"] = players["snacks"].fillna(players["position"].map(FIRST_IMPRESSIONS))
+
+    schedule = pd.read_sql("SELECT team FROM schedule WHERE year = ? AND week = ?", db.engine, params=(year, week))
+    playing = set(schedule["team"])
+    weather = check_the_weather(db, year, week)
+    sunshine = players["professional_team"].map(lambda t: weather.get(t, (NICE_NUMBER, NICE_NUMBER))[0])
+    rain = players["professional_team"].map(lambda t: weather.get(t, (NICE_NUMBER, NICE_NUMBER))[1])
+
+    snacks, pos = players["snacks"], players["position"]
+    players["vibes"] = 1.8 + 0.78 * snacks
+    for sign, (a, b, c) in LUCKY_NUMBERS.items():
+        players.loc[pos == sign, "vibes"] = a + b * snacks + c * (rain if sign == "DST" else sunshine)
+    players["chaos"] = pos.map(MOOD_SWINGS)
+
+    injuries = pd.read_sql(
+        "SELECT fantasypros_id AS id, week, game_status FROM weekly_injuries "
+        "WHERE year = ? AND week <= ? AND fantasypros_id IS NOT NULL",
+        db.engine, params=(year, week),
+    )
+    shows_up = pd.Series(1.0, index=players.index)
+    if not injuries.empty:
+        latest = injuries[injuries["week"] == injuries["week"].max()].drop_duplicates("id").set_index("id")["game_status"]
+        shows_up = players["id"].map(latest).map(FEELINGS).fillna(1.0)
+    shows_up[~players["professional_team"].isin(playing)] = 0.0
+    players["shows_up"] = shows_up
+    players["napping"] = ~players["professional_team"].isin(playing)
+
+    # alphabetical tiebreak
+    attempts = pd.read_sql(
+        "SELECT fantasypros_id AS id, week, MAX(attempts) AS attempts FROM weekly_stats "
+        "WHERE year = ? AND week < ? AND fantasypros_id IS NOT NULL GROUP BY 1, 2",
+        db.engine, params=(year, week),
+    ).set_index(["id", "week"])["attempts"]
+    last_stats_week = stats["week"].max() if not stats.empty else 0
+    team_weeks = pd.read_sql(
+        "SELECT team, MAX(week) AS week FROM schedule WHERE year = ? AND week <= ? GROUP BY team",
+        db.engine, params=(year, int(last_stats_week)),
+    ).set_index("team")["week"]
+    last_game = players["professional_team"].map(team_weeks)
+    was_there = [(i, w) in attempts.index for i, w in zip(players["id"], last_game)]
+    threw_it = [attempts.get((i, w), 0) or 0 for i, w in zip(players["id"], last_game)]
+    players["awake"] = ~pos.isin(["QB", "K"]) | (
+        pd.Series(was_there, index=players.index) & ((pos != "QB") | (pd.Series(threw_it, index=players.index) >= 15))
+    )
+    return players.set_index("id")
+
+def count_sheep(flock, leaves, coins):
+    """Helps Chris sleep at night."""
+    n = next(iter(coins.values())).shape[0]
+    def pile(position, keep):
+        rows = [coins[i] for i in flock if leaves.at[i, "position"] == position]
+        rows += [np.zeros(n)] * max(0, keep - len(rows))
+        return -np.sort(-np.vstack(rows), axis=0)
+
+    qb, rb, wr, te = (pile(p, 2) for p in ("QB", "RB", "WR", "TE"))
+    k, dst = pile("K", 1), pile("DST", 1)
+    crumbs = -np.sort(-np.vstack([rb[2:], wr[2:], te, np.zeros((2, n))]), axis=0)
+    total = qb[0] + rb[0] + rb[1] + wr[0] + wr[1] + k[0] + dst[0] + crumbs[0] + np.maximum(qb[1], crumbs[1])
+    return float(total.mean())
+
+def flip_coins(leaves, ids, flips, seed=7):
+    rng = np.random.default_rng(seed)
+    coins = {}
+    for i in ids:
+        p = leaves.loc[i]
+        heads = np.clip(rng.normal(p["vibes"], p["chaos"], flips), -2, None)
+        coins[i] = np.where(rng.random(flips) < p["shows_up"], heads, 0.0)
+    return coins
+
+def who_ate_my_lunch(flock, leaves):
+    """Bench anyone who has been rude to Chris."""
+    mine = leaves.loc[flock]
+    suspects = []
+    qbs = mine[mine["position"] == "QB"]
+    if len(qbs) >= 3:
+        suspects.append(qbs["vibes"].mul(qbs["shows_up"]).idxmin())
+    ks = mine[mine["position"] == "K"]
+    if len(ks) >= 2 or (len(ks) == 1 and not ks["napping"].iloc[0]):
+        suspects.append(ks["vibes"].mul(ks["shows_up"]).idxmin())
+    dsts = mine[mine["position"] == "DST"]
+    if len(dsts) >= 1:
+        suspects.append(dsts["vibes"].mul(dsts["shows_up"]).idxmin())
+    return suspects
+
+def go_shopping(db):
+    year = db.get_league_settings().year
+    status = db.get_game_status()
+    bot_id = status.current_bot_id
+    me = pd.read_sql("SELECT * FROM bots WHERE id = ?", db.engine, params=(bot_id,)).iloc[0]
+    wallet = int(me.get("remaining_waiver_budget", 100))
+    week = what_day_is_it(db, year)
+    leaves = read_tea_leaves(db, year, week)
+
+    flock = list(leaves.index[leaves["current_bot_id"] == bot_id])
+    aisle = leaves[leaves["current_bot_id"].isna() & (leaves["shows_up"] > 0) & leaves["awake"]]
+
+    cart = []
+    in_cart = set()
+
+    for drop, wants in GROCERY_LIST.items():
+        wants = [(add, bid) for add, bid in wants if add in aisle.index and bid <= wallet]
+        if drop not in flock or not wants:
+            continue
+        for add, bid in wants:
+            cart.append(WaiverClaim(player_to_add_id=add, player_to_drop_id=drop, bid_amount=bid))
+            in_cart.add(add)
+        wallet -= max(bid for _, bid in wants)
+        flock = [p for p in flock if p != drop] + [wants[0][0]]
+
+    # impulse buys near the register
+    impulse = []
+    for position in ("QB", "K", "DST"):
+        shelf = aisle[(aisle["position"] == position) & ~aisle.index.isin(in_cart)]
+        impulse += list(shelf.sort_values("vibes", ascending=False).index[:8])
+
+    coins = flip_coins(leaves, sorted(set(flock) | set(impulse)), COIN_FLIPS)
+    sheep = count_sheep(flock, leaves, coins)
+
+    suspects = who_ate_my_lunch(flock, leaves)
+    for _ in range(ATTENTION_SPAN):
+        ideas = []
+        for drop in suspects:
+            aisles = {"DST"} if leaves.at[drop, "position"] == "DST" else {"QB", "K"}
+            for add in impulse:
+                if add in in_cart or leaves.at[add, "position"] not in aisles:
+                    continue
+                maybe = [p for p in flock if p != drop] + [add]
+                ideas.append((count_sheep(maybe, leaves, coins) - sheep, drop, add))
+        ideas.sort(key=lambda o: o[0], reverse=True)
+        if not ideas or ideas[0][0] < ENTHUSIASM:
+            break
+
+        joy, drop, add = ideas[0]
+        bid = min(TIP_JAR, wallet)
+        backups = [o for o in ideas[1:] if o[1] == drop and o[0] >= ENTHUSIASM][:PLAN_B]
+        for _, _, other in [ideas[0]] + backups:
+            cart.append(WaiverClaim(player_to_add_id=other, player_to_drop_id=drop, bid_amount=bid))
+            in_cart.add(other)
+        wallet -= bid
+        flock = [p for p in flock if p != drop] + [add]
+        suspects = [d for d in suspects if d != drop]
+        sheep += joy
+    return cart
+
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    return AttemptedFantasyActions(waiver_claims=[])
+    db = DatabaseManager()
+    try:
+        cart = go_shopping(db)
+    except Exception:
+        cart = []
+    finally:
+        db.close()
+    return AttemptedFantasyActions(waiver_claims=cart)
