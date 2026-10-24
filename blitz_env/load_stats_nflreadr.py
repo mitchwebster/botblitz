@@ -19,6 +19,7 @@ adds FG/PAT points on top of `fantasy_points_ppr`, which leaves kicking out
 (see `_KICKING_POINTS`); the native column is left as nflverse reports it.
 """
 
+import glob
 import os
 import subprocess
 import tempfile
@@ -46,28 +47,32 @@ def _normalize_name(name) -> str:
     return "".join(ch for ch in name.lower() if ch.isalnum())
 
 
+def _player_pool(year: int):
+    """The draftable pool for `year`, from the tracked player_ranks_{year}.csv
+    at the repo root -- not the blitz_env/ copy, which only exists after
+    `make build-py-module` and so is missing on a fresh CI checkout (that
+    silently left every CI-collected DST row with no fantasypros_id, scoring
+    0). Falls back to the newest year that ships one, since older backfill
+    years don't."""
+    from blitz_env.load_players import load_all_players
+
+    path = os.path.join(_REPO_ROOT, f"player_ranks_{year}.csv")
+    if not os.path.isfile(path):
+        candidates = sorted(glob.glob(os.path.join(_REPO_ROOT, "player_ranks_*.csv")))
+        if not candidates:
+            raise FileNotFoundError(f"No player_ranks_*.csv found in {_REPO_ROOT}")
+        path = candidates[-1]
+    return load_all_players(path)
+
+
 def _name_team_crosswalk(year: int) -> pd.DataFrame:
     """Fallback for players load_player_id_crosswalk() has no gsis_id match
     for (a nflreadr/nflverse ID-table gap -- seen for a handful of kickers
     and other fringe players, not limited to any one position) -- matches on
-    normalized (full_name, team) against this year's draftable pool instead.
-    Same fallback-year behavior as _dst_team_crosswalk if `year`'s pool CSV
-    isn't shipped."""
-    from blitz_env.load_players import load_players
-
-    try:
-        players = load_players(year)
-    except FileNotFoundError:
-        import glob
-        candidates = sorted(glob.glob(os.path.join(_REPO_ROOT, "blitz_env", "player_ranks_*.csv")))
-        if not candidates:
-            return pd.DataFrame(columns=["_name_key", "team", "fantasypros_id"])
-        fallback_year = int(os.path.basename(candidates[-1]).removeprefix("player_ranks_").removesuffix(".csv"))
-        players = load_players(fallback_year)
-
+    normalized (full_name, team) against this year's draftable pool instead."""
     rows = [
         {"_name_key": _normalize_name(p.full_name), "team": p.professional_team, "fantasypros_id": p.id}
-        for p in players
+        for p in _player_pool(year)
     ]
     return pd.DataFrame(rows).drop_duplicates(subset=["_name_key", "team"])
 
@@ -76,27 +81,28 @@ def _dst_team_crosswalk(year: int) -> pd.DataFrame:
     """
     team abbreviation -> fantasypros_id, from the player ranks pool (DST rows).
     Team DST fantasypros_ids are effectively static year over year (32
-    franchises), so if `year`'s rank CSV isn't available (common for older
-    backfill years -- only recent years ship a player_ranks_{year}.csv), fall
-    back to whichever rank CSV *is* available rather than failing outright.
+    franchises), so _player_pool's fallback to another year's CSV is safe here.
     """
-    from blitz_env.load_players import load_players
-
-    try:
-        players = load_players(year)
-    except FileNotFoundError:
-        import glob
-        candidates = sorted(glob.glob(os.path.join(_REPO_ROOT, "blitz_env", "player_ranks_*.csv")))
-        if not candidates:
-            return pd.DataFrame(columns=["team", "fantasypros_id"])
-        fallback_year = int(os.path.basename(candidates[-1]).removeprefix("player_ranks_").removesuffix(".csv"))
-        players = load_players(fallback_year)
-
     rows = [
         {"team": p.professional_team, "fantasypros_id": p.id}
-        for p in players if "DST" in p.allowed_positions
+        for p in _player_pool(year) if "DST" in p.allowed_positions
     ]
+    if not rows:
+        raise ValueError(f"Player pool for {year} has no DST entries")
     return pd.DataFrame(rows).drop_duplicates(subset=["team"])
+
+
+def _attach_dst_ids(dst: pd.DataFrame, year: int) -> pd.DataFrame:
+    """Join each DST row to its fantasypros_id by team. Raises if any team is
+    left unmatched: all 32 franchises are in the pool, so a missing id is
+    always a bug, and a row without one silently scores 0."""
+    dst = dst.copy()
+    dst["team"] = dst["team"].replace(_TEAM_ABBR_TO_POOL)
+    dst = dst.merge(_dst_team_crosswalk(year), on="team", how="left")
+    unmatched = sorted(dst.loc[dst["fantasypros_id"].isna(), "team"].unique())
+    if unmatched:
+        raise ValueError(f"DST teams with no fantasypros_id in the {year} player pool: {unmatched}")
+    return dst
 
 
 _OFFENSE_LEGACY_ALIASES = {
@@ -262,10 +268,10 @@ def fetch_season_stats(year: int, summary_level: str = "week") -> tuple[pd.DataF
             offense["position"] = offense["position"].str.upper()
 
     if not dst.empty:
+        # Outside the try below on purpose: an id-matching failure must stop
+        # the run, not be downgraded to a warning that drops every DST row.
+        dst = _attach_dst_ids(dst, year)
         try:
-            crosswalk = _dst_team_crosswalk(year)
-            dst["team"] = dst["team"].replace(_TEAM_ABBR_TO_POOL)
-            dst = dst.merge(crosswalk, on="team", how="left")
             dst = _add_legacy_aliases(dst, _DST_LEGACY_ALIASES)
             dst["FPTS"] = dst["points_allowed"].apply(_pa_points) + (
                 dst.get("def_sacks", 0).fillna(0) * 1
