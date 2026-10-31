@@ -47,6 +47,11 @@ function App() {
   const [filterText, setFilterText] = useState("");
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
+  // Team profile modal: click a team name anywhere to see their full-season
+  // matchup history, mirroring the player profile modal below.
+  const [profileTeam, setProfileTeam] = useState(null); // { id, name, owner }
+  const [teamProfileRows, setTeamProfileRows] = useState([]);
+  const [teamsByName, setTeamsByName] = useState({}); // name -> { id, owner }, for making any team-name text clickable
   const [error, setError] = useState(null);
   // Projections tab: independent week/source filters + position checkboxes,
   // populated from whatever's actually in external_projections (not tied to
@@ -227,6 +232,26 @@ function App() {
     }
   }, [db]);
 
+  // Team name -> { id, owner } lookup, so any team name rendered as plain
+  // text anywhere in the app (not just rows that carry a bot_id column) can
+  // still be made clickable into the team profile modal.
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const result = db.exec("SELECT id, name, owner FROM bots");
+      const map = {};
+      if (result.length > 0) {
+        for (const [id, name, owner] of result[0].values) {
+          map[name] = { id, owner };
+        }
+      }
+      setTeamsByName(map);
+    } catch (err) {
+      console.error("Failed to load bots for team lookup:", err);
+      setTeamsByName({});
+    }
+  }, [db]);
+
   // Player profile: full weekly history for whichever player was clicked --
   // actual points + raw stat line (weekly_stats) alongside every source's
   // projection for that same week (external_projections).
@@ -338,11 +363,52 @@ function App() {
     setProfileRows(Object.values(byWeek).sort((a, b) => a.week - b.week));
   }, [db, profilePlayer, weeklyStatsCols, dbYear]);
 
+  // Team profile: full-season matchup history for whichever team was clicked.
+  useEffect(() => {
+    if (!db || !profileTeam) {
+      setTeamProfileRows([]);
+      return;
+    }
+    try {
+      const teamId = profileTeam.id;
+      const result = db.exec(`
+        SELECT
+          m.week AS week,
+          CASE WHEN m.home_bot_id = ${teamId} THEN visitor_bot.name ELSE home_bot.name END AS opponent,
+          CASE WHEN m.home_bot_id = ${teamId} THEN m.home_score ELSE m.visitor_score END AS team_score,
+          CASE WHEN m.home_bot_id = ${teamId} THEN m.visitor_score ELSE m.home_score END AS opp_score,
+          CASE
+            WHEN m.winning_bot_id IS NULL THEN 'Tie'
+            WHEN m.winning_bot_id = ${teamId} THEN 'W'
+            ELSE 'L'
+          END AS result
+        FROM matchups m
+        LEFT JOIN bots AS home_bot ON m.home_bot_id = home_bot.id
+        LEFT JOIN bots AS visitor_bot ON m.visitor_bot_id = visitor_bot.id
+        WHERE m.home_bot_id = ${teamId} OR m.visitor_bot_id = ${teamId}
+        ORDER BY m.week
+      `);
+      if (result.length > 0) {
+        const cols = result[0].columns;
+        setTeamProfileRows(result[0].values.map((row) => Object.fromEntries(row.map((v, i) => [cols[i], v]))));
+      } else {
+        setTeamProfileRows([]);
+      }
+    } catch (err) {
+      console.error("Failed to load team matchup history:", err);
+      setTeamProfileRows([]);
+    }
+  }, [db, profileTeam]);
+
   useEffect(() => {
     if (!db) return;
     if (activeTab === "projections" || activeTab === "players") {
       if (projWeek === null || projSource === null) return;
-    } else if (activeTab !== "draftBoard" && activeTab !== "transactions" && selectedWeek === null) {
+    } else if (
+      activeTab !== "draftBoard" &&
+      activeTab !== "transactions" &&
+      selectedWeek === null
+    ) {
       return;
     }
 
@@ -617,12 +683,16 @@ function App() {
       `,
       transactions: `
         SELECT
-          t.week AS Week,
-          substr(t.date, 1, 10) AS Date,
-          b.name AS Team,
-          COALESCE(added_p.full_name, t.added) AS Added,
-          COALESCE(dropped_p.full_name, t.dropped) AS Dropped,
-          t.bid AS Bid
+          t.week AS week,
+          substr(t.date, 1, 10) AS date,
+          t.bot_id AS team_id,
+          b.name AS team_name,
+          b.owner AS team_owner,
+          t.added AS added_id,
+          COALESCE(added_p.full_name, t.added) AS added_name,
+          t.dropped AS dropped_id,
+          COALESCE(dropped_p.full_name, t.dropped) AS dropped_name,
+          t.bid AS bid
         FROM transactions t
         LEFT JOIN bots b ON b.id = t.bot_id
         LEFT JOIN players added_p ON added_p.id = t.added
@@ -862,14 +932,24 @@ function App() {
             {tableColumns.map((col) => {
               // Rosters rows carry both id + full_name -- make the name a link into the player profile.
               const isPlayerName = col === "full_name" && row.id != null;
+              // Current/Last Week and Leaderboard only carry a team name, no id column --
+              // look it up by name against the bots table instead.
+              const isTeamName =
+                ["home_bot_name", "visitor_bot_name", "winning_bot_name", "Name", "teamName"].includes(col) &&
+                teamsByName[row[col]] != null;
+              const onCellClick = isPlayerName
+                ? () => setProfilePlayer({ id: row.id, name: row.full_name })
+                : isTeamName
+                ? () => onTeamClick(teamsByName[row[col]].id, row[col], teamsByName[row[col]].owner)
+                : undefined;
               return (
                 <td
                   key={col}
-                  onClick={isPlayerName ? () => setProfilePlayer({ id: row.id, name: row.full_name }) : undefined}
+                  onClick={onCellClick}
                   style={{
                     border: `1px solid ${vars.border}`,
                     padding: "0.5rem",
-                    ...(isPlayerName ? { cursor: "pointer", textDecoration: "underline" } : {}),
+                    ...(onCellClick ? { cursor: "pointer", textDecoration: "underline" } : {}),
                   }}
                 >
                   {col === "position" && POSITION_COLORS[row[col]] ? <PositionPill position={row[col]} /> : row[col]}
@@ -1053,6 +1133,123 @@ function App() {
           </table>
         </div>
       </>
+    );
+  };
+
+  // Shared click target for any team name anywhere in the app: opens a
+  // modal with their full-season matchup history. Mirrors setProfilePlayer
+  // below, which is the same "click a name, see their detail" pattern already
+  // used for players (rosters, draft board, matchup details).
+  const onTeamClick = (teamId, teamName, teamOwner) => {
+    setProfileTeam({ id: teamId, name: teamName, owner: teamOwner });
+  };
+  const clickableNameStyle = { cursor: "pointer", textDecoration: "underline" };
+
+  const renderTransactionsTable = () => (
+    <table style={{ width: "100%", borderCollapse: "collapse", border: `1px solid ${vars.border}`, marginBottom: "2rem" }}>
+      <thead>
+        <tr>
+          {["Week", "Date", "Team", "Added", "Dropped", "Bid"].map((label) => (
+            <th key={label} style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", textAlign: "left" }}>{label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row, idx) => (
+          <tr key={idx}>
+            <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.week}</td>
+            <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.date}</td>
+            <td
+              onClick={row.team_id != null ? () => onTeamClick(row.team_id, row.team_name, row.team_owner) : undefined}
+              style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", ...(row.team_id != null ? clickableNameStyle : {}) }}
+            >
+              {row.team_name}
+            </td>
+            <td
+              onClick={row.added_id != null ? () => setProfilePlayer({ id: row.added_id, name: row.added_name }) : undefined}
+              style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", ...(row.added_id != null ? clickableNameStyle : {}) }}
+            >
+              {row.added_name}
+            </td>
+            <td
+              onClick={row.dropped_id != null ? () => setProfilePlayer({ id: row.dropped_id, name: row.dropped_name }) : undefined}
+              style={{ border: `1px solid ${vars.border}`, padding: "0.5rem", ...(row.dropped_id != null ? clickableNameStyle : {}) }}
+            >
+              {row.dropped_name}
+            </td>
+            <td style={{ border: `1px solid ${vars.border}`, padding: "0.5rem" }}>{row.bid}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+
+  const renderTeamProfileModal = () => {
+    if (!profileTeam) return null;
+
+    const wins = teamProfileRows.filter((r) => r.result === "W").length;
+    const losses = teamProfileRows.filter((r) => r.result === "L").length;
+
+    return (
+      <div
+        onClick={() => setProfileTeam(null)}
+        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ background: vars.background, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "8px", padding: "1.5rem", maxWidth: "95vw", maxHeight: "85vh", overflow: "auto" }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h2 style={{ margin: 0 }}>
+              {profileTeam.name}{profileTeam.owner ? ` (${profileTeam.owner})` : ""}
+              <span style={{ fontWeight: "normal", fontSize: "0.9rem", marginLeft: "0.75rem", color: vars.muted }}>
+                {wins}-{losses}
+              </span>
+            </h2>
+            <button
+              onClick={() => setProfileTeam(null)}
+              style={{ background: vars.muted, color: vars.foreground, border: `1px solid ${vars.border}`, borderRadius: "4px", padding: "0.4rem 0.8rem", cursor: "pointer" }}
+            >
+              Close
+            </button>
+          </div>
+
+          {teamProfileRows.length === 0 ? (
+            <p>No matchup data found for this team.</p>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+              <thead>
+                <tr>
+                  {["Week", "Opponent", "Score", "Opp Score", "Result"].map((h) => (
+                    <th key={h} style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: h === "Opponent" ? "left" : "right", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {teamProfileRows.map((row) => (
+                  <tr key={row.week}>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>{row.week}</td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem" }}>{row.opponent}</td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right", fontWeight: "bold" }}>
+                      {Number(row.team_score || 0).toFixed(2)}
+                    </td>
+                    <td style={{ border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right" }}>
+                      {Number(row.opp_score || 0).toFixed(2)}
+                    </td>
+                    <td style={{
+                      border: `1px solid ${vars.border}`, padding: "0.4rem 0.6rem", textAlign: "right",
+                      color: row.result === "W" ? "#22c55e" : (row.result === "L" ? "#ef4444" : vars.foreground),
+                      fontWeight: 600,
+                    }}>
+                      {row.result}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -1388,7 +1585,12 @@ function App() {
           })
           .map(([team, players]) => (
             <div key={team}>
-              <h2>{team}</h2>
+              <h2
+                onClick={teamsByName[team] != null ? () => onTeamClick(teamsByName[team].id, team, teamsByName[team].owner) : undefined}
+                style={teamsByName[team] != null ? { cursor: "pointer", textDecoration: "underline", display: "inline-block" } : undefined}
+              >
+                {team}
+              </h2>
               {renderTable(players, columns)}
             </div>
           ))
@@ -1429,7 +1631,12 @@ function App() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>
-                    {matchup.homeTeam}
+                    <span
+                      onClick={() => onTeamClick(matchup.homeBotId, matchup.homeTeam)}
+                      style={{ cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      {matchup.homeTeam}
+                    </span>
                     <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "0.5rem" }}>
                       (ID: {matchup.homeBotId})
                     </span>
@@ -1443,7 +1650,12 @@ function App() {
                     {matchup.visitorScore.toFixed(2)}
                   </span>
                   <span>
-                    {matchup.visitorTeam}
+                    <span
+                      onClick={() => onTeamClick(matchup.visitorBotId, matchup.visitorTeam)}
+                      style={{ cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      {matchup.visitorTeam}
+                    </span>
                     <span style={{ fontSize: "0.8rem", opacity: 0.7, marginLeft: "0.5rem" }}>
                       (ID: {matchup.visitorBotId})
                     </span>
@@ -1529,10 +1741,13 @@ function App() {
         renderPlayersTable()
       ) : activeTab === "draftBoard" ? (
         renderDraftBoard()
+      ) : activeTab === "transactions" ? (
+        renderTransactionsTable()
       ) : (
         renderTable(sortData(data), columns)
       )}
       {renderProfileModal()}
+      {renderTeamProfileModal()}
     </div>
   );
 }
