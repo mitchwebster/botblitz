@@ -430,6 +430,23 @@ function App() {
       }
     }
 
+    // weekly_lineups only gets a week's rows once that week is fully scored
+    // (the engine's end-of-week handler computes the actual best lineup
+    // retroactively, after the fact) -- so the currently in-progress week
+    // has no rows yet. Rather than show nothing, matchupDetails falls back
+    // to each team's current roster (players.current_bot_id) for weeks that
+    // aren't finalized yet; slot/bench distinction isn't knowable until the
+    // week is scored, so every player just shows as "ROSTER" there.
+    let weeklyLineupsExistsForWeek = true;
+    if (activeTab === "matchupDetails" && weeklyLineupsExists) {
+      try {
+        const weekCheck = db.exec(`SELECT 1 FROM weekly_lineups WHERE week = ${selectedWeek} LIMIT 1;`);
+        weeklyLineupsExistsForWeek = weekCheck.length > 0 && weekCheck[0].values.length > 0;
+      } catch (e) {
+        weeklyLineupsExistsForWeek = false;
+      }
+    }
+
     // players doesn't strictly need league-state tables (bots/matchups/etc) --
     // a stats-only db (e.g. a freshly-built season.db with no draft run yet)
     // should still show the player list, just without a fantasy team column.
@@ -503,7 +520,7 @@ function App() {
         LEFT JOIN bots AS winning_bot ON m.winning_bot_id = winning_bot.id
         WHERE week = ${selectedWeek - 1}
       `,
-      matchupDetails: `
+      matchupDetails: weeklyLineupsExistsForWeek ? `
         SELECT
           m.id as matchup_id,
           m.home_bot_id,
@@ -541,6 +558,35 @@ function App() {
             ELSE 9
           END,
           p.full_name
+      ` : `
+        -- This week hasn't been scored yet (the engine only writes
+        -- weekly_lineups once a week is finalized), so fall back to each
+        -- team's current roster instead of the retroactive best-lineup --
+        -- slot/bench isn't knowable yet, so every player is just "ROSTER".
+        SELECT
+          m.id as matchup_id,
+          m.home_bot_id,
+          m.visitor_bot_id,
+          home_bot.name as home_team,
+          visitor_bot.name as visitor_team,
+          m.home_score,
+          m.visitor_score,
+          p.id as player_id,
+          p.full_name,
+          p.allowed_positions,
+          p.current_bot_id as bot_id,
+          CASE WHEN p.current_bot_id = m.home_bot_id THEN 'home' ELSE 'visitor' END as side,
+          ws.FPTS as actual_points,
+          wp.FPTS as projected_points,
+          'ROSTER' as slot
+        FROM matchups m
+        INNER JOIN bots as home_bot ON m.home_bot_id = home_bot.id
+        INNER JOIN bots as visitor_bot ON m.visitor_bot_id = visitor_bot.id
+        INNER JOIN players p ON (p.current_bot_id = m.home_bot_id OR p.current_bot_id = m.visitor_bot_id)
+        LEFT JOIN weekly_stats ws ON p.id = ws.fantasypros_id AND ws.week = m.week AND ws.year = ${dbYear ?? CURRENT_SEASON_YEAR}
+        LEFT JOIN weekly_projections wp ON p.id = wp.fantasypros_id AND wp.week = m.week AND wp.year = ${dbYear ?? CURRENT_SEASON_YEAR}
+        WHERE m.week = ${selectedWeek}
+        ORDER BY m.id, side, p.full_name
       `,
       leaderboard: `
         WITH botScores AS (
@@ -1600,7 +1646,13 @@ function App() {
             No matchup data available for this week.
           </div>
         ) : (
-          getMatchupData().map((matchup) => {
+          <>
+            {data.some((row) => row.slot === "ROSTER") && (
+              <div style={{ marginBottom: "1rem", padding: "0.75rem 1rem", background: vars.muted, border: `1px solid ${vars.border}`, borderRadius: "4px", fontSize: "0.9rem" }}>
+                This week hasn't been scored yet, so starters/bench aren't finalized -- showing each team's full current roster instead.
+              </div>
+            )}
+          {getMatchupData().map((matchup) => {
             // Determine winner
           const homeWon = matchup.homeScore > matchup.visitorScore;
           const visitorWon = matchup.visitorScore > matchup.homeScore;
@@ -1735,7 +1787,8 @@ function App() {
               </div>
             </div>
           );
-        })
+          })}
+          </>
         )
       ) : activeTab === "players" ? (
         renderPlayersTable()
