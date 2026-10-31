@@ -144,13 +144,26 @@ def get_season_total_points() -> pd.DataFrame:
     return season_stats_df[["fantasypros_id", "FPTS"]].rename(columns={"FPTS": "season_total_points"})
 
 def get_weekly_projections(week: int) -> pd.DataFrame:
-    """Get weekly projections for a specific week (FantasySharks, via external_projections)"""
+    """Get weekly projections for a specific week (ESPN, via external_projections).
+
+    Was FantasySharks, but that source (and FFToday) started getting
+    blocked/rate-limited on GitHub Actions' shared runner IPs partway
+    through the season -- FantasySharks stalled at week 6, FFToday at week
+    3, while ESPN has stayed fully complete the whole season. Checked: no
+    other bot has this single-source dependency, they all average across
+    whichever sources are actually present, which is what made them
+    resilient to this and what this bot should have done from the start.
+    ESPN has no DST data at all (dropped from its scrape entirely, a
+    separate known gap), so DST candidates always have no projection here
+    -- see the NaN handling in find_upgrade_candidates for why that no
+    longer kills the whole comparison for them.
+    """
     db = DatabaseManager()
     year = db.get_league_settings().year
 
     weekly_proj_df = pd.read_sql(
         f"SELECT fantasypros_id, points AS weekly_projected_points FROM external_projections "
-        f"WHERE year = {year} AND week = {week} AND source = 'FantasySharks'",
+        f"WHERE year = {year} AND week = {week} AND source = 'ESPN'",
         db.engine
     )
     return weekly_proj_df
@@ -192,6 +205,17 @@ def find_upgrade_candidates() -> list[WaiverClaim]:
     # Merge all data together
     players_df = players_df.merge(season_points_df, left_on="id", right_on="fantasypros_id", how="left")
     players_df = players_df.merge(weekly_proj_df, left_on="id", right_on="fantasypros_id", how="left")
+
+    # A player with no row in either source (not just "zero points", genuinely
+    # missing -- e.g. every DST via ESPN, or a rookie season_stats hasn't
+    # caught up to yet) must compare as 0, not NaN. `row.get(col, 0)` does NOT
+    # protect against this: the column exists after the merge, just holds NaN,
+    # so the default is never used -- `candidate > NaN` and `NaN > my_value`
+    # are both always False in pandas, which was silently failing every single
+    # comparison for every player missing from either source, not just the
+    # ones actually tied/worse.
+    players_df["season_total_points"] = players_df["season_total_points"].fillna(0)
+    players_df["weekly_projected_points"] = players_df["weekly_projected_points"].fillna(0)
 
     # Get my team
     my_bot_id = db.get_game_status().current_bot_id
