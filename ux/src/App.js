@@ -342,7 +342,7 @@ function App() {
     if (!db) return;
     if (activeTab === "projections" || activeTab === "players") {
       if (projWeek === null || projSource === null) return;
-    } else if (activeTab !== "draftBoard" && selectedWeek === null) {
+    } else if (activeTab !== "draftBoard" && activeTab !== "transactions" && selectedWeek === null) {
       return;
     }
 
@@ -615,6 +615,20 @@ function App() {
         ) ap ON ap.fantasypros_id = w.fantasypros_id
         ORDER BY w.pick
       `,
+      transactions: `
+        SELECT
+          t.week AS Week,
+          substr(t.date, 1, 10) AS Date,
+          b.name AS Team,
+          COALESCE(added_p.full_name, t.added) AS Added,
+          COALESCE(dropped_p.full_name, t.dropped) AS Dropped,
+          t.bid AS Bid
+        FROM transactions t
+        LEFT JOIN bots b ON b.id = t.bot_id
+        LEFT JOIN players added_p ON added_p.id = t.added
+        LEFT JOIN players dropped_p ON dropped_p.id = t.dropped
+        ORDER BY t.week DESC, t.id DESC
+      `,
     };
 
     const query = queries[activeTab];
@@ -717,6 +731,7 @@ function App() {
     { key: "projections", label: "Projections" },
     { key: "players", label: "Players" },
     { key: "draftBoard", label: "Draft Board" },
+    { key: "transactions", label: "Transactions" },
   ];
 
   const handleSort = (col) => {
