@@ -562,14 +562,20 @@ NICE_NUMBER = 22.0
 
 # Groceries. Do not question the groceries.
 GROCERY_LIST = {
-    "18239": [("18219", 41)],
-    "27339": [
-        ("19245", 8),
-        ("24346", 3),
-        ("27520", 1),
+    "18239": [
+        ("18705", 25),
+        ("24172", 10),
+        ("23013", 3),
     ],
     "20094": [
-        ("15623", 1),
+        ("23013", 3),
+        ("24172", 10),
+        ("19647", 2),
+    ],
+    "27339": [
+        ("25304", 3),
+        ("26398", 2),
+        ("26039", 1),
     ],
 }
 TIP_JAR = 2
@@ -707,8 +713,9 @@ def who_ate_my_lunch(flock, leaves):
     mine = leaves.loc[flock]
     suspects = []
     qbs = mine[mine["position"] == "QB"]
-    if len(qbs) >= 3:
-        suspects.append(qbs["vibes"].mul(qbs["shows_up"]).idxmin())
+    awake_qbs = qbs[~qbs["napping"]]
+    if len(qbs) >= 3 and len(awake_qbs):
+        suspects.append(awake_qbs["vibes"].mul(awake_qbs["shows_up"]).idxmin())
     ks = mine[mine["position"] == "K"]
     if len(ks) >= 2 or (len(ks) == 1 and not ks["napping"].iloc[0]):
         suspects.append(ks["vibes"].mul(ks["shows_up"]).idxmin())
@@ -775,7 +782,7 @@ def go_shopping(db):
         flock = [p for p in flock if p != drop] + [add]
         suspects = [d for d in suspects if d != drop]
         sheep += joy
-    return cart
+    return cart[:10]
 
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
     db = DatabaseManager()
