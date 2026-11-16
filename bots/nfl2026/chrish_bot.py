@@ -562,20 +562,20 @@ NICE_NUMBER = 22.0
 
 # Groceries. Do not question the groceries.
 GROCERY_LIST = {
-    "18239": [
-        ("18705", 25),
-        ("24172", 10),
-        ("23013", 3),
-    ],
     "20094": [
-        ("23013", 3),
-        ("24172", 10),
-        ("19647", 2),
+        ("23013", 6),
+        ("23891", 2),
+        ("18256", 1),
+    ],
+    "18239": [
+        ("23891", 4),
+        ("18256", 1),
+        ("22986", 1),
     ],
     "27339": [
-        ("25304", 3),
-        ("26398", 2),
-        ("26039", 1),
+        ("26398", 4),
+        ("26314", 1),
+        ("25411", 1),
     ],
 }
 TIP_JAR = 2
@@ -740,7 +740,7 @@ def go_shopping(db):
     in_cart = set()
 
     for drop, wants in GROCERY_LIST.items():
-        wants = [(add, bid) for add, bid in wants if add in aisle.index and bid <= wallet]
+        wants = [(add, bid) for add, bid in wants if add in leaves.index and pd.isna(leaves.at[add, "current_bot_id"]) and bid <= wallet]
         if drop not in flock or not wants:
             continue
         for add, bid in wants:
