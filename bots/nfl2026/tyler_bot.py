@@ -14,7 +14,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from blitz_env import AttemptedFantasyActions
+from blitz_env import AttemptedFantasyActions, WaiverClaim
 from blitz_env.models import DatabaseManager
 
 TAG = "[tyler_bot]"
@@ -99,6 +99,19 @@ PLAYOFF_TEAMS = 6
 POINTS_TIEBREAK = 0.0005  # objective = P(playoffs) + this x expected season points
 LLM_MARGIN_OBJECTIVE = 0.01
 
+# Waivers (FAAB, $100 for the season, max 10 claims/week, highest bid wins, ties -> worse team).
+WAIVER_CANDIDATES = 40  # free agents considered, by rest-of-season value
+WAIVER_CANDIDATES_PER_POS = 3  # plus the best few at every position (bye-week K/DST streams)
+WAIVER_SIMS = 200
+WAIVER_MIN_GAIN = 3.0  # expected season points a swap must add to be worth a claim
+# Bid a share of the REMAINING budget by the target's rank among this week's upgrades (best
+# gain first): top target 30%, next two 15%, next five 8%, the rest 4%. Won head-to-head
+# 2025 tournaments vs. gain-priced bidding (1x-3x) and other tier strengths.
+WAIVER_BID_TIERS = ((1, 0.30), (3, 0.15), (8, 0.08), (None, 0.04))
+MAX_CLAIMS = 10
+MAX_CLAIMS_PER_ADD = 2  # best drop + one fallback drop per target
+DEFAULT_WAIVER_BUDGET = 100
+
 
 # --------------------------------------------------------------------------- data
 
@@ -119,6 +132,18 @@ def _sql(db, query: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def _weekly_stats(db, year: int) -> pd.DataFrame:
+    """Actual weekly points. Older season.db files lack opponent_team (only used for schedule
+    strength), so fall back to the core columns rather than losing every stat."""
+    base = (f"FROM weekly_stats WHERE CAST(year AS INTEGER) = {year} AND fantasypros_id IS NOT NULL "
+            f"AND CAST(week AS INTEGER) <= {FINAL_WEEK} GROUP BY 1, 2")
+    core = "SELECT fantasypros_id AS id, CAST(week AS INTEGER) AS week, MAX(FPTS) AS pts, MAX(position) AS stat_position"
+    try:
+        return pd.read_sql(f"{core}, MAX(opponent_team) AS opp {base}", db.engine)
+    except Exception:  # noqa: BLE001
+        return _sql(db, f"{core} {base}")
+
+
 def _load(db):
     settings = pd.read_sql("SELECT * FROM league_settings", db.engine).iloc[0]
     status = pd.read_sql("SELECT * FROM game_statuses", db.engine).iloc[0]
@@ -135,11 +160,7 @@ def _load(db):
         players.loc[players["current_bot_id"].notna(), "current_bot_id"].astype(str)
     bot_ids = [str(b) for b in pd.read_sql("SELECT id FROM bots", db.engine)["id"]]
     data = {
-        "weekly": _sql(db,
-            f"SELECT fantasypros_id AS id, CAST(week AS INTEGER) AS week, MAX(FPTS) AS pts, "
-            f"MAX(position) AS stat_position, MAX(opponent_team) AS opp "
-            f"FROM weekly_stats WHERE CAST(year AS INTEGER) = {year} AND fantasypros_id IS NOT NULL "
-            f"AND CAST(week AS INTEGER) <= {FINAL_WEEK} GROUP BY 1, 2"),
+        "weekly": _weekly_stats(db, year),
         "ext": _sql(db,
             f"SELECT fantasypros_id AS id, CAST(week AS INTEGER) AS week, source, points "
             f"FROM external_projections WHERE CAST(year AS INTEGER) = {year} "
@@ -932,6 +953,122 @@ def draft_player() -> str:
         db.close()
 
 
+# --------------------------------------------------------------------------- waivers
+
+
+def _remaining_budget(db, me: str) -> int:
+    try:
+        df = pd.read_sql(f"SELECT remaining_waiver_budget FROM bots WHERE id = '{me}'", db.engine)
+        return int(df["remaining_waiver_budget"].iloc[0])
+    except Exception:  # noqa: BLE001 - older/local schemas lack the column
+        return DEFAULT_WAIVER_BUDGET
+
+
+def _still_alive(db, me: str, week: int) -> bool:
+    """False once the regular season is over and I have no matchup this week."""
+    if week <= REGULAR_SEASON_WEEKS:
+        return True
+    try:
+        df = pd.read_sql(
+            f"SELECT COUNT(*) AS n FROM matchups WHERE week = {week} "
+            f"AND (home_bot_id = '{me}' OR visitor_bot_id = '{me}')", db.engine)
+        return int(df["n"].iloc[0]) > 0
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _waiver_claims(db) -> list:
+    started = time.time()
+    settings, status, players, data, _ = _load(db)
+    slots = settings["player_slots"]
+    slots = json.loads(slots) if isinstance(slots, str) else dict(slots)
+    me = str(status["current_bot_id"])
+    week = int(status["current_fantasy_week"] or 0)
+    if week < 1 or week > FINAL_WEEK or not _still_alive(db, me, week):
+        print(f"{TAG} week {week}: no waiver claims (season over or eliminated)")
+        return []
+
+    # Only use what was known before this fantasy week, so replayed weeks stay honest.
+    data = dict(data)
+    for k in ("weekly", "injuries"):
+        if not data[k].empty:
+            data[k] = data[k][data[k]["week"] < week]
+    model = Model(players, data, cutoff=week - 1)
+    df = model.players
+    dead = model.dead_positions
+    mine = list(df.index[df["current_bot_id"] == me])
+    if not mine:
+        return []
+    budget = _remaining_budget(db, me)
+
+    free = df[(df["availability"] == "AVAILABLE") & df["current_bot_id"].isna() & ~df["position"].isin(dead)]
+    free = free.assign(future=free["value"] - free["known"]).sort_values("future", ascending=False)
+    cand = list(dict.fromkeys(list(free.head(WAIVER_CANDIDATES).index)
+                              + list(free.groupby("position").head(WAIVER_CANDIDATES_PER_POS).index)))
+    if not cand:
+        return []
+
+    # Remaining-season lineup value, simulated with common random numbers. In the playoffs
+    # every remaining week counts fully.
+    weeks = model.future_weeks
+    week_w = np.where((weeks <= REGULAR_SEASON_WEEKS) | (week > REGULAR_SEASON_WEEKS), 1.0, PLAYOFF_WEEK_WEIGHT)
+    ids = mine + cand
+    rows = [model.row[i] for i in ids]
+    rng = np.random.default_rng(week)
+    wf = len(weeks)
+    noise = rng.gamma(GAMMA_SHAPE, 1.0 / (GAMMA_SHAPE * (1 - ZERO_PROB)), (len(ids), WAIVER_SIMS, wf))
+    noise[rng.random(noise.shape) < ZERO_PROB] = 0.0
+    pts = (model.expected[rows] * week_w)[:, None, :] * noise
+    pts = pts.reshape(len(ids), WAIVER_SIMS * wf)
+    pos = df.loc[ids, "position"].to_numpy()
+    col_w = np.full(WAIVER_SIMS * wf, 1.0 / WAIVER_SIMS)
+    at = {pid: i for i, pid in enumerate(ids)}
+
+    def value(roster):
+        r = [at[p] for p in roster]
+        return lineup_total(pts[r], pos[r], slots, col_w)
+
+    base = value(mine)
+    pairs = []
+    for a in cand:
+        for d in mine:
+            gain = value([p for p in mine if p != d] + [a]) - base
+            if gain >= WAIVER_MIN_GAIN:
+                pairs.append((gain, a, d))
+    if not pairs:
+        print(f"{TAG} week {week}: no upgrades worth a claim (budget ${budget})")
+        return []
+    pairs.sort(reverse=True)
+
+    targets = list(dict.fromkeys(a for _, a, _ in pairs))  # by best gain
+
+    def bid_for(a):
+        rank = targets.index(a) + 1
+        frac = next(f for cap, f in WAIVER_BID_TIERS if cap is None or rank <= cap)
+        return int(min(budget, max(1, round(budget * frac))))
+
+    # Best pairs first; later pairs reusing a won add or a used drop become the engine-side
+    # fallbacks (it voids claims whose add was won or whose drop already left).
+    claims, per_add = [], {}
+    for gain, a, d in pairs:
+        if per_add.get(a, 0) >= MAX_CLAIMS_PER_ADD:
+            continue
+        per_add[a] = per_add.get(a, 0) + 1
+        claims.append(WaiverClaim(player_to_add_id=str(a), player_to_drop_id=str(d), bid_amount=bid_for(a)))
+        print(f"{TAG}   claim {df.at[a, 'full_name']} ({df.at[a, 'position']}) for "
+              f"{df.at[d, 'full_name']} ({df.at[d, 'position']}): +{gain:.1f} pts, bid ${bid_for(a)}")
+        if len(claims) >= MAX_CLAIMS:
+            break
+    print(f"{TAG} week {week}: {len(claims)} claims, budget ${budget}, {time.time() - started:.1f}s")
+    return claims
+
+
 def perform_weekly_fantasy_actions() -> AttemptedFantasyActions:
-    """No waiver moves yet; the engine starts the best lineup from the roster each week."""
-    return AttemptedFantasyActions(waiver_claims=[])
+    db = DatabaseManager()
+    try:
+        return AttemptedFantasyActions(waiver_claims=_waiver_claims(db))
+    except Exception as e:  # noqa: BLE001 - a bad week should cost us claims, not crash the bot
+        print(f"{TAG} waiver logic failed ({e!r}); submitting no claims")
+        return AttemptedFantasyActions(waiver_claims=[])
+    finally:
+        db.close()
